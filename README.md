@@ -5,7 +5,8 @@ Standalone office-core frontend for secure bitmap transmission through the exist
 ## Architecture
 
 - Next.js frontend deployed independently to `fax.nftmail.box`
-- Injected wallet connection for sender ownership checks
+- Privy email, Google, Farcaster, and wallet onboarding
+- Automatic embedded wallets for users without an existing wallet
 - Client-side image downscaling and greyscale reduction
 - `/api/tray/*` requests proxy to `https://nftmail.box/api/tray/*`
 - Compression, tier enforcement, storage, and delivery remain authoritative in NFTmail
@@ -17,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Copy `.env.example` to `.env.local`, set `NEXT_PUBLIC_PRIVY_APP_ID`, then open `http://localhost:3000`.
 
 ## Production
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { usePrivy, useWallets } from '@privy-io/react-auth';
 import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap } from 'lucide-react';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
@@ -46,8 +47,9 @@ async function prepareImage(file: File): Promise<{ base64: string; preview: stri
 }
 
 export default function Home() {
+  const { ready, authenticated, login, logout } = usePrivy();
+  const { wallets } = useWallets();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [walletAddress, setWalletAddress] = useState('');
   const [mailbox, setMailbox] = useState('');
   const [recipient, setRecipient] = useState('');
   const [fileName, setFileName] = useState('');
@@ -57,20 +59,9 @@ export default function Home() {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [trayUrl, setTrayUrl] = useState('');
+  const walletAddress = wallets[0]?.address || '';
 
   const ticket = useMemo(() => Math.random().toString(36).slice(2, 6).toUpperCase(), []);
-
-  async function connectWallet() {
-    setError('');
-    const provider = (window as Window & { ethereum?: { request(args: { method: string }): Promise<unknown> } }).ethereum;
-    if (!provider) return setError('Install or open an Ethereum wallet to continue.');
-    try {
-      const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[];
-      setWalletAddress(accounts[0] || '');
-    } catch {
-      setError('Wallet connection was cancelled.');
-    }
-  }
 
   async function selectFile(file: File) {
     setError('');
@@ -131,10 +122,10 @@ export default function Home() {
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Internet document transmission office</p>
           </div>
         </div>
-        {walletAddress ? (
-          <button onClick={() => setWalletAddress('')} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} / Disconnect</button>
+        {authenticated && walletAddress ? (
+          <button onClick={logout} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} / Sign out</button>
         ) : (
-          <button onClick={() => void connectWallet()} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white">Connect operator</button>
+          <button onClick={login} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Join / sign in</button>
         )}
       </header>
 
@@ -184,7 +175,7 @@ export default function Home() {
             {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold">FAULT: {error}</div>}
             {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
 
-            {!walletAddress ? <button onClick={() => void connectWallet()} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white"><LockKeyhole size={17} /> Authenticate operator</button> : <button onClick={() => void transmit()} disabled={status === 'sending' || !base64} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:cursor-not-allowed disabled:opacity-45">{status === 'sending' ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />} Transmit NFTfax</button>}
+            {!authenticated || !walletAddress ? <button onClick={login} disabled={!ready} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:opacity-50"><LockKeyhole size={17} /> Join with email or social</button> : <button onClick={() => void transmit()} disabled={status === 'sending' || !base64} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:cursor-not-allowed disabled:opacity-45">{status === 'sending' ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />} Transmit NFTfax</button>}
             <p className="mt-4 text-center text-[8px] uppercase tracking-[.16em] text-[#625d51]">Basic: 2 internal sends/month · Pro: unlimited external · Premium: colour + multipage</p>
           </div>
         </div>
