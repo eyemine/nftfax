@@ -11,11 +11,12 @@ export default function Providers({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ['email', 'google', 'farcaster', 'wallet'],
+        loginMethods: ['wallet', 'email', 'google', 'farcaster'],
         appearance: {
           theme: 'light',
           accentColor: '#e65b2f',
-          showWalletLoginFirst: false,
+          showWalletLoginFirst: true,
+          walletList: ['metamask', 'detected_wallets', 'coinbase_wallet', 'wallet_connect'],
         },
         embeddedWallets: {
           ethereum: {

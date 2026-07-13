@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useWallets } from '@privy-io/react-auth';
-import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap } from 'lucide-react';
+import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap, Wallet, Inbox } from 'lucide-react';
+import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
+type View = 'send' | 'tray';
 
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 const MAX_ENCODED_LENGTH = 1_300_000;
@@ -59,9 +61,39 @@ export default function Home() {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [trayUrl, setTrayUrl] = useState('');
-  const walletAddress = wallets[0]?.address || '';
+  const [manualAddress, setManualAddress] = useState('');
+  const [hasMetaMask, setHasMetaMask] = useState(false);
+  const [view, setView] = useState<View>('send');
+  const walletAddress = manualAddress || wallets[0]?.address || '';
+  const isConnected = authenticated || !!manualAddress;
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      setHasMetaMask(true);
+    }
+  }, []);
 
   const ticket = useMemo(() => Math.random().toString(36).slice(2, 6).toUpperCase(), []);
+
+  async function connectMetaMask() {
+    setError('');
+    try {
+      if (typeof window === 'undefined' || !window.ethereum) {
+        throw new Error('MetaMask or an EIP-1193 wallet is required.');
+      }
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
+      const first = accounts[0];
+      if (!first) throw new Error('No account selected.');
+      setManualAddress(first.toLowerCase());
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'MetaMask connection failed.');
+    }
+  }
+
+  function handleDisconnect() {
+    setManualAddress('');
+    void logout();
+  }
 
   async function selectFile(file: File) {
     setError('');
@@ -122,14 +154,40 @@ export default function Home() {
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Internet document transmission office</p>
           </div>
         </div>
-        {authenticated && walletAddress ? (
-          <button onClick={logout} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} / Sign out</button>
+        {isConnected && walletAddress ? (
+          <button onClick={handleDisconnect} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} / Sign out</button>
         ) : (
-          <button onClick={login} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Join / sign in</button>
+          <div className="flex gap-2">
+            {hasMetaMask && (
+              <button onClick={() => void connectMetaMask()} className="key-shadow flex items-center gap-2 border border-[#3c3c3c] bg-[#25251f] px-4 py-2 text-[10px] font-bold uppercase text-white"><Wallet size={14} /> MetaMask</button>
+            )}
+            <button onClick={login} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Join / sign in</button>
+          </div>
         )}
       </header>
 
-      <section className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+      <div className="mx-auto mb-4 flex max-w-6xl gap-2">
+        <button
+          onClick={() => setView('send')}
+          className={`key-shadow flex items-center gap-2 border px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em] ${view === 'send' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+        >
+          <Send size={13} /> Send
+        </button>
+        <button
+          onClick={() => setView('tray')}
+          className={`key-shadow flex items-center gap-2 border px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+        >
+          <Inbox size={13} /> In-Tray
+        </button>
+      </div>
+
+      {view === 'tray' && (
+        <section className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
+          <InTray local={mailbox} wallet={walletAddress} />
+        </section>
+      )}
+
+      <section className={`machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] ${view === 'send' ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
           <span>NF-8004 / Network facsimile</span>
           <span className="flex items-center gap-2 text-[#456049]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#56705a]" /> Line ready</span>
@@ -175,8 +233,17 @@ export default function Home() {
             {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold">FAULT: {error}</div>}
             {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
 
-            {!authenticated || !walletAddress ? <button onClick={login} disabled={!ready} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:opacity-50"><LockKeyhole size={17} /> Join with email or social</button> : <button onClick={() => void transmit()} disabled={status === 'sending' || !base64} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:cursor-not-allowed disabled:opacity-45">{status === 'sending' ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />} Transmit NFTfax</button>}
-            <p className="mt-4 text-center text-[8px] uppercase tracking-[.16em] text-[#625d51]">Basic: 2 internal sends/month · Pro: unlimited external · Premium: colour + multipage</p>
+            {!isConnected || !walletAddress ? (
+              <div className="flex w-full flex-col gap-2">
+                {hasMetaMask && (
+                  <button onClick={() => void connectMetaMask()} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#3c3c3c] bg-[#25251f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white"><Wallet size={17} /> Connect MetaMask</button>
+                )}
+                <button onClick={login} disabled={!ready} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:opacity-50"><LockKeyhole size={17} /> Join with email or social</button>
+              </div>
+            ) : (
+              <button onClick={() => void transmit()} disabled={status === 'sending' || !base64} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:cursor-not-allowed disabled:opacity-45">{status === 'sending' ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />} Transmit NFTfax</button>
+            )}
+            <p className="mt-4 text-center text-[8px] uppercase tracking-[.16em] text-[#625d51]">Basic: earn send credits by forwarding · Pro: unlimited internal · Premium: external + colour</p>
           </div>
         </div>
       </section>
