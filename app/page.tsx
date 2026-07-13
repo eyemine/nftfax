@@ -183,6 +183,13 @@ export default function Home() {
 
       {view === 'tray' && (
         <section className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
+          <label className="mb-5 block max-w-md">
+            <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Your mailbox</span>
+            <div className="flex">
+              <input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder="yourname" className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" />
+              <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@nftmail.box</span>
+            </div>
+          </label>
           <InTray local={mailbox} wallet={walletAddress} />
         </section>
       )}
