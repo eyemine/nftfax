@@ -8,45 +8,7 @@ import InTray from './components/InTray';
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
 type View = 'send' | 'tray';
 
-const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
-const MAX_ENCODED_LENGTH = 1_300_000;
-
-function stripDataUri(value: string): string {
-  const comma = value.indexOf(',');
-  return comma >= 0 ? value.slice(comma + 1) : value;
-}
-
-async function prepareImage(file: File): Promise<{ base64: string; preview: string; sizeKb: number }> {
-  if (file.size > MAX_SOURCE_BYTES) throw new Error('Source image exceeds the 20MB intake limit.');
-  const bitmap = await createImageBitmap(file);
-  const initialScale = Math.min(1, 1728 / bitmap.width, 2200 / bitmap.height);
-  let scale = initialScale;
-  let dataUri = '';
-
-  for (let attempt = 0; attempt < 7; attempt += 1) {
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(320, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(400, Math.round(bitmap.height * scale));
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('This browser cannot operate the image processor.');
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-    for (let index = 0; index < pixels.data.length; index += 4) {
-      const grey = Math.round(pixels.data[index] * 0.299 + pixels.data[index + 1] * 0.587 + pixels.data[index + 2] * 0.114);
-      pixels.data[index] = grey;
-      pixels.data[index + 1] = grey;
-      pixels.data[index + 2] = grey;
-    }
-    context.putImageData(pixels, 0, 0);
-    dataUri = canvas.toDataURL('image/jpeg', 0.76);
-    if (stripDataUri(dataUri).length <= MAX_ENCODED_LENGTH) break;
-    scale *= 0.8;
-  }
-  bitmap.close();
-  const base64 = stripDataUri(dataUri);
-  if (!base64 || base64.length > MAX_ENCODED_LENGTH) throw new Error('The image could not be reduced to fax size.');
-  return { base64, preview: dataUri, sizeKb: Math.round(base64.length * 0.75 / 1024) };
-}
+import { prepareImage } from './lib/image';
 
 export default function Home() {
   const { ready, authenticated, login, logout } = usePrivy();
