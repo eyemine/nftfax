@@ -59,12 +59,12 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-function FaxThumb({ id, encrypted, elapsed, className = 'h-40' }: { id: string; encrypted?: boolean; elapsed: number; className?: string }) {
+function FaxThumb({ id, encrypted, elapsed, className = 'h-40', overrideSrc }: { id: string; encrypted?: boolean; elapsed: number; className?: string; overrideSrc?: string }) {
   const [src, setSrc] = useState('');
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (encrypted) return;
+    if (encrypted || overrideSrc) return;
     let cancelled = false;
     (async () => {
       try {
@@ -80,7 +80,18 @@ function FaxThumb({ id, encrypted, elapsed, className = 'h-40' }: { id: string; 
       }
     })();
     return () => { cancelled = true; };
-  }, [id, encrypted]);
+  }, [id, encrypted, overrideSrc]);
+
+  // A composite preview overrides the fetched bitmap and renders at full
+  // contrast (a fresh, un-faded link) inside the same fax frame.
+  if (overrideSrc) {
+    return (
+      <div className={`w-full overflow-hidden bg-[#e7e0d1] ${className}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={overrideSrc} alt={`Composite ${id}`} className="h-full w-full object-contain grayscale" />
+      </div>
+    );
+  }
 
   if (encrypted) {
     return (
@@ -356,12 +367,13 @@ export default function InTray({ local, wallet }: InTrayProps) {
               {/* Left: the fax (or live composite preview) */}
               <div className="flex min-h-0 flex-col border-b border-[#918978] bg-[#e7e0d1] p-4 lg:border-b-0 lg:border-r">
                 <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
-                  {compositePreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={compositePreview} alt="Composite preview" className="max-h-full max-w-full object-contain grayscale" />
-                  ) : (
-                    <FaxThumb id={selected.id} encrypted={selected.encrypted} elapsed={now - selected.createdAt} className="h-full" />
-                  )}
+                  <FaxThumb
+                    id={selected.id}
+                    encrypted={compositePreview ? false : selected.encrypted}
+                    elapsed={compositePreview ? 0 : now - selected.createdAt}
+                    overrideSrc={compositePreview || undefined}
+                    className="h-full"
+                  />
                   {compositing && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/80"><Loader2 className="animate-spin" /></div>}
                 </div>
                 {compositePreview && (
