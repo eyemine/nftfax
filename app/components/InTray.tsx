@@ -125,7 +125,8 @@ export default function InTray({ local, wallet }: InTrayProps) {
   const [forwardFileName, setForwardFileName] = useState('');
   const [baseSrc, setBaseSrc] = useState('');
   const [overlaySrc, setOverlaySrc] = useState('');
-  const [chainOp, setChainOp] = useState<ChainOp>('stamp');
+  const [chainOp, setChainOp] = useState<ChainOp>('ghost');
+  const [negative, setNegative] = useState(false);
   const [compositeBase64, setCompositeBase64] = useState('');
   const [compositePreview, setCompositePreview] = useState('');
   const [compositing, setCompositing] = useState(false);
@@ -165,7 +166,8 @@ export default function InTray({ local, wallet }: InTrayProps) {
     setForwardTo('');
     setForwardFileName('');
     setOverlaySrc('');
-    setChainOp('stamp');
+    setChainOp('ghost');
+    setNegative(false);
     setCompositeBase64('');
     setCompositePreview('');
     setCompositing(false);
@@ -185,14 +187,14 @@ export default function InTray({ local, wallet }: InTrayProps) {
     return () => { cancelled = true; };
   }, [selected]);
 
-  // Recompute the composite whenever the overlay, operation, or base changes.
+  // Recompute the composite whenever the overlay, operation, negative toggle, or base changes.
   useEffect(() => {
     if (!overlaySrc || !baseSrc) { setCompositeBase64(''); setCompositePreview(''); return; }
     let cancelled = false;
     setCompositing(true);
     (async () => {
       try {
-        const result = await compositeChain(baseSrc, overlaySrc, chainOp);
+        const result = await compositeChain(baseSrc, overlaySrc, chainOp, negative);
         if (!cancelled) { setCompositeBase64(result.base64); setCompositePreview(result.preview); }
       } catch (cause: unknown) {
         if (!cancelled) setNotice(cause instanceof Error ? cause.message : 'Compositing failed.');
@@ -201,7 +203,7 @@ export default function InTray({ local, wallet }: InTrayProps) {
       }
     })();
     return () => { cancelled = true; };
-  }, [overlaySrc, baseSrc, chainOp]);
+  }, [overlaySrc, baseSrc, chainOp, negative]);
 
   function selectForwardFile(file: File) {
     setNotice('');
@@ -436,7 +438,16 @@ export default function InTray({ local, wallet }: InTrayProps) {
 
                     {overlaySrc && (
                       <div className="mb-4">
-                        <p className="mb-2 text-[8px] font-bold uppercase tracking-[.18em] text-[#615c50]">Chain operation</p>
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-[8px] font-bold uppercase tracking-[.18em] text-[#615c50]">Chain operation</p>
+                          <button
+                            onClick={() => setNegative((n) => !n)}
+                            className={`border px-2 py-1 text-[8px] font-bold uppercase tracking-wider ${negative ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf] text-[#4a4638]'}`}
+                            title="Invert the uploaded image (RGB only) before blending"
+                          >
+                            Negative {negative ? '· On' : '· Off'}
+                          </button>
+                        </div>
                         <div className="grid grid-cols-3 gap-2">
                           {CHAIN_OPS.map((opt) => {
                             const Icon = OP_ICON[opt.id];

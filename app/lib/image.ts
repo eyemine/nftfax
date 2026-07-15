@@ -10,9 +10,9 @@ export const MAX_ENCODED_LENGTH = 1_300_000;
 export type ChainOp = 'stamp' | 'ghost' | 'illuminate';
 
 export const CHAIN_OPS: { id: ChainOp; label: string; raw: string; hint: string }[] = [
-  { id: 'stamp', label: 'Stamp', raw: 'Copy', hint: 'Assert your ink over the chain (darken).' },
   { id: 'ghost', label: 'Ghost', raw: 'Xor', hint: 'A hidden layer revealed only where marks interact (XOR).' },
   { id: 'illuminate', label: 'Illuminate', raw: 'Or', hint: 'Add light — bright marks glow through dark areas.' },
+  { id: 'stamp', label: 'Stamp', raw: 'Copy', hint: 'Assert your ink over the chain (darken).' },
 ];
 
 function stripDataUri(value: string): string {
@@ -33,7 +33,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 /// Composite an overlay image onto a base fax bitmap using a chain operation.
 /// Both are reduced to greyscale, scaled to the base dimensions, then combined
 /// pixel-by-pixel. Returns a fax-sized JPEG (base64 + preview data URI).
-export async function compositeChain(baseSrc: string, overlaySrc: string, op: ChainOp): Promise<{ base64: string; preview: string; sizeKb: number }> {
+export async function compositeChain(baseSrc: string, overlaySrc: string, op: ChainOp, negative = false): Promise<{ base64: string; preview: string; sizeKb: number }> {
   const [base, overlay] = await Promise.all([loadImage(baseSrc), loadImage(overlaySrc)]);
   const width = Math.max(1, base.naturalWidth || base.width);
   const height = Math.max(1, base.naturalHeight || base.height);
@@ -59,6 +59,16 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   const dh = oh * coverScale;
   ctx.drawImage(overlay, (width - dw) / 2, (height - dh) / 2, dw, dh);
   const overData = ctx.getImageData(0, 0, width, height);
+
+  if (negative) {
+    const o = overData.data;
+    for (let i = 0; i < o.length; i += 4) {
+      o[i] = 255 - o[i];
+      o[i + 1] = 255 - o[i + 1];
+      o[i + 2] = 255 - o[i + 2];
+      // alpha untouched
+    }
+  }
 
   const out = ctx.createImageData(width, height);
   const b = baseData.data;
