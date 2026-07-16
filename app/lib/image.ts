@@ -48,15 +48,15 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   const baseData = ctx.getImageData(0, 0, width, height);
 
   // Draw the overlay WITHOUT stretching: preserve its aspect ratio and scale so
-  // the greater dimension matches the underlying fax (cover), centered. Areas
-  // not covered stay white (paper) so they are neutral for every operation.
+  // it fits entirely within the underlying fax (contain), centered. Areas not
+  // covered stay white (paper) so they are neutral for every operation.
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
   const ow = Math.max(1, overlay.naturalWidth || overlay.width);
   const oh = Math.max(1, overlay.naturalHeight || overlay.height);
-  const coverScale = Math.max(width / ow, height / oh);
-  const dw = ow * coverScale;
-  const dh = oh * coverScale;
+  const containScale = Math.min(width / ow, height / oh);
+  const dw = ow * containScale;
+  const dh = oh * containScale;
   ctx.drawImage(overlay, (width - dw) / 2, (height - dh) / 2, dw, dh);
   const overData = ctx.getImageData(0, 0, width, height);
 
