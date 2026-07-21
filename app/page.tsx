@@ -26,6 +26,7 @@ export default function Home() {
   const [manualAddress, setManualAddress] = useState('');
   const [hasMetaMask, setHasMetaMask] = useState(false);
   const [view, setView] = useState<View>('send');
+  const [fromDomain, setFromDomain] = useState<'fax' | 'nftmail.box'>('fax');
   const walletAddress = manualAddress || wallets[0]?.address || '';
   const isConnected = authenticated || !!manualAddress;
 
@@ -88,7 +89,8 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fromLabel: mailbox.trim().toLowerCase().replace(/@nftmail\.box$/, ''),
+          fromLabel: mailbox.trim().toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, ''),
+          fromDomain,
           ownerWallet: walletAddress,
           to: recipient.trim(),
           format: 'jpg',
@@ -145,14 +147,25 @@ export default function Home() {
 
       {view === 'tray' && (
         <section className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
+          <div className="mb-3 flex gap-2">
+            {(['fax', 'nftmail.box'] as const).map((d) => (
+              <button
+                key={d}
+                onClick={() => setFromDomain(d)}
+                className={`key-shadow border px-3 py-2 text-[10px] font-bold uppercase ${fromDomain === d ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+              >
+                @{d}
+              </button>
+            ))}
+          </div>
           <label className="mb-5 block max-w-md">
             <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Your mailbox</span>
             <div className="flex">
-              <input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder="yourname" className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" />
-              <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@nftmail.box</span>
+              <input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={fromDomain === 'fax' ? 'dfz.1234' : 'yourname'} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" />
+              <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@{fromDomain}</span>
             </div>
           </label>
-          <InTray local={mailbox} wallet={walletAddress} />
+          <InTray local={mailbox} wallet={walletAddress} domain={fromDomain} />
         </section>
       )}
 
@@ -194,8 +207,19 @@ export default function Home() {
               <div className="relative overflow-hidden"><div className="scanline absolute inset-y-0 w-1/3" /><p className="text-[8px] uppercase tracking-[.2em] text-[#7fa178]">Transmission monitor</p><p className="mt-2 text-sm font-bold">{status === 'sent' ? 'DELIVERY CONFIRMED' : status === 'sending' ? 'DIALING REMOTE STATION…' : status === 'ready' ? 'DOCUMENT READY' : 'AWAITING DOCUMENT'}</p></div>
             </div>
 
-            <label className="mb-4 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">From mailbox</span><div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder="yourname" className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@nftmail.box</span></div></label>
-            <label className="mb-5 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Destination address</span><input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box" type="email" className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></label>
+            <div className="mb-4 flex gap-2">
+              {(['fax', 'nftmail.box'] as const).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setFromDomain(d)}
+                  className={`key-shadow border px-3 py-2 text-[10px] font-bold uppercase ${fromDomain === d ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+                >
+                  @{d}
+                </button>
+              ))}
+            </div>
+            <label className="mb-4 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">From mailbox</span><div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={fromDomain === 'fax' ? 'dfz.1234' : 'yourname'} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@{fromDomain}</span></div></label>
+            <label className="mb-5 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Destination address</span><input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></label>
 
             <div className="mb-5 grid grid-cols-3 gap-2 text-center text-[8px] font-bold uppercase"><div className="border border-[#958e7e] bg-[#cec6b6] p-2"><ShieldCheck size={15} className="mx-auto mb-1" />Bitmap only</div><div className="border border-[#958e7e] bg-[#cec6b6] p-2"><LockKeyhole size={15} className="mx-auto mb-1" />No trackers</div><div className="border border-[#958e7e] bg-[#cec6b6] p-2"><Zap size={15} className="mx-auto mb-1" />Auto reduce</div></div>
 

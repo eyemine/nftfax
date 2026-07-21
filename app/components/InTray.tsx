@@ -17,6 +17,7 @@ import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain } from '.
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
 
+const JAM_MS = 72 * 60 * 60 * 1000;
 const DECAY_MS = 8 * 24 * 60 * 60 * 1000;
 
 interface InboxFax {
@@ -36,20 +37,22 @@ interface InboxFax {
 interface InTrayProps {
   local: string;
   wallet: string;
+  domain?: string;
 }
 
 function contrastForElapsed(ms: number): number {
-  if (ms <= 2 * 24 * 60 * 60 * 1000) return 1.0;
-  if (ms <= 4 * 24 * 60 * 60 * 1000) return 0.75;
-  if (ms <= 6 * 24 * 60 * 60 * 1000) return 0.5;
-  return 0.28;
+  if (ms <= 24 * 60 * 60 * 1000) return 1.0;
+  if (ms >= JAM_MS) return 0.1;
+  const window = JAM_MS - 24 * 60 * 60 * 1000;
+  const t = (ms - 24 * 60 * 60 * 1000) / window;
+  return 0.7 - t * 0.3; // 0.7 -> 0.4 over the 24–72 h window
 }
 
-function formatCountdown(msLeft: number): string {
-  if (msLeft <= 0) return 'JAMMED';
-  const d = Math.floor(msLeft / 86_400_000);
-  const h = Math.floor((msLeft % 86_400_000) / 3_600_000);
-  const m = Math.floor((msLeft % 3_600_000) / 60_000);
+function formatCountdown(msLeftToJam: number): string {
+  if (msLeftToJam <= 0) return 'LINE JAMMED';
+  const d = Math.floor(msLeftToJam / 86_400_000);
+  const h = Math.floor((msLeftToJam % 86_400_000) / 3_600_000);
+  const m = Math.floor((msLeftToJam % 3_600_000) / 60_000);
   if (d > 0) return `${d}d ${h}h left`;
   if (h > 0) return `${h}h ${m}m left`;
   return `${m}m left`;
@@ -59,12 +62,12 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-function FaxThumb({ id, encrypted, elapsed, className = 'h-40', overrideSrc }: { id: string; encrypted?: boolean; elapsed: number; className?: string; overrideSrc?: string }) {
+function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', overrideSrc }: { id: string; encrypted?: boolean; elapsed: number; jammed?: boolean; className?: string; overrideSrc?: string }) {
   const [src, setSrc] = useState('');
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (encrypted || overrideSrc) return;
+    if (encrypted || overrideSrc || jammed) return;
     let cancelled = false;
     (async () => {
       try {
@@ -80,7 +83,7 @@ function FaxThumb({ id, encrypted, elapsed, className = 'h-40', overrideSrc }: {
       }
     })();
     return () => { cancelled = true; };
-  }, [id, encrypted, overrideSrc]);
+  }, [id, encrypted, overrideSrc, jammed]);
 
   // A composite preview overrides the fetched bitmap and renders at full
   // contrast (a fresh, un-faded link) inside the same fax frame.
@@ -89,6 +92,14 @@ function FaxThumb({ id, encrypted, elapsed, className = 'h-40', overrideSrc }: {
       <div className={`w-full overflow-hidden bg-[#e7e0d1] ${className}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={overrideSrc} alt={`Composite ${id}`} className="h-full w-full object-contain grayscale" />
+      </div>
+    );
+  }
+
+  if (jammed) {
+    return (
+      <div className={`grid w-full place-items-center bg-[#f4f2ed] text-[8px] font-bold uppercase tracking-widest text-[#9a9282] ${className}`}>
+        <span>LINE JAMMED</span>
       </div>
     );
   }
@@ -114,10 +125,11 @@ function FaxThumb({ id, encrypted, elapsed, className = 'h-40', overrideSrc }: {
   );
 }
 
-export default function InTray({ local, wallet }: InTrayProps) {
+export default function InTray({ local, wallet, domain = 'nftmail.box' }: InTrayProps) {
   const [faxes, setFaxes] = useState<InboxFax[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [credits, setCredits] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [busyId, setBusyId] = useState('');
   const [forwardFor, setForwardFor] = useState('');
@@ -133,7 +145,8 @@ export default function InTray({ local, wallet }: InTrayProps) {
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState<InboxFax | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cleanLocal = useMemo(() => local.trim().toLowerCase().replace(/@nftmail\.box$/, ''), [local]);
+  const cleanLocal = useMemo(() => local.trim().toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, ''), [local]);
+  const effectiveDomain = useMemo(() => domain.trim().toLowerCase() || 'nftmail.box', [domain]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
@@ -141,16 +154,23 @@ export default function InTray({ local, wallet }: InTrayProps) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`/api/tray/inbox?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}`, { cache: 'no-store' });
-      const data = await res.json() as { faxes?: InboxFax[]; error?: string };
-      if (!res.ok) throw new Error(data.error || 'Could not load in-tray');
-      setFaxes(data.faxes || []);
+      const [inboxRes, creditsRes] = await Promise.all([
+        fetch(`/api/tray/inbox?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store' }),
+        fetch(`/api/tray/credits?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store' }),
+      ]);
+      const inboxData = await inboxRes.json() as { faxes?: InboxFax[]; error?: string };
+      if (!inboxRes.ok) throw new Error(inboxData.error || 'Could not load in-tray');
+      setFaxes(inboxData.faxes || []);
+      if (creditsRes.ok) {
+        const creditData = await creditsRes.json() as { credits?: number };
+        setCredits(typeof creditData.credits === 'number' ? creditData.credits : null);
+      }
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : 'Could not load in-tray');
     } finally {
       setLoading(false);
     }
-  }, [cleanLocal, wallet]);
+  }, [cleanLocal, wallet, effectiveDomain]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -221,6 +241,7 @@ export default function InTray({ local, wallet }: InTrayProps) {
     try {
       const payload: Record<string, string> = {
         fromLabel: cleanLocal,
+        fromDomain: effectiveDomain,
         ownerWallet: wallet,
         to: forwardTo.trim(),
         chainTrayId: fax.id,
@@ -265,6 +286,7 @@ export default function InTray({ local, wallet }: InTrayProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           local: cleanLocal,
+          domain: effectiveDomain,
           ownerWallet: wallet,
           chainId: cfg.chain.id,
           contract: cfg.contract,
@@ -308,9 +330,14 @@ export default function InTray({ local, wallet }: InTrayProps) {
           <p className="text-[9px] font-bold uppercase tracking-[.24em] text-[#615c50]">Incoming transmissions</p>
           <h2 className="mt-1 text-xl font-black uppercase">In-Tray {faxes.length > 0 && <span className="text-[#e65b2f]">({faxes.length})</span>}</h2>
         </div>
-        <button onClick={() => void load()} disabled={loading} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase disabled:opacity-50">
-          {loading ? <Loader2 className="animate-spin" size={13} /> : 'Refresh'}
-        </button>
+        <div className="flex items-center gap-3">
+          {credits !== null && (
+            <span className="border border-[#77705f] bg-[#d8d0bf] px-2 py-2 text-[10px] font-bold uppercase text-[#615c50]">Send credits: {credits}</span>
+          )}
+          <button onClick={() => void load()} disabled={loading} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase disabled:opacity-50">
+            {loading ? <Loader2 className="animate-spin" size={13} /> : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {notice && <div className="mb-4 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold uppercase">{notice}</div>}
@@ -325,19 +352,19 @@ export default function InTray({ local, wallet }: InTrayProps) {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {faxes.map((fax) => {
           const elapsed = now - fax.createdAt;
-          const msLeft = DECAY_MS - elapsed;
+          const msLeftToJam = JAM_MS - elapsed;
           const permanent = !!fax.savedGnosis || !!fax.mintedBase;
-          const jammed = !permanent && msLeft <= 0;
+          const jammed = !permanent && elapsed > JAM_MS;
           return (
             <div key={fax.id} onClick={() => openDetail(fax)} className="machine-shadow cursor-pointer overflow-hidden border border-[#8f8878] bg-[#c8c0ae] hover:ring-2 hover:ring-[#e65b2f]">
               <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-3 py-2 text-[9px] font-bold uppercase tracking-[.14em]">
                 <span>T/#{fax.id.slice(0, 4).toUpperCase()}</span>
                 <span className={permanent ? 'text-[#456049]' : jammed ? 'text-[#a94228]' : 'text-[#615c50]'}>
-                  {permanent ? 'PERMANENT' : formatCountdown(msLeft)}
+                  {permanent ? 'PERMANENT' : formatCountdown(msLeftToJam)}
                 </span>
               </div>
 
-              <FaxThumb id={fax.id} encrypted={fax.encrypted} elapsed={jammed ? DECAY_MS : elapsed} />
+              <FaxThumb id={fax.id} encrypted={fax.encrypted} elapsed={elapsed} jammed={jammed} />
 
               <div className="space-y-2 p-3">
                 <p className="truncate text-[10px] font-bold uppercase text-[#4a4638]">From: {fax.from}</p>
@@ -347,7 +374,8 @@ export default function InTray({ local, wallet }: InTrayProps) {
                   {fax.savedGnosis && <span className="border border-[#c08a2f] bg-[#f0e4cd] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#7a5a15]">Gnosis</span>}
                   {fax.chainDepth && fax.chainDepth > 1 && <span className="border border-[#7a6a5a] bg-[#e3dcc8] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#5a4d3e]">Link {fax.chainDepth}</span>}
                 </div>
-                {!fax.forwarded && !fax.encrypted && <p className="text-[8px] uppercase tracking-wide text-[#6e685a]">Forward to unlock Base mint</p>}
+                {!permanent && !jammed && !fax.forwarded && !fax.encrypted && <p className="text-[8px] uppercase tracking-wide text-[#6e685a]">Forward to unlock Base mint</p>}
+                {!permanent && jammed && !fax.encrypted && <p className="text-[8px] uppercase tracking-wide text-[#a94228]">LINE JAMMED — start a new chain with {fax.from}</p>}
               </div>
             </div>
           );
@@ -373,6 +401,7 @@ export default function InTray({ local, wallet }: InTrayProps) {
                     id={selected.id}
                     encrypted={compositePreview ? false : selected.encrypted}
                     elapsed={compositePreview ? 0 : now - selected.createdAt}
+                    jammed={!compositePreview && !selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > JAM_MS}
                     overrideSrc={compositePreview || undefined}
                     className="h-full"
                   />
@@ -398,13 +427,13 @@ export default function InTray({ local, wallet }: InTrayProps) {
                 </div>
 
                 <div className="mb-5 grid grid-cols-3 gap-2">
-                  <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[9px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
+                  <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > JAM_MS)} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[9px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
                     <Send size={12} /> Forward
                   </button>
                   <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint
                   </button>
-                  <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[9px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis || !selected.forwarded} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[9px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
                     <Archive size={12} /> Save
                   </button>
                 </div>
@@ -416,7 +445,7 @@ export default function InTray({ local, wallet }: InTrayProps) {
                     <input
                       value={forwardTo}
                       onChange={(e) => setForwardTo(e.target.value)}
-                      placeholder="next@nftmail.box"
+                      placeholder="next@nftmail.box or next@fax"
                       className="mb-3 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
                     />
 
