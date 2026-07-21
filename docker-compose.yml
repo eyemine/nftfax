@@ -1,0 +1,9 @@
+services:
+  nftfax:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nftfax-nftfax-1
+    ports:
+      - "3002:3000"
+    restart: unless-stopped
