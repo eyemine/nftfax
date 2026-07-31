@@ -1,18 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { usePrivy, useWallets } from '@privy-io/react-auth';
-import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap, Wallet, Inbox } from 'lucide-react';
+import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
+import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap, Wallet, Inbox, UserCheck } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
-type View = 'send' | 'tray';
+type View = 'send' | 'tray' | 'delegate';
 
 import { prepareImage } from './lib/image';
+import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
+import { SkinPanel } from './components/SkinPanel';
+import { DelegatePanel } from './components/DelegatePanel';
+import Link from 'next/link';
 
 export default function Home() {
   const { ready, authenticated, login, logout } = usePrivy();
-  const { wallets } = useWallets();
+  const activeWallet = useActiveWallet().wallet;
   const inputRef = useRef<HTMLInputElement>(null);
   const [mailbox, setMailbox] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -26,8 +30,9 @@ export default function Home() {
   const [manualAddress, setManualAddress] = useState('');
   const [hasMetaMask, setHasMetaMask] = useState(false);
   const [view, setView] = useState<View>('send');
-  const [fromDomain, setFromDomain] = useState<'fax' | 'nftmail.box'>('fax');
-  const walletAddress = manualAddress || wallets[0]?.address || '';
+  const [collection, setCollection] = useState<CollectionKey>(FAX_THEME.key);
+  const collectionTheme = useMemo(() => getCollectionTheme(collection), [collection]);
+  const walletAddress = manualAddress || activeWallet?.address?.toLowerCase() || '';
   const isConnected = authenticated || !!manualAddress;
 
   useEffect(() => {
@@ -53,9 +58,9 @@ export default function Home() {
     }
   }
 
-  function handleDisconnect() {
+  async function handleDisconnect() {
     setManualAddress('');
-    void logout();
+    await logout();
   }
 
   async function selectFile(file: File) {
@@ -90,7 +95,8 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fromLabel: mailbox.trim().toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, ''),
-          fromDomain,
+          fromDomain: 'fax',
+          collection,
           ownerWallet: walletAddress,
           to: recipient.trim(),
           format: 'jpg',
@@ -114,8 +120,8 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={21} /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-[-0.08em]">NFTFAX<span className="text-[#e65b2f]">®</span></h1>
-            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Internet document transmission office</p>
+            <h1 className="text-2xl font-black tracking-[-0.08em]">{collectionTheme.siteName}<span style={{ color: collectionTheme.accent }}>®</span></h1>
+            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>
           </div>
         </div>
         {isConnected && walletAddress ? (
@@ -125,12 +131,12 @@ export default function Home() {
             {hasMetaMask && (
               <button onClick={() => void connectMetaMask()} className="key-shadow flex items-center gap-2 border border-[#3c3c3c] bg-[#25251f] px-4 py-2 text-[10px] font-bold uppercase text-white"><Wallet size={14} /> MetaMask</button>
             )}
-            <button onClick={login} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Join / sign in</button>
+            <button onClick={() => login()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Join / sign in</button>
           </div>
         )}
       </header>
 
-      <div className="mx-auto mb-4 flex max-w-6xl gap-2">
+      <div className="mx-auto mb-4 flex max-w-6xl gap-2 flex-wrap">
         <button
           onClick={() => setView('send')}
           className={`key-shadow flex items-center gap-2 border px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em] ${view === 'send' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
@@ -143,33 +149,45 @@ export default function Home() {
         >
           <Inbox size={13} /> In-Tray
         </button>
+        <Link
+          href="/pre-register"
+          className="key-shadow flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em]"
+        >
+          <Radio size={13} /> Telegraph
+        </Link>
       </div>
 
       {view === 'tray' && (
-        <section className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
+        <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
           <div className="mb-3 flex gap-2">
-            {(['fax', 'nftmail.box'] as const).map((d) => (
-              <button
-                key={d}
-                onClick={() => setFromDomain(d)}
-                className={`key-shadow border px-3 py-2 text-[10px] font-bold uppercase ${fromDomain === d ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
-              >
-                @{d}
-              </button>
-            ))}
+            <select
+              value={collection}
+              onChange={(event) => setCollection(event.target.value as CollectionKey)}
+              className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-[10px] font-bold uppercase"
+            >
+              {(['chonk', 'deadfellaz', 'normie', 'pow'] as const).map((k) => (
+                <option key={k} value={k}>{getCollectionTheme(k).collectionName}</option>
+              ))}
+            </select>
           </div>
           <label className="mb-5 block max-w-md">
             <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Your mailbox</span>
             <div className="flex">
-              <input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={fromDomain === 'fax' ? 'dfz.1234' : 'yourname'} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" />
-              <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@{fromDomain}</span>
+              <input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" />
+              <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span>
             </div>
           </label>
-          <InTray local={mailbox} wallet={walletAddress} domain={fromDomain} />
-        </section>
+          <InTray local={mailbox} wallet={walletAddress} domain="fax" />
+        </SkinPanel>
       )}
 
-      <section className={`machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] ${view === 'send' ? '' : 'hidden'}`}>
+      {view === 'delegate' && (
+        <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
+          <DelegatePanel collection={collection} walletAddress={walletAddress} />
+        </SkinPanel>
+      )}
+
+      <SkinPanel theme={collectionTheme} className={`machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] ${view === 'send' ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
           <span>NF-8004 / Network facsimile</span>
           <span className="flex items-center gap-2 text-[#456049]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#56705a]" /> Line ready</span>
@@ -208,17 +226,23 @@ export default function Home() {
             </div>
 
             <div className="mb-4 flex gap-2">
-              {(['fax', 'nftmail.box'] as const).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setFromDomain(d)}
-                  className={`key-shadow border px-3 py-2 text-[10px] font-bold uppercase ${fromDomain === d ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
-                >
-                  @{d}
-                </button>
-              ))}
+              <select
+                value={collection}
+                onChange={(event) => setCollection(event.target.value as CollectionKey)}
+                className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-[10px] font-bold uppercase"
+              >
+                {(['chonk', 'deadfellaz', 'normie', 'pow'] as const).map((k) => (
+                  <option key={k} value={k}>{getCollectionTheme(k).collectionName}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => setView('delegate')}
+                className="key-shadow flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase"
+              >
+                <UserCheck size={13} /> Delegate
+              </button>
             </div>
-            <label className="mb-4 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">From mailbox</span><div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={fromDomain === 'fax' ? 'dfz.1234' : 'yourname'} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@{fromDomain}</span></div></label>
+            <label className="mb-4 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">From mailbox</span><div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></label>
             <label className="mb-5 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Destination address</span><input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></label>
 
             <div className="mb-5 grid grid-cols-3 gap-2 text-center text-[8px] font-bold uppercase"><div className="border border-[#958e7e] bg-[#cec6b6] p-2"><ShieldCheck size={15} className="mx-auto mb-1" />Bitmap only</div><div className="border border-[#958e7e] bg-[#cec6b6] p-2"><LockKeyhole size={15} className="mx-auto mb-1" />No trackers</div><div className="border border-[#958e7e] bg-[#cec6b6] p-2"><Zap size={15} className="mx-auto mb-1" />Auto reduce</div></div>
@@ -231,7 +255,7 @@ export default function Home() {
                 {hasMetaMask && (
                   <button onClick={() => void connectMetaMask()} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#3c3c3c] bg-[#25251f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white"><Wallet size={17} /> Connect MetaMask</button>
                 )}
-                <button onClick={login} disabled={!ready} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:opacity-50"><LockKeyhole size={17} /> Join with email or social</button>
+                <button onClick={() => login()} disabled={!ready} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:opacity-50"><LockKeyhole size={17} /> Join with email or social</button>
               </div>
             ) : (
               <button onClick={() => void transmit()} disabled={status === 'sending' || !base64} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:cursor-not-allowed disabled:opacity-45">{status === 'sending' ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />} Transmit NFTfax</button>
@@ -239,9 +263,9 @@ export default function Home() {
             <p className="mt-4 text-center text-[8px] uppercase tracking-[.16em] text-[#625d51]">Basic: earn send credits by forwarding · Pro: unlimited internal · Premium: external + colour</p>
           </div>
         </div>
-      </section>
+      </SkinPanel>
 
-      <footer className="mx-auto mt-5 flex max-w-6xl flex-col justify-between gap-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row"><span>Powered by NFTmail.box / ERC-8004 identity</span><a href="https://nftmail.box" className="underline">Open full mailbox console →</a></footer>
+      <footer className="mx-auto mt-5 flex max-w-6xl flex-col justify-between gap-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row"><span>Powered by NFTmail.box / ERC-8004 identity</span><div className="flex gap-4"><a href="/pre-register" className="underline">Pre-register for launch →</a><a href="https://nftmail.box" className="underline">Open full mailbox console →</a></div></footer>
     </main>
   );
 }

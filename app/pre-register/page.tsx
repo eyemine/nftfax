@@ -1,0 +1,274 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
+import { Radio, Loader2, Check, Users, AlertCircle, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { getCollectionTheme, type CollectionKey } from '../lib/theme';
+import { SkinPanel } from '../components/SkinPanel';
+
+type RegisterStatus = 'idle' | 'registering' | 'registered' | 'error';
+
+interface TelegraphEntry {
+  handle: string;
+  wallet: string;
+  collection: string;
+  ready: boolean;
+  readyUntil?: number;
+  createdAt: number;
+}
+
+export default function PreRegisterPage() {
+  const { ready, authenticated, login, logout } = usePrivy();
+  const activeWallet = useActiveWallet().wallet;
+  const [collection, setCollection] = useState<CollectionKey>('deadfellaz');
+  const theme = useMemo(() => getCollectionTheme(collection), [collection]);
+  const walletAddress = activeWallet?.address?.toLowerCase() || '';
+
+  const [handle, setHandle] = useState('');
+  const [readyReceive, setReadyReceive] = useState(true);
+  const [status, setStatus] = useState<RegisterStatus>('idle');
+  const [error, setError] = useState('');
+  const [vaultWallet, setVaultWallet] = useState('');
+  const [tokenId, setTokenId] = useState('');
+  const [entries, setEntries] = useState<TelegraphEntry[]>([]);
+
+  useEffect(() => {
+    setHandle('');
+    setStatus('idle');
+    setError('');
+    void loadEntries();
+  }, [collection]);
+
+  async function loadEntries() {
+    try {
+      const res = await fetch(`/api/telegraph/list?collection=${collection}`, { cache: 'no-store' });
+      const json = (await res.json()) as { items?: TelegraphEntry[]; error?: string };
+      setEntries(json.items ?? []);
+    } catch {
+      setEntries([]);
+    }
+  }
+
+  async function register() {
+    setError('');
+    setStatus('registering');
+
+    if (!walletAddress) {
+      setError('Connect a wallet first.');
+      setStatus('error');
+      return;
+    }
+
+    const h = handle.trim().toLowerCase();
+    if (!h) {
+      setError('Enter a fax handle.');
+      setStatus('error');
+      return;
+    }
+
+    const vault = vaultWallet.trim().toLowerCase();
+    const tok = tokenId.trim();
+    if (vault && !/^0x[a-f0-9]{40}$/i.test(vault)) {
+      setError('Invalid vault wallet address.');
+      setStatus('error');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/telegraph/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          handle: h,
+          wallet: walletAddress,
+          collection,
+          ready: readyReceive,
+          readyUntil: 0,
+          vaultWallet: vault || undefined,
+          tokenId: tok || undefined,
+        }),
+      });
+
+      const json = (await res.json()) as { status?: string; error?: string };
+      if (!res.ok) {
+        throw new Error(json.error || 'Registration failed');
+      }
+
+      setStatus('registered');
+      setHandle('');
+      void loadEntries();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Registration failed');
+      setStatus('error');
+    }
+  }
+
+  const communityTotal = entries.length;
+  const readyCount = entries.filter((e) => e.ready).length;
+
+  return (
+    <main className="min-h-screen px-4 py-6 md:px-8 md:py-10" style={{ backgroundColor: '#c8c0ae' }}>
+      <header className="mx-auto mb-5 flex max-w-6xl items-center justify-between border-b border-[#575244] pb-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={21} /></div>
+          <div>
+            <h1 className="text-2xl font-black tracking-[-0.08em]">TELEGRAPH<span style={{ color: theme.accent }}>®</span></h1>
+            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Pre-registration for 08/08/2026</p>
+          </div>
+        </div>
+        <Link href="/" className="text-[10px] font-bold uppercase tracking-[.12em] underline text-[#625e52]"><ArrowLeft size={13} className="inline" /> Back to fax</Link>
+      </header>
+
+      <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[.9fr_1.1fr]">
+        <SkinPanel theme={theme} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+            <span>Join the launch directory</span>
+            <span className="flex items-center gap-2 text-[#456049]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#56705a]" /> Active</span>
+          </div>
+
+          <div className="p-5 md:p-8 space-y-4">
+            <p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#625e52]">
+              Add your wallet and handle to the Day-1 player directory. Other players can forward faxes to active participants when their own chains stall.
+            </p>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Community</span>
+              <select
+                value={collection}
+                onChange={(e) => setCollection(e.target.value as CollectionKey)}
+                className="key-shadow w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-[10px] font-bold uppercase"
+              >
+                {(['chonk', 'deadfellaz', 'normie', 'pow'] as const).map((k) => (
+                  <option key={k} value={k}>{getCollectionTheme(k).collectionName}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Fax handle</span>
+              <div className="flex">
+                <input
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  placeholder={theme.mailboxPlaceholder}
+                  className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                />
+                <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span>
+              </div>
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Vault wallet (optional, Delegate.xyz)</span>
+              <input
+                value={vaultWallet}
+                onChange={(e) => setVaultWallet(e.target.value)}
+                placeholder="0x..."
+                className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Token ID (optional, for delegation)</span>
+              <input
+                value={tokenId}
+                onChange={(e) => setTokenId(e.target.value)}
+                placeholder="e.g. 123"
+                className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+              />
+            </label>
+
+            <div className="border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-bold uppercase tracking-[.18em] block mb-1">Wallet</span>
+                {walletAddress && (
+                  <button
+                    onClick={() => void (async () => { await logout(); })()}
+                    className="text-[9px] font-bold uppercase underline text-[#a94228]"
+                  >
+                    Sign out
+                  </button>
+                )}
+              </div>
+              {walletAddress ? (
+                <span className="font-mono text-xs">{walletAddress.slice(0, 8)}…{walletAddress.slice(-6)}</span>
+              ) : (
+                <span className="text-[#625e52] text-xs">No wallet connected</span>
+              )}
+            </div>
+
+            <label className="flex items-center gap-2 text-[10px] font-bold uppercase">
+              <input
+                type="checkbox"
+                checked={readyReceive}
+                onChange={(e) => setReadyReceive(e.target.checked)}
+                className="h-4 w-4 accent-[#e65b2f]"
+              />
+              Signal ready to receive faxes on 08/08
+            </label>
+
+            {!walletAddress ? (
+              <button
+                onClick={() => login({ loginMethods: ['wallet'] })}
+                className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white"
+              >
+                <Users size={17} /> Connect wallet to telegraph
+              </button>
+            ) : (
+              <button
+                onClick={() => void register()}
+                disabled={status === 'registering'}
+                className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:opacity-50"
+              >
+                {status === 'registering' ? <Loader2 size={17} className="animate-spin" /> : <Check size={17} />}
+                Join Telegraph Directory
+              </button>
+            )}
+
+            {status === 'registered' && (
+              <div className="border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold">
+                <Check size={15} className="inline" /> Registered. You are in the Day-1 directory.
+              </div>
+            )}
+
+            {error && (
+              <div className="flex items-start gap-2 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold">
+                <AlertCircle size={15} />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+        </SkinPanel>
+
+        <SkinPanel theme={theme} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+            <span>Active player radar — {theme.collectionName}</span>
+            <span>{readyCount}/{communityTotal} ready</span>
+          </div>
+
+          <div className="max-h-[500px] overflow-y-auto p-5 md:p-8">
+            {entries.length === 0 ? (
+              <p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#625e52]">No players registered for {theme.collectionName} yet. Be the first.</p>
+            ) : (
+              <div className="space-y-2">
+                {entries.map((entry) => (
+                  <div key={entry.handle} className="flex items-center justify-between border border-[#847d6e] bg-[#eee8dc] px-3 py-2">
+                    <div>
+                      <p className="text-xs font-bold">{entry.handle}@fax</p>
+                      <p className="text-[9px] uppercase tracking-wider text-[#625e52]">{entry.wallet.slice(0, 6)}…{entry.wallet.slice(-4)}</p>
+                    </div>
+                    {entry.ready ? (
+                      <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-[#456049]"><span className="h-2 w-2 rounded-full bg-[#56705a]" /> Ready</span>
+                    ) : (
+                      <span className="text-[9px] font-bold uppercase text-[#625e52]">Registered</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </SkinPanel>
+      </div>
+    </main>
+  );
+}
