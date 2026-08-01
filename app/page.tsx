@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
-import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap, Wallet, Inbox, UserCheck } from 'lucide-react';
+import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap, Wallet, Inbox, UserCheck, Info } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
@@ -154,6 +154,12 @@ export default function Home() {
           className="key-shadow flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em]"
         >
           <Radio size={13} /> Telegraph
+        </Link>
+        <Link
+          href="/about"
+          className="key-shadow ml-auto flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em]"
+        >
+          <Info size={13} /> About
         </Link>
       </div>
 

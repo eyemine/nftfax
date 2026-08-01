@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Radio } from 'lucide-react';
+import { Loader2, Radio, Info } from 'lucide-react';
 import Link from 'next/link';
 
 interface ChainEntry {
@@ -58,7 +58,10 @@ export default function TelegraphPage() {
               <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Telegraph log</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">Return to office</Link>
+          <div className="flex gap-2">
+            <Link href="/about" className="key-shadow flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase"><Info size={13} /> About</Link>
+            <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">Return to office</Link>
+          </div>
         </header>
 
         {loading && (
