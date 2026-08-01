@@ -90,33 +90,58 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">The 1111 collection</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">The 2222 collection</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
-              <p>Deep chains can be minted into a fixed-supply <strong>1111 NFT collection</strong> tiered by hop depth:</p>
+              <p>
+                Deep chains can be minted into a fixed-supply <strong>2222 NFT collection</strong> tiered by hop depth.
+                The tier names are for clarity: two bookend names with meaning, nine literal hop descriptors in between.
+                A collector who sees <strong>7 Hop</strong> knows exactly what they earned.
+              </p>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-[10px] md:text-xs">
                   <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
                     <tr>
-                      <th className="border border-[#8f8878] p-2">Tier</th>
                       <th className="border border-[#8f8878] p-2">Hops</th>
                       <th className="border border-[#8f8878] p-2">Supply</th>
+                      <th className="border border-[#8f8878] p-2">Name</th>
                     </tr>
                   </thead>
                   <tbody className="bg-[#eee8dc]">
-                    <tr><td className="border border-[#8f8878] p-2">Genesis</td><td className="border border-[#8f8878] p-2">1</td><td className="border border-[#8f8878] p-2">1</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Carbon</td><td className="border border-[#8f8878] p-2">2</td><td className="border border-[#8f8878] p-2">520</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Thermal</td><td className="border border-[#8f8878] p-2">3</td><td className="border border-[#8f8878] p-2">266</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Transfer</td><td className="border border-[#8f8878] p-2">4</td><td className="border border-[#8f8878] p-2">133</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Register</td><td className="border border-[#8f8878] p-2">5</td><td className="border border-[#8f8878] p-2">72</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Duplex</td><td className="border border-[#8f8878] p-2">6</td><td className="border border-[#8f8878] p-2">44</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Relay</td><td className="border border-[#8f8878] p-2">7</td><td className="border border-[#8f8878] p-2">30</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Exchange</td><td className="border border-[#8f8878] p-2">8</td><td className="border border-[#8f8878] p-2">16</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Trunk</td><td className="border border-[#8f8878] p-2">9</td><td className="border border-[#8f8878] p-2">12</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Backbone</td><td className="border border-[#8f8878] p-2">10</td><td className="border border-[#8f8878] p-2">10</td></tr>
-                    <tr><td className="border border-[#8f8878] p-2">Beacon</td><td className="border border-[#8f8878] p-2">11+</td><td className="border border-[#8f8878] p-2">7</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">1</td><td className="border border-[#8f8878] p-2">1,111</td><td className="border border-[#8f8878] p-2">Dial Tone</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">2</td><td className="border border-[#8f8878] p-2">555</td><td className="border border-[#8f8878] p-2">Hop 2</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">3</td><td className="border border-[#8f8878] p-2">246</td><td className="border border-[#8f8878] p-2">Hop 3</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">4</td><td className="border border-[#8f8878] p-2">111</td><td className="border border-[#8f8878] p-2">Hop 4</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">5</td><td className="border border-[#8f8878] p-2">88</td><td className="border border-[#8f8878] p-2">Hop 5</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">6</td><td className="border border-[#8f8878] p-2">44</td><td className="border border-[#8f8878] p-2">Hop 6</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">7</td><td className="border border-[#8f8878] p-2">21</td><td className="border border-[#8f8878] p-2">Hop 7</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">8</td><td className="border border-[#8f8878] p-2">13</td><td className="border border-[#8f8878] p-2">Hop 8</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">9</td><td className="border border-[#8f8878] p-2">12</td><td className="border border-[#8f8878] p-2">Hop 9</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">10</td><td className="border border-[#8f8878] p-2">11</td><td className="border border-[#8f8878] p-2">Hop 10</td></tr>
+                    <tr><td className="border border-[#8f8878] p-2">11+</td><td className="border border-[#8f8878] p-2">10</td><td className="border border-[#8f8878] p-2">Dead Letter</td></tr>
                   </tbody>
                 </table>
               </div>
+            </div>
+          </SkinPanel>
+
+          <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Forwarding &amp; minting strategy</div>
+            <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
+              <p>
+                Forwarding and minting are <strong>not the same action</strong>. You can forward a fax to keep the chain alive
+                without minting your current tier, then let the next player mint a rarer tier later — but only if the timer allows it.
+              </p>
+              <ul className="space-y-2 list-disc pl-4">
+                <li><strong>Forward now, mint now</strong> — guaranteed. You claim the current tier and the chain continues.</li>
+                <li><strong>Forward without minting</strong> — free for you, but the next player gets the mint. You save the mint fee and bet on reaching a higher, rarer tier.</li>
+                <li><strong>Wait for a tier to sell out</strong> — if a low-supply tier is nearly exhausted, holding the fax and hoping it mints out before the 72-hour jam is high-risk, high-reward.</li>
+                <li><strong>Same-wallet forwarding is blocked</strong> — you cannot forward a fax directly to another NFT held by the same wallet. Cross-wallet play is still possible, but adds friction.</li>
+              </ul>
+              <p>
+                The 72-hour thermal timer is the enforcer. Waiting is a bet against the clock:
+                if the tier does not mint out before the line jams, the chain is dead and the mint opportunity is lost.
+                This creates genuine game strategy — late-tier sniping, gifting a friend a rarer mint, and timer tension are all part of play.
+              </p>
             </div>
           </SkinPanel>
         </div>
