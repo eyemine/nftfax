@@ -139,7 +139,7 @@ export default function PreRegisterPage() {
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radar size={24} /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-[-0.08em]">ROLODEX<span style={{ color: theme.accent }}>•</span></h1>
+            <h1 className="text-2xl font-black tracking-[-0.08em]">ROLODEX<span style={{ color: theme.accent }}>™</span></h1>
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Pre-registration for 08/08/2026</p>
           </div>
         </div>

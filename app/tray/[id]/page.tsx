@@ -55,7 +55,7 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
           <div className="flex items-center gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={24} /></div>
             <div>
-              <h1 className="text-2xl font-black tracking-[-0.08em]">{FAX_THEME.siteName}<span style={{ color: FAX_THEME.accent }}>•</span></h1>
+              <h1 className="text-2xl font-black tracking-[-0.08em]">{FAX_THEME.siteName}<span style={{ color: FAX_THEME.accent }}>™</span></h1>
               <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">{FAX_THEME.tagline}</p>
             </div>
           </div>

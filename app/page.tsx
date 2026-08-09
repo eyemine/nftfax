@@ -120,7 +120,7 @@ export default function Home() {
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={24} /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-[-0.08em]">{collectionTheme.siteName}<span style={{ color: collectionTheme.accent }}>•</span></h1>
+            <h1 className="text-2xl font-black tracking-[-0.08em]">{collectionTheme.siteName}<span style={{ color: collectionTheme.accent }}>™</span></h1>
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>
           </div>
         </div>
