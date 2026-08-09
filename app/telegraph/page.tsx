@@ -52,7 +52,7 @@ export default function TelegraphPage() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={21} /></div>
+            <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={24} /></div>
             <div>
               <h1 className="text-2xl font-black tracking-[-0.08em]">NFTFAX<span className="text-[#e65b2f]">•</span></h1>
               <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Telegraph log</p>
