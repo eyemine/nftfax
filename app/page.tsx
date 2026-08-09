@@ -153,7 +153,7 @@ export default function Home() {
           href="/pre-register"
           className="key-shadow flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em]"
         >
-          <LayersArrowDown size={13} /> Telegraph
+          <LayersArrowDown size={13} /> Rolodex
         </Link>
         <Link
           href="/about"

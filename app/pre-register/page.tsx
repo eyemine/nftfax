@@ -9,7 +9,7 @@ import { SkinPanel } from '../components/SkinPanel';
 
 type RegisterStatus = 'idle' | 'registering' | 'registered' | 'error';
 
-interface TelegraphEntry {
+interface RolodexEntry {
   handle: string;
   wallet: string;
   collection: string;
@@ -31,7 +31,7 @@ export default function PreRegisterPage() {
   const [error, setError] = useState('');
   const [vaultWallet, setVaultWallet] = useState('');
   const [tokenId, setTokenId] = useState('');
-  const [entries, setEntries] = useState<TelegraphEntry[]>([]);
+  const [entries, setEntries] = useState<RolodexEntry[]>([]);
 
   useEffect(() => {
     setHandle('');
@@ -43,7 +43,7 @@ export default function PreRegisterPage() {
   async function loadEntries() {
     try {
       const res = await fetch(`/api/telegraph/list?collection=${collection}`, { cache: 'no-store' });
-      const json = (await res.json()) as { items?: TelegraphEntry[]; error?: string };
+      const json = (await res.json()) as { items?: RolodexEntry[]; error?: string };
       setEntries(json.items ?? []);
     } catch {
       setEntries([]);
@@ -113,7 +113,7 @@ export default function PreRegisterPage() {
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={24} /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-[-0.08em]">TELEGRAPH<span style={{ color: theme.accent }}>•</span></h1>
+            <h1 className="text-2xl font-black tracking-[-0.08em]">ROLODEX<span style={{ color: theme.accent }}>•</span></h1>
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Pre-registration for 08/08/2026</p>
           </div>
         </div>
@@ -212,7 +212,7 @@ export default function PreRegisterPage() {
                 onClick={() => login({ loginMethods: ['wallet'] })}
                 className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white"
               >
-                <Users size={17} /> Connect wallet to telegraph
+                <Users size={17} /> Connect wallet to rolodex
               </button>
             ) : (
               <button
@@ -221,7 +221,7 @@ export default function PreRegisterPage() {
                 className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white disabled:opacity-50"
               >
                 {status === 'registering' ? <Loader2 size={17} className="animate-spin" /> : <Check size={17} />}
-                Join Telegraph Directory
+                Join Rolodex Directory
               </button>
             )}
 

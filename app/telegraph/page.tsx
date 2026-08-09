@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Radio, Info } from 'lucide-react';
+import { Loader2, Radar, Info } from 'lucide-react';
 import Link from 'next/link';
 
 interface ChainEntry {
@@ -12,7 +12,7 @@ interface ChainEntry {
   createdAt: number;
 }
 
-interface TelegraphData {
+interface RolodexData {
   totalPublic?: number;
   uniqueSenders?: number;
   uniqueRecipients?: number;
@@ -25,8 +25,8 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-export default function TelegraphPage() {
-  const [data, setData] = useState<TelegraphData | null>(null);
+export default function RolodexPage() {
+  const [data, setData] = useState<RolodexData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -35,8 +35,8 @@ export default function TelegraphPage() {
     void (async () => {
       try {
         const res = await fetch('/api/tray/telegraph', { cache: 'no-store' });
-        const json = await res.json() as TelegraphData & { error?: string };
-        if (!res.ok) throw new Error(json.error || 'Could not load telegraph log');
+        const json = await res.json() as RolodexData & { error?: string };
+        if (!res.ok) throw new Error(json.error || 'Could not load rolodex log');
         if (!cancelled) setData(json);
       } catch (cause: unknown) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load log');
@@ -52,10 +52,10 @@ export default function TelegraphPage() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={24} /></div>
+            <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radar size={24} /></div>
             <div>
               <h1 className="text-2xl font-black tracking-[-0.08em]">NFTFAX<span className="text-[#e65b2f]">•</span></h1>
-              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Telegraph log</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Rolodex log</p>
             </div>
           </div>
           <div className="flex gap-2">

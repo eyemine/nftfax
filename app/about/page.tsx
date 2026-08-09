@@ -44,7 +44,7 @@ export default function AboutPage() {
             <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">How to play</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
-                <li><strong>Register</strong> your <strong>@fax</strong> identity in the Telegraph directory before launch.</li>
+                <li><strong>Register</strong> your <strong>@fax</strong> identity in the Rolodex directory before launch.</li>
                 <li><strong>Send</strong> a greyscale image to any <code>prefix.tokenId@fax</code> address.</li>
                 <li><strong>Forward</strong> public faxes you receive to keep the chain alive and earn +1 send credit.</li>
                 <li><strong>Save</strong> a fax only after it has been forwarded — permanence is unlocked by participation.</li>
@@ -84,7 +84,7 @@ export default function AboutPage() {
               <ul className="space-y-2 list-disc pl-4">
                 <li><strong>@fax</strong> transmissions are <strong>public canvases</strong> — anyone can view them at <code>/tray/&#123;id&#125;</code>, with no encryption or private metadata.</li>
                 <li><strong>@nftmail.box</strong> transmissions are private and cannot be opened by anyone except the recipient.</li>
-                <li>The Telegraph log only tracks public chains and community diversity.</li>
+                <li>The Rolodex log only tracks public chains and community diversity.</li>
               </ul>
             </div>
           </SkinPanel>
