@@ -11,7 +11,7 @@
 /// Unsaved / unminted faxes decay after 8 days so the gallery stays uncluttered.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Send, Coins, Archive, Clock, Lock, Radio, X, Upload, Link2, Stamp, Ghost, Sun } from 'lucide-react';
+import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun } from 'lucide-react';
 import { compositeChain, CHAIN_OPS, type ChainOp } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain } from '../lib/contracts';
 
@@ -62,7 +62,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', overrideSrc }: { id: string; encrypted?: boolean; elapsed: number; jammed?: boolean; className?: string; overrideSrc?: string }) {
+function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', overrideSrc, href }: { id: string; encrypted?: boolean; elapsed: number; jammed?: boolean; className?: string; overrideSrc?: string; href?: string }) {
   const [src, setSrc] = useState('');
   const [failed, setFailed] = useState(false);
 
@@ -117,10 +117,17 @@ function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', override
   if (!src) {
     return <div className={`grid w-full place-items-center bg-[#e7e0d1] ${className}`}><Loader2 className="animate-spin text-[#847d6e]" size={18} /></div>;
   }
+  const thumb = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={`Fax ${id}`} className="h-full w-full object-contain grayscale" style={{ filter: `grayscale(1) contrast(${contrastForElapsed(elapsed)})`, opacity: 0.4 + 0.6 * contrastForElapsed(elapsed) }} />
+  );
   return (
     <div className={`w-full overflow-hidden bg-[#e7e0d1] ${className}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={`Fax ${id}`} className="h-full w-full object-contain grayscale" style={{ filter: `grayscale(1) contrast(${contrastForElapsed(elapsed)})`, opacity: 0.4 + 0.6 * contrastForElapsed(elapsed) }} />
+      {href ? (
+        <a href={href} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="block h-full w-full">
+          {thumb}
+        </a>
+      ) : thumb}
     </div>
   );
 }
@@ -318,7 +325,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box' }: InTray
   if (!cleanLocal || !wallet) {
     return (
       <div className="grid min-h-[220px] place-items-center border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center">
-        <div><Radio size={26} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">Connect + name your mailbox</p><p className="mt-2 text-[10px] uppercase tracking-wider text-[#696457]">Enter your NFTmail mailbox and connect a wallet to load your in-tray.</p></div>
+        <div><LayersArrowDown size={26} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">Connect + name your mailbox</p><p className="mt-2 text-[10px] uppercase tracking-wider text-[#696457]">Enter your NFTmail mailbox and connect a wallet to load your in-tray.</p></div>
       </div>
     );
   }
@@ -364,7 +371,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box' }: InTray
                 </span>
               </div>
 
-              <FaxThumb id={fax.id} encrypted={fax.encrypted} elapsed={elapsed} jammed={jammed} />
+              <FaxThumb id={fax.id} encrypted={fax.encrypted} elapsed={elapsed} jammed={jammed} href={`https://nftmail.box/tray/${fax.id}`} />
 
               <div className="space-y-2 p-3">
                 <p className="truncate text-[10px] font-bold uppercase text-[#4a4638]">From: {fax.from}</p>

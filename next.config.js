@@ -7,6 +7,10 @@ const nextConfig = {
         source: '/api/tray/:path*',
         destination: 'https://nftmail.box/api/tray/:path*',
       },
+      {
+        source: '/api/telegraph/:path*',
+        destination: 'https://nftmail.box/api/telegraph/:path*',
+      },
     ];
   },
 };

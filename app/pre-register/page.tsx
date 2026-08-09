@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
-import { Radio, Loader2, Check, Users, AlertCircle, ArrowLeft } from 'lucide-react';
+import { LayersArrowDown, Loader2, Check, Users, AlertCircle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
 import { SkinPanel } from '../components/SkinPanel';
@@ -111,9 +111,9 @@ export default function PreRegisterPage() {
     <main className="min-h-screen px-4 py-6 md:px-8 md:py-10" style={{ backgroundColor: '#c8c0ae' }}>
       <header className="mx-auto mb-5 flex max-w-6xl items-center justify-between border-b border-[#575244] pb-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={21} /></div>
+          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={21} /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-[-0.08em]">TELEGRAPH<span style={{ color: theme.accent }}>®</span></h1>
+            <h1 className="text-2xl font-black tracking-[-0.08em]">TELEGRAPH<span style={{ color: theme.accent }}>•</span></h1>
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Pre-registration for 08/08/2026</p>
           </div>
         </div>

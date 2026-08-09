@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
-import { Check, Loader2, LockKeyhole, Radio, Send, ShieldCheck, Upload, Zap, Wallet, Inbox, UserCheck, Info } from 'lucide-react';
+import { Check, Loader2, LockKeyhole, LayersArrowDown, Send, ShieldCheck, Upload, Zap, Wallet, Inbox, UserCheck, Info } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
@@ -118,9 +118,9 @@ export default function Home() {
     <main className="min-h-screen px-4 py-6 md:px-8 md:py-10">
       <header className="mx-auto mb-5 flex max-w-6xl items-center justify-between border-b border-[#575244] pb-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={21} /></div>
+          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={21} /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-[-0.08em]">{collectionTheme.siteName}<span style={{ color: collectionTheme.accent }}>®</span></h1>
+            <h1 className="text-2xl font-black tracking-[-0.08em]">{collectionTheme.siteName}<span style={{ color: collectionTheme.accent }}>•</span></h1>
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>
           </div>
         </div>
@@ -153,7 +153,7 @@ export default function Home() {
           href="/pre-register"
           className="key-shadow flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em]"
         >
-          <Radio size={13} /> Telegraph
+          <LayersArrowDown size={13} /> Telegraph
         </Link>
         <Link
           href="/about"

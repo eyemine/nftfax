@@ -3,6 +3,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_PRIVY_APP_ID=${NEXT_PUBLIC_PRIVY_APP_ID}
+        - NEXT_PUBLIC_NFTMAIL_URL=${NEXT_PUBLIC_NFTMAIL_URL}
     container_name: nftfax-nftfax-1
     ports:
       - "3002:3000"

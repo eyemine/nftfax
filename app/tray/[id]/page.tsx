@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Lock, Radio, X } from 'lucide-react';
+import { Loader2, Lock, LayersArrowDown, X } from 'lucide-react';
 import Link from 'next/link';
+import { FAX_THEME } from '../../lib/theme';
+import { SkinPanel } from '../../components/SkinPanel';
 
 interface TrayDocument {
   id: string;
@@ -51,16 +53,16 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
       <div className="mx-auto max-w-5xl">
         <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={21} /></div>
+            <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={21} /></div>
             <div>
-              <h1 className="text-2xl font-black tracking-[-0.08em]">NFTFAX<span className="text-[#e65b2f]">®</span></h1>
-              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Internet document transmission office</p>
+              <h1 className="text-2xl font-black tracking-[-0.08em]">{FAX_THEME.siteName}<span style={{ color: FAX_THEME.accent }}>•</span></h1>
+              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">{FAX_THEME.tagline}</p>
             </div>
           </div>
           <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">Open office</Link>
         </header>
 
-        <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+        <SkinPanel className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
             <span>Public transmission T/#{doc.id.slice(0, 4).toUpperCase()}</span>
             <span className={jammed ? 'text-[#a94228]' : 'text-[#456049]'}>{jammed ? 'LINE JAMMED' : 'LINE OPEN'}</span>
@@ -98,7 +100,7 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
               </p>
             </div>
           </div>
-        </div>
+        </SkinPanel>
 
         <footer className="mt-5 text-center text-[8px] font-bold uppercase tracking-[.14em] text-[#575347]">
           Powered by NFTmail.box / ERC-8004 identity
