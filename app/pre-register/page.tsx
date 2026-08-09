@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
-import { LayersArrowDown, Loader2, Check, Users, AlertCircle, ArrowLeft } from 'lucide-react';
+import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, ArrowLeft, X } from 'lucide-react';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
 import { SkinPanel } from '../components/SkinPanel';
@@ -104,6 +104,32 @@ export default function PreRegisterPage() {
     }
   }
 
+  async function removeEntry(entry: RolodexEntry) {
+    if (!walletAddress) return;
+    if (entry.wallet.toLowerCase() !== walletAddress.toLowerCase()) {
+      setError('You can only remove your own entries.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/telegraph/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          handle: entry.handle,
+          wallet: entry.wallet,
+          collection: entry.collection,
+        }),
+      });
+      if (!res.ok) {
+        const json = (await res.json()) as { error?: string };
+        throw new Error(json.error || 'Removal failed');
+      }
+      void loadEntries();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Removal failed');
+    }
+  }
+
   const communityTotal = entries.length;
   const readyCount = entries.filter((e) => e.ready).length;
 
@@ -111,7 +137,7 @@ export default function PreRegisterPage() {
     <main className="min-h-screen px-4 py-6 md:px-8 md:py-10" style={{ backgroundColor: '#c8c0ae' }}>
       <header className="mx-auto mb-5 flex max-w-6xl items-center justify-between border-b border-[#575244] pb-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={24} /></div>
+          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radar size={24} /></div>
           <div>
             <h1 className="text-2xl font-black tracking-[-0.08em]">ROLODEX<span style={{ color: theme.accent }}>•</span></h1>
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">Pre-registration for 08/08/2026</p>
@@ -257,11 +283,22 @@ export default function PreRegisterPage() {
                       <p className="text-xs font-bold">{entry.handle}@fax</p>
                       <p className="text-[9px] uppercase tracking-wider text-[#625e52]">{entry.wallet.slice(0, 6)}…{entry.wallet.slice(-4)}</p>
                     </div>
-                    {entry.ready ? (
-                      <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-[#456049]"><span className="h-2 w-2 rounded-full bg-[#56705a]" /> Ready</span>
-                    ) : (
-                      <span className="text-[9px] font-bold uppercase text-[#625e52]">Registered</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {entry.ready ? (
+                        <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-[#456049]"><span className="h-2 w-2 rounded-full bg-[#56705a]" /> Ready</span>
+                      ) : (
+                        <span className="text-[9px] font-bold uppercase text-[#625e52]">Registered</span>
+                      )}
+                      {walletAddress && entry.wallet.toLowerCase() === walletAddress.toLowerCase() && (
+                        <button
+                          onClick={() => void removeEntry(entry)}
+                          className="text-[#a94228] hover:text-[#c0392b]"
+                          title="Remove from radar"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

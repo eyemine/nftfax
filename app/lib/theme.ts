@@ -67,7 +67,7 @@ const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
     rpc: 'https://ethereum-rpc.publicnode.com',
   },
   pow: {
-    siteName: 'POW NFTFAX',
+    siteName: 'POWNFT NFTFAX',
     tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'atom.1234',
     mailboxHint: 'atom.1234',

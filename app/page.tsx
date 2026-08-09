@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
-import { Check, Loader2, LockKeyhole, LayersArrowDown, Send, ShieldCheck, Upload, Zap, Wallet, Inbox, UserCheck, Info } from 'lucide-react';
+import { Check, Loader2, LockKeyhole, LayersArrowDown, Radar, Send, ShieldCheck, Upload, Zap, Wallet, Inbox, UserCheck, Info } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
@@ -129,9 +129,9 @@ export default function Home() {
         ) : (
           <div className="flex gap-2">
             {hasMetaMask && (
-              <button onClick={() => void connectMetaMask()} className="key-shadow flex items-center gap-2 border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white"><Wallet size={14} /> MetaMask</button>
+              <button onClick={() => void connectMetaMask()} className="key-shadow flex items-center gap-2 border border-[#3c3c3c] bg-[#25251f] px-4 py-2 text-[10px] font-bold uppercase text-white"><Wallet size={14} /> MetaMask</button>
             )}
-            <button onClick={() => login()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Join / sign in</button>
+            <button onClick={() => login()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Other wallets</button>
           </div>
         )}
       </header>
@@ -153,7 +153,7 @@ export default function Home() {
           href="/pre-register"
           className="key-shadow flex items-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase tracking-[.14em]"
         >
-          <LayersArrowDown size={13} /> Rolodex
+          <Radar size={13} /> Rolodex
         </Link>
         <Link
           href="/about"
