@@ -37,8 +37,8 @@ function getNumericEnv(key: string, fallback: number): number {
 /// Default fallbacks for the three fax chain-letter games.
 const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
   chonk: {
-    siteName: 'CHONKFAX',
-    tagline: 'Base chain letter',
+    siteName: 'CHONKS NFTFAX',
+    tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'chonk.1234',
     mailboxHint: 'chonk.1234',
     collectionName: 'Chonks',
@@ -47,8 +47,8 @@ const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
     rpc: 'https://mainnet.base.org',
   },
   deadfellaz: {
-    siteName: 'DEADFELLAZFAX',
-    tagline: 'Ethereum chain letter',
+    siteName: 'DEADFELLAZ NFTFAX',
+    tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'dfz.1234',
     mailboxHint: 'dfz.1234',
     collectionName: 'Dead Fellaz',
@@ -57,8 +57,8 @@ const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
     rpc: 'https://ethereum-rpc.publicnode.com',
   },
   normie: {
-    siteName: 'NORMIEFAX',
-    tagline: '40 x 40 chain letter',
+    siteName: 'NORMIES NFTFAX',
+    tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'normie.1234',
     mailboxHint: 'normie.1234',
     collectionName: 'Normies',
@@ -67,8 +67,8 @@ const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
     rpc: 'https://ethereum-rpc.publicnode.com',
   },
   pow: {
-    siteName: 'POWFAX',
-    tagline: 'Proof of Work chain letter',
+    siteName: 'POW NFTFAX',
+    tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'atom.1234',
     mailboxHint: 'atom.1234',
     collectionName: 'POW NFT',
