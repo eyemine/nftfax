@@ -11,7 +11,8 @@ export default function Providers({ children }: { children: ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ['wallet', 'email', 'google', 'farcaster'],
+        // loginMethods: ['wallet', 'email', 'google', 'farcaster'],
+        loginMethods: ['wallet'], // web3-only for now
         appearance: {
           theme: 'light',
           accentColor: '#e65b2f',

@@ -129,7 +129,7 @@ export default function Home() {
         ) : (
           <div className="flex gap-2">
             {hasMetaMask && (
-              <button onClick={() => void connectMetaMask()} className="key-shadow flex items-center gap-2 border border-[#3c3c3c] bg-[#25251f] px-4 py-2 text-[10px] font-bold uppercase text-white"><Wallet size={14} /> MetaMask</button>
+              <button onClick={() => void connectMetaMask()} className="key-shadow flex items-center gap-2 border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white"><Wallet size={14} /> MetaMask</button>
             )}
             <button onClick={() => login()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50">Join / sign in</button>
           </div>
