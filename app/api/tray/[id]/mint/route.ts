@@ -48,9 +48,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers: NO_STORE });
   }
 
+  // Next.js standalone can misreport nextUrl.origin as https:// against its own
+  // plain-HTTP internal listener (behind an nginx TLS-terminating proxy), which
+  // breaks this same-origin self-fetch with an SSL handshake error. Force http
+  // for the internal hop; only used for our own ownership-check route.
+  const internalOrigin = `http://${req.nextUrl.hostname}:${req.nextUrl.port || process.env.PORT || 3000}`;
+
   try {
     const listRes = await fetch(
-      `${req.nextUrl.origin}/api/tray/inbox?local=${encodeURIComponent(local)}&wallet=${encodeURIComponent(wallet)}`,
+      `${internalOrigin}/api/tray/inbox?local=${encodeURIComponent(local)}&wallet=${encodeURIComponent(wallet)}`,
       { cache: 'no-store' },
     );
     if (!listRes.ok) {
