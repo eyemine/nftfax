@@ -16,6 +16,15 @@ export const FADE_MS = FADE_HOURS * 60 * 60 * 1000;
 
 export const BASE_FREE_CREDITS = 2;
 
+/// First 100 accounts to ever check their fax credits get a launch bonus of
+/// 5 free credits instead of the standard 2. Best-effort (not transactional —
+/// concurrent first-time joins may occasionally over/undercount by a couple
+/// under heavy simultaneous load), gated by `fax-joined:{label}` so a given
+/// label is only ever counted once.
+export const FIRST_JOINER_BONUS_CREDITS = 5;
+export const FIRST_JOINER_CAP = 100;
+const JOINER_COUNT_KEY = 'fax-joiner-count';
+
 function labelKey(prefix: string, label: string): string {
   return `${prefix}:${label.toLowerCase().trim()}`;
 }
@@ -135,6 +144,28 @@ export async function earnForwardCredit(label: string, ownerAddress: string): Pr
 
   await setCredits(label, nextCredits, ownerAddress);
   await setLastForwarded(label, now, ownerAddress);
+}
+
+/// Grants the first-100-joiners launch bonus on an account's very first
+/// credits lookup, then behaves like `getCredits` on every subsequent call.
+/// Call this from the credits GET route instead of `getCredits` directly.
+export async function ensureJoinerBonus(label: string, ownerAddress: string): Promise<number> {
+  const joinedRaw = await kvGet(labelKey('fax-joined', label));
+  if (joinedRaw !== null) {
+    return getCredits(label);
+  }
+
+  const countRaw = await kvGet(JOINER_COUNT_KEY);
+  const count = countRaw ? parseInt(countRaw, 10) || 0 : 0;
+  const granted = count < FIRST_JOINER_CAP ? FIRST_JOINER_BONUS_CREDITS : BASE_FREE_CREDITS;
+
+  await Promise.all([
+    setCredits(label, granted, ownerAddress),
+    kvPut(labelKey('fax-joined', label), String(granted), ownerAddress),
+    ...(count < FIRST_JOINER_CAP ? [kvPut(JOINER_COUNT_KEY, String(count + 1), ownerAddress)] : []),
+  ]);
+
+  return granted;
 }
 
 /// Reset an account's thermal-fade jam and refill free credits.
