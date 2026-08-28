@@ -136,25 +136,64 @@ interface LogEntry {
   transactionHash: string;
 }
 
+async function findContractDeploymentBlock(rpcUrl: string = FAX_RPC_URL, contract: string = FAX_CONTRACT): Promise<number> {
+  const current = await getBlockNumber(rpcUrl);
+  let low = 0;
+  let high = current;
+  let firstWithCode = current;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getCode',
+        params: [contract, `0x${mid.toString(16)}`],
+      }),
+    });
+    const json = (await res.json()) as RpcResponse<string>;
+    const code = json.result ?? '0x';
+    if (code && code.length > 2) {
+      firstWithCode = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+  return firstWithCode;
+}
+
+const LOG_RANGE = 9_999;
+
 async function getLogs(topic0: string, extraTopics: (string | null)[] = []): Promise<LogEntry[]> {
-  const res = await fetch(FAX_RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'eth_getLogs',
-      params: [{
-        address: FAX_CONTRACT,
-        fromBlock: '0x0',
-        toBlock: 'latest',
-        topics: [topic0, ...extraTopics],
-      }],
-    }),
-  });
-  const json = (await res.json()) as RpcResponse<LogEntry[]>;
-  if (json.error) throw new Error(json.error.message ?? 'eth_getLogs failed');
-  return json.result ?? [];
+  const current = await getBlockNumber();
+  const startBlock = await findContractDeploymentBlock();
+  const allLogs: LogEntry[] = [];
+  for (let from = startBlock; from <= current; from += LOG_RANGE) {
+    const to = Math.min(from + LOG_RANGE - 1, current);
+    const res = await fetch(FAX_RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_getLogs',
+        params: [{
+          address: FAX_CONTRACT,
+          fromBlock: `0x${from.toString(16)}`,
+          toBlock: `0x${to.toString(16)}`,
+          topics: [topic0, ...extraTopics],
+        }],
+      }),
+    });
+    const json = (await res.json()) as RpcResponse<LogEntry[]>;
+    if (json.error) throw new Error(json.error.message ?? 'eth_getLogs failed');
+    if (json.result) allLogs.push(...json.result);
+  }
+  allLogs.sort((a, b) => Number(BigInt(a.blockNumber)) - Number(BigInt(b.blockNumber)));
+  return allLogs;
 }
 
 /// Every address a fax collectible has ever been minted to (FaxMinted.to,
