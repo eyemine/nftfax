@@ -144,7 +144,7 @@ export default function DrawClient() {
   const supplyReached = totalMinted >= MAX_SUPPLY;
   const totalPoolWei = BigInt(MAX_SUPPLY) * mintPrice;
   const remainingPoolWei = balance;
-  const prizePerWinner = supplyReached ? balance / BigInt(11) : BigInt(0);
+  const prizePerWinner = supplyReached ? totalPoolWei / BigInt(11) : BigInt(0);
 
   function getProvider() {
     return (activeWallet as unknown as { provider?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } })?.provider ?? null;
