@@ -14,6 +14,9 @@ services:
       - NFTMAIL_WEBHOOK_SECRET=${NFTMAIL_WEBHOOK_SECRET}
       - PINATA_JWT=${PINATA_JWT}
       - IRYS_PRIVATE_KEY=${IRYS_PRIVATE_KEY}
+      - RELAYER_PRIVATE_KEY=${RELAYER_PRIVATE_KEY}
+      - GASLESS_DAILY_CAP=${GASLESS_DAILY_CAP:-100}
+      - GNOSIS_RPC_URL=${GNOSIS_RPC_URL:-https://rpc.gnosischain.com}
     ports:
       - "3002:3000"
     restart: unless-stopped
