@@ -2,7 +2,7 @@
 ///
 /// Proxies to the worker's checkFaxMintEligibility action. This enforces the
 /// per-chain single-claim rule (a source token can mint many collectibles, but
-/// only one per chain) without touching the wallet.
+/// only one per chain) before the wallet is asked to sign.
 
 import { NextRequest, NextResponse } from 'next/server';
 

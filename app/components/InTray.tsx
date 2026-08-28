@@ -337,7 +337,9 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         if (!tokenURI) {
           tokenURI = await pinFaxMetadata(targetId, cleanLocal).catch(() => null) || undefined;
         }
-        const tx = await buildMintTx({ local: cleanLocal, connectedWallet: wallet, trayId: targetId, tokenURI });
+        // The source token is the recipient of the fax being minted, not the connected wallet's identity.
+        const sourceLocal = (fax.to || '').toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, '') || cleanLocal;
+        const tx = await buildMintTx({ local: sourceLocal, connectedWallet: wallet, trayId: targetId, tokenURI });
         if (tx.error) throw new Error(tx.error);
         const sent = await sendMintTx(provider, wallet, tx);
         if (sent.error) throw new Error(sent.error);
