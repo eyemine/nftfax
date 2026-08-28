@@ -165,7 +165,7 @@ async function findContractDeploymentBlock(rpcUrl: string = FAX_RPC_URL, contrac
   return firstWithCode;
 }
 
-const LOG_RANGE = 9_999;
+const LOG_RANGE = 5_000;
 
 async function getLogs(topic0: string, extraTopics: (string | null)[] = []): Promise<LogEntry[]> {
   const current = await getBlockNumber();
