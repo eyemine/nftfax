@@ -17,14 +17,15 @@ interface TrayDocument {
   dataBase64?: string;
   createdAt: number;
   chainDepth?: number;
+  chainTimerDuration?: number;
 }
 
-const JAM_MS = 72 * 60 * 60 * 1000;
+const DEFAULT_JAM_MS = 72 * 60 * 60 * 1000;
 
-function contrastForElapsed(ms: number): number {
+function contrastForElapsed(ms: number, maxMs = DEFAULT_JAM_MS): number {
   if (ms <= 24 * 60 * 60 * 1000) return 1.0;
-  if (ms >= JAM_MS) return 0.1;
-  const window = JAM_MS - 24 * 60 * 60 * 1000;
+  if (ms >= maxMs) return 0.1;
+  const window = maxMs - 24 * 60 * 60 * 1000;
   const t = (ms - 24 * 60 * 60 * 1000) / window;
   return 0.7 - t * 0.3;
 }
@@ -41,8 +42,9 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
     return () => clearInterval(t);
   }, []);
 
+  const jamMs = doc.chainTimerDuration || DEFAULT_JAM_MS;
   const elapsed = now - doc.createdAt;
-  const jammed = elapsed > JAM_MS;
+  const jammed = elapsed > jamMs;
   const src = useMemo(() => {
     if (!doc.dataBase64) return '';
     return `data:image/${doc.format || 'png'};base64,${doc.dataBase64}`;
@@ -82,7 +84,7 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
                 </div>
               ) : src ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={src} alt={`Fax ${doc.id}`} className="max-h-full max-w-full object-contain grayscale" style={{ filter: `grayscale(1) contrast(${contrastForElapsed(elapsed)})`, opacity: 0.4 + 0.6 * contrastForElapsed(elapsed) }} />
+                <img src={src} alt={`Fax ${doc.id}`} className="max-h-full max-w-full object-contain grayscale" style={{ filter: `grayscale(1) contrast(${contrastForElapsed(elapsed, jamMs)})`, opacity: 0.4 + 0.6 * contrastForElapsed(elapsed, jamMs) }} />
               ) : (
                 <Loader2 className="animate-spin text-[#847d6e]" />
               )}
