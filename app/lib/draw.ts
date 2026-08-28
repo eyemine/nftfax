@@ -136,40 +136,14 @@ interface LogEntry {
   transactionHash: string;
 }
 
-async function findContractDeploymentBlock(rpcUrl: string = FAX_RPC_URL, contract: string = FAX_CONTRACT): Promise<number> {
-  const current = await getBlockNumber(rpcUrl);
-  let low = 0;
-  let high = current;
-  let firstWithCode = current;
-  while (low <= high) {
-    const mid = Math.floor((low + high) / 2);
-    const res = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'eth_getCode',
-        params: [contract, `0x${mid.toString(16)}`],
-      }),
-    });
-    const json = (await res.json()) as RpcResponse<string>;
-    const code = json.result ?? '0x';
-    if (code && code.length > 2) {
-      firstWithCode = mid;
-      high = mid - 1;
-    } else {
-      low = mid + 1;
-    }
-  }
-  return firstWithCode;
-}
-
+// Base mainnet deployment block for NFTFaxCollectible (V2).
+// Update this if the contract is ever redeployed.
+const DEPLOYMENT_BLOCK = 50_373_637;
 const LOG_RANGE = 5_000;
 
 async function getLogs(topic0: string, extraTopics: (string | null)[] = []): Promise<LogEntry[]> {
   const current = await getBlockNumber();
-  const startBlock = await findContractDeploymentBlock();
+  const startBlock = DEPLOYMENT_BLOCK;
   const allLogs: LogEntry[] = [];
   for (let from = startBlock; from <= current; from += LOG_RANGE) {
     const to = Math.min(from + LOG_RANGE - 1, current);

@@ -89,42 +89,34 @@ export default function DrawClient() {
 
   const refresh = useCallback(async () => {
     try {
-      const [currentRound, block, total, price, bal, contractOwner] = await Promise.all([
-        getCurrentRound(),
-        getBlockNumber(),
-        getTotalMinted(),
-        getMintPrice(),
-        getContractBalance(),
-        getOwner(),
-      ]);
-      setRound(currentRound);
-      setCurrentBlock(block);
-      setTotalMinted(total);
-      setMintPrice(price);
-      setBalance(bal);
-      setOwner(contractOwner);
-
-      const allEntries = await getAllMintEntries();
-      setEntries(allEntries);
-
-      if (currentRound > 0) {
-        const roundData = await getDrawRound(currentRound);
-        setData(roundData);
-        const prizeEvents = await getPrizeSentEvents(currentRound);
-        setWinners(prizeEvents.map((e) => ({ winner: e.winner, amount: e.amount, txHash: e.txHash })));
-        if (roundData?.seedCaptured) {
-          const tierMap = await fetchAllTiers(allEntries.map((e) => e.tokenId));
-          const computed = await selectTieredWinners(roundData.seed, allEntries, tierMap, 10);
-          const claimedSet = new Set(prizeEvents.map((e) => e.winner));
-          setTieredWinners(computed.map((w) => ({ ...w, claimed: claimedSet.has(w.winner) })));
-        } else {
-          setTieredWinners([]);
-        }
-      } else {
-        setData(null);
-        setWinners([]);
-        setTieredWinners([]);
+      const res = await fetch('/api/draw/state', { cache: 'no-store' });
+      const json = (await res.json()) as {
+        round: number;
+        currentBlock: number;
+        totalMinted: number;
+        mintPrice: string;
+        balance: string;
+        owner: string;
+        supplyReached: boolean;
+        roundData: DrawRoundData | null;
+        winners: { winner: string; amount: string; txHash: string }[];
+        tieredWinners: { tier: string; winner: string; tokenId: number; claimed: boolean }[];
+        entries: MintEntry[];
+        error?: string;
+      };
+      if (!res.ok || json.error) {
+        throw new Error(json.error ?? 'Could not read draw state');
       }
+      setRound(json.round);
+      setCurrentBlock(json.currentBlock);
+      setTotalMinted(json.totalMinted);
+      setMintPrice(BigInt(json.mintPrice));
+      setBalance(BigInt(json.balance));
+      setOwner(json.owner);
+      setData(json.roundData);
+      setWinners(json.winners.map((w) => ({ ...w, amount: BigInt(w.amount) })));
+      setTieredWinners(json.tieredWinners);
+      setEntries(json.entries);
       setError('');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not read draw state from chain.');
