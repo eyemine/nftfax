@@ -24,6 +24,7 @@ const MINT_FAX_DIRECT_SELECTOR = '0x08c40d22'; // mintFaxDirect(address,uint8,ui
 const MINT_FAX_ON_CHAIN_WITH_URI_SELECTOR = '0xd2c61ae0'; // mintFaxOnChainWithURI(uint256,string,string)
 const MINT_FAX_DIRECT_WITH_URI_SELECTOR = '0x4690e06f'; // mintFaxDirectWithURI(address,uint8,uint256,string,string)
 const MINT_PRICE_SELECTOR = '0x6817c76c'; // mintPrice()
+const CLAIMED_SELECTOR = '0x076ba748'; // claimed(uint8,uint256)
 
 const DEFAULT_MINT_PRICE_WEI = BigInt('2000000000000000'); // 0.002 ETH fallback if the price read fails
 
@@ -162,6 +163,32 @@ export interface BuildMintTxResult {
   error?: string;
 }
 
+/// Reads the contract's claimed mapping for a community/sourceTokenId pair.
+/// Returns true if this source token has already minted a Fax Chain collectible.
+export async function isTokenClaimed(
+  identity: FaxIdentity,
+  rpcUrl = 'https://mainnet.base.org',
+): Promise<boolean> {
+  const data = CLAIMED_SELECTOR + encodeUint256(COMMUNITY_ENUM[identity.collection]) + encodeUint256(identity.tokenId);
+  try {
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_call',
+        params: [{ to: BASE_FAX_COLLECTIBLE, data }, 'latest'],
+      }),
+    });
+    const json = (await res.json()) as RpcResponse;
+    if (!json.result || json.result === '0x') return false;
+    return BigInt(json.result) === BigInt(1);
+  } catch {
+    return false;
+  }
+}
+
 /// Builds the calldata + value for the on-chain mint transaction. Returns
 /// `error` (no `data`) if the mailbox identity can't be resolved to a known
 /// collection/token, or if off-chain ownership/delegation verification fails
@@ -174,6 +201,11 @@ export async function buildMintTx({ local, connectedWallet, trayId, tokenURI }: 
 
   if (!identity) {
     return { to: BASE_FAX_COLLECTIBLE, data: '', value, error: 'Could not determine an NFT collection/token ID from this mailbox to mint against.' };
+  }
+
+  const alreadyClaimed = await isTokenClaimed(identity);
+  if (alreadyClaimed) {
+    return { to: BASE_FAX_COLLECTIBLE, data: '', value, error: 'This source token has already minted a Fax Chain collectible.' };
   }
 
   if (identity.collection === 'chonk') {

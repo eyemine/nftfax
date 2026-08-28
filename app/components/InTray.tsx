@@ -736,7 +736,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                         <p className="mt-1 text-[9px] uppercase text-[#6e685a]">Resumes on V2 contract — {MINT_RESUME_AT}</p>
                       </div>
                     ) : (
-                      <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[10px] font-black uppercase text-white disabled:opacity-50">
+                      <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[10px] font-black uppercase text-white disabled:opacity-50">
                         {busyId === selected.id ? <Loader2 className="animate-spin" size={14} /> : <Coins size={14} />} Mint to Base
                       </button>
                     )}
@@ -748,7 +748,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS))} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[9px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
                     <Send size={12} /> Forward
                   </button>
-                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
+                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
                     <Coins size={12} /> {MINT_PAUSED ? 'Paused' : 'Mint'}
                   </button>
                   <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis || !selected.forwarded} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[9px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
@@ -758,7 +758,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 )}
                 {activeTab === 'sent' && !selected.mintedBase && !selected.savedGnosis && !MINT_PAUSED && !selected.encrypted && (selected.sourceTrayId || selected.chainTrayId || selected.recipientForwarded || selected.forwarded) && (
                 <div className="mb-5 grid grid-cols-2 gap-2">
-                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
                   </button>
                   <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[9px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
