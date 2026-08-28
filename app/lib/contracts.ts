@@ -34,9 +34,10 @@ export const GNOSIS_CHAIN: ChainConfig = {
   currency: { name: 'xDAI', symbol: 'xDAI', decimals: 18 },
 };
 
-// Base: the tradeable chain-letter collectible (mint) — V2 deployed, live.
+// Base: the tradeable chain-letter collectible (mint) — V3 deployed, live.
 // V1: 0x0093D896E677831D4e1fe92F3E548Ca72D3CD5FE
-export const BASE_FAX_COLLECTIBLE = '0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5';
+// V2: 0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5
+export const BASE_FAX_COLLECTIBLE = '0x677db3b180b266b12c7af1fed2f6fa30560cb010';
 // Gnosis: the permanence / archive anchor (save) — FaxTray deployed on Gnosis mainnet.
 export const GNOSIS_FAX_ARCHIVE = '0xb337eb5f7dad6f7f441c17cdde03e08220e9650d';
 
