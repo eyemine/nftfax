@@ -7,22 +7,11 @@ import { Loader2, Dices, CheckCircle2, Clock, Trophy, ArrowLeft, ShieldAlert, Ch
 import {
   FAX_CONTRACT,
   FAX_CONTRACT_DEPLOYED,
-  getBlockNumber,
-  getCurrentRound,
-  getDrawRound,
   getDrawPhase,
-  getPrizeSentEvents,
-  getTotalMinted,
-  getMintPrice,
-  getContractBalance,
-  getAllMintEntries,
   getFaxAccountLabel,
-  fetchAllTiers,
-  selectTieredWinners,
+  captureDrawSeedTx,
   distributePrizesTx,
   withdrawTx,
-  captureDrawSeedTx,
-  getOwner,
   type DrawRoundData,
   type DrawPhase,
   type MintEntry,
@@ -328,7 +317,7 @@ export default function DrawClient() {
             )}
 
             {/* Winners by tier */}
-            {supplyReached && tieredWinners.length > 0 && (
+            {supplyReached && (
               <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
                 <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em] flex items-center gap-2">
                   <Trophy size={14} /> Winners by tier
