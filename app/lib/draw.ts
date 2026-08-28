@@ -17,6 +17,8 @@ const SELECTOR_OWNER = '0x8da5cb5b'; // owner()
 const SELECTOR_COMMIT_DRAW_BLOCK = '0xfdbfd371'; // commitDrawBlock(uint256)
 const SELECTOR_CAPTURE_DRAW_SEED = '0x4023282d'; // captureDrawSeed(uint256)
 const SELECTOR_TOKEN_URI = '0xc87b56dd'; // tokenURI(uint256)
+const SELECTOR_TOTAL_MINTED = '0xa2309ff8'; // totalMinted()
+const SELECTOR_MINT_PRICE = '0x6817c76c'; // mintPrice()
 
 // ---- Event topics (from `cast sig-event`) ----
 const TOPIC_FAX_MINTED = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506e5629bcb0e5c';
@@ -65,6 +67,27 @@ export async function getBlockNumber(rpcUrl: string = FAX_RPC_URL): Promise<numb
 export async function getCurrentRound(): Promise<number> {
   const result = await ethCall(SELECTOR_CURRENT_ROUND);
   return Number(BigInt(result));
+}
+
+export async function getTotalMinted(): Promise<number> {
+  const result = await ethCall(SELECTOR_TOTAL_MINTED);
+  return Number(BigInt(result));
+}
+
+export async function getMintPrice(): Promise<bigint> {
+  const result = await ethCall(SELECTOR_MINT_PRICE);
+  return BigInt(result || '0');
+}
+
+export async function getContractBalance(): Promise<bigint> {
+  const res = await fetch(FAX_RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getBalance', params: [FAX_CONTRACT, 'latest'] }),
+  });
+  const json = (await res.json()) as RpcResponse;
+  if (json.error) throw new Error(json.error.message ?? 'eth_getBalance failed');
+  return BigInt(json.result || '0');
 }
 
 export async function getOwner(): Promise<string> {
@@ -145,6 +168,20 @@ export async function getAllMinters(): Promise<string[]> {
 export interface MintEntry {
   tokenId: number;
   minter: string;
+  community: number; // 1 = CHONK, 2 = DEADFELLAZ, 3 = POW, 4 = NORMIE
+  sourceTokenId: number;
+}
+
+const COMMUNITY_PREFIXES: Record<number, string> = {
+  1: 'chonk',
+  2: 'dfz',
+  3: 'atom',
+  4: 'normie',
+};
+
+export function getFaxAccountLabel(entry: MintEntry): string {
+  const prefix = COMMUNITY_PREFIXES[entry.community] || 'fax';
+  return `${prefix}.${entry.sourceTokenId}@fax`;
 }
 
 /// Same as getAllMinters but also extracts the minted token ID
@@ -152,10 +189,17 @@ export interface MintEntry {
 /// can fetch each token's metadata and read its tier trait.
 export async function getAllMintEntries(): Promise<MintEntry[]> {
   const logs = await getLogs(TOPIC_FAX_MINTED);
-  return logs.map((log) => ({
-    tokenId: Number(BigInt(log.topics[1])),
-    minter: `0x${log.topics[2].slice(-40)}`.toLowerCase(),
-  }));
+  return logs.map((log) => {
+    const data = log.data.startsWith('0x') ? log.data.slice(2) : log.data;
+    const community = Number(BigInt(`0x${data.slice(0, 64)}`));
+    const sourceTokenId = Number(BigInt(`0x${data.slice(64, 128)}`));
+    return {
+      tokenId: Number(BigInt(log.topics[1])),
+      minter: `0x${log.topics[2].slice(-40)}`.toLowerCase(),
+      community,
+      sourceTokenId,
+    };
+  });
 }
 
 /// ABI-decode a dynamic string from an eth_call return value.
@@ -322,6 +366,84 @@ export async function captureDrawSeedTx(fromAccount: string, round: number, prov
   }
 }
 
+/// Helper to build the calldata for owner-only distributePrizes(). Kept in
+/// draw.ts for discoverability; callers should guard this behind an owner check.
+export function encodeDistributePrizes(
+  round: number,
+  winners: string[],
+  amountsWei: bigint[],
+): string {
+  // ABI-encode: distributePrizes(uint256 round, address[] winners, uint256[] amounts)
+  // For dynamic arrays the layout is:
+  //   round (32)
+  //   winners offset (32) -> 0x40
+  //   amounts offset (32) -> 0x40 + 32 + winners.length*32  (rounded to word boundary)
+  if (winners.length !== amountsWei.length) throw new Error('Array length mismatch');
+  const selector = '0x23fcd3e4';
+  const roundEnc = encodeUint256(round);
+  const winnersOffset = 64; // 2 * 32 bytes after round
+  const amountsOffset = winnersOffset + 32 + winners.length * 32;
+  const winnersCount = encodeUint256(winners.length);
+  const winnersData = winners.map((w) => w.toLowerCase().slice(-64).padStart(64, '0')).join('');
+  const amountsCount = encodeUint256(amountsWei.length);
+  const amountsData = amountsWei.map((a) => encodeUint256(a)).join('');
+  return (
+    selector +
+    roundEnc +
+    encodeUint256(winnersOffset) +
+    encodeUint256(amountsOffset) +
+    winnersCount +
+    winnersData +
+    amountsCount +
+    amountsData
+  );
+}
+
+export async function distributePrizesTx(
+  fromAccount: string,
+  round: number,
+  winners: string[],
+  amountsWei: bigint[],
+  provider?: EthereumProvider | null,
+): Promise<{ txHash?: string; error?: string }> {
+  const p = provider ?? getProvider();
+  if (!p) return { error: 'A connected wallet is required.' };
+  try {
+    const data = encodeDistributePrizes(round, winners, amountsWei);
+    const txHash = await p.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: fromAccount, to: FAX_CONTRACT, data }],
+    });
+    return { txHash: typeof txHash === 'string' ? txHash : undefined };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function encodeWithdraw(to: string): string {
+  // withdraw(address payable to)
+  return '0x51cff8d9' + to.toLowerCase().slice(-64).padStart(64, '0');
+}
+
+export async function withdrawTx(
+  fromAccount: string,
+  to: string,
+  provider?: EthereumProvider | null,
+): Promise<{ txHash?: string; error?: string }> {
+  const p = provider ?? getProvider();
+  if (!p) return { error: 'A connected wallet is required.' };
+  try {
+    const data = encodeWithdraw(to);
+    const txHash = await p.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: fromAccount, to: FAX_CONTRACT, data }],
+    });
+    return { txHash: typeof txHash === 'string' ? txHash : undefined };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /// Owner-only. Included for completeness on an admin-gated view of /draw.
 export async function commitDrawBlockTx(fromAccount: string, futureBlock: number): Promise<{ txHash?: string; error?: string }> {
   const provider = getProvider();
@@ -391,6 +513,7 @@ export async function selectWinners(seedHex: string, minters: string[], winnerCo
 export interface TieredWinner {
   tier: string;
   winner: string;
+  tokenId: number;
 }
 
 /// Tier-aware winner selection: groups mint entries by their NFT metadata
@@ -433,7 +556,7 @@ export async function selectTieredWinners(
     for (const entry of shuffledEntries) {
       if (seenWallets.has(entry.minter)) continue;
       seenWallets.add(entry.minter);
-      winners.push({ tier, winner: entry.minter });
+      winners.push({ tier, winner: entry.minter, tokenId: entry.tokenId });
       break; // one winner per tier
     }
   }
