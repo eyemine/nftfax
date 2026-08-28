@@ -9,6 +9,8 @@
 /// has forwarded it onward (mirrors the mint gate).
 
 import { NextRequest, NextResponse } from 'next/server';
+import { gaslessAvailable, gaslessSaveFax } from '@/app/lib/gasless-save';
+import type { Hex } from 'viem';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -37,6 +39,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     ownerWallet?: string;
     gnosisTx?: string;
     gnosisTokenId?: string | number;
+    gasless?: boolean;
+    tokenURI?: string;
   };
   const local = (body.local || '').toLowerCase().trim().replace(/@nftmail\.box$/, '');
   const wallet = (body.ownerWallet || '').trim();
@@ -77,6 +81,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }, { status: 403, headers: NO_STORE });
     }
 
+    let gnosisTx = body.gnosisTx || null;
+    if (body.gasless && gaslessAvailable()) {
+      if (!body.tokenURI) {
+        return NextResponse.json({ error: 'Missing tokenURI for gasless save.' }, { status: 400, headers: NO_STORE });
+      }
+      const relayerResult = await gaslessSaveFax(wallet as Hex, id, body.tokenURI);
+      if ('error' in relayerResult) {
+        return NextResponse.json({ error: relayerResult.error }, { status: 502, headers: NO_STORE });
+      }
+      gnosisTx = relayerResult.txHash;
+    }
+
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: workerHeaders(),
@@ -86,7 +102,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         trayId: id,
         forwardedTrayId: fax.forwardedTrayId || undefined,
         local,
-        gnosisTx: body.gnosisTx || null,
+        gnosisTx,
         gnosisTokenId: body.gnosisTokenId ?? null,
       }),
     });

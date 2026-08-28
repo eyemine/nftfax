@@ -8,11 +8,14 @@
     "start": "next start"
   },
   "dependencies": {
+    "@irys/upload": "^0.0.15",
+    "@irys/upload-ethereum": "^0.0.16",
     "@privy-io/react-auth": "^3.34.0",
     "lucide-react": "^1.30.0",
     "next": "^16.2.10",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "viem": "^2.52.0"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.14.10",

@@ -1,4 +1,4 @@
-/// Proxies the worker's getTelegraphLog filtered to fax.nftmail.box only.
+/// Proxies the worker's getTelegraphLog filtered to NFTfax (@fax) addresses only.
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest) {
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ action: 'getTelegraphLog', domainFilter: 'fax.nftmail.box' }),
+      body: JSON.stringify({ action: 'getTelegraphLog', domainFilter: 'fax' }),
       cache: 'no-store',
     });
     const data = await res.json();

@@ -37,7 +37,6 @@ function getNumericEnv(key: string, fallback: number): number {
 /// Default fallbacks for the three fax chain-letter games.
 const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
   chonk: {
-    siteName: 'CHONKS NFTFAX',
     tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'chonk.1234',
     mailboxHint: 'chonk.1234',
@@ -51,7 +50,7 @@ const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
     tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'dfz.1234',
     mailboxHint: 'dfz.1234',
-    collectionName: 'Dead Fellaz',
+    collectionName: 'Deadfellaz',
     contract: '0x2acab3dea77832c09420663b0e1cb386031ba17b',
     chainId: 1,
     rpc: 'https://ethereum-rpc.publicnode.com',
@@ -80,20 +79,20 @@ const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
 
 function baseTheme(): Omit<FaxTheme, 'key'> & { key: CollectionKey } {
   return {
-    key: 'deadfellaz',
+    key: 'chonk',
     siteName: getEnv('FAX_SITE_NAME', 'NFTFAX'),
-    tagline: getEnv('FAX_TAGLINE', 'Internet document transmission office'),
+    tagline: getEnv('FAX_TAGLINE', 'Base NFT chain letter'),
     fromDomain: (getEnv('FAX_FROM_DOMAIN', 'fax') as 'fax' | 'nftmail.box') === 'nftmail.box' ? 'nftmail.box' : 'fax',
-    mailboxPlaceholder: getEnv('FAX_MAILBOX_PLACEHOLDER', 'dfz.1234'),
-    mailboxHint: getEnv('FAX_MAILBOX_HINT', 'dfz.1234'),
+    mailboxPlaceholder: getEnv('FAX_MAILBOX_PLACEHOLDER', 'chonk.1234'),
+    mailboxHint: getEnv('FAX_MAILBOX_HINT', 'chonk.1234'),
     backgroundImage: getEnv('FAX_BACKGROUND_IMAGE', '') || null,
     backgroundOpacity: Math.max(0, Math.min(1, getNumericEnv('FAX_BACKGROUND_OPACITY', 0.25))),
     accent: getEnv('FAX_ACCENT', '#e65b2f'),
     primaryButton: getEnv('FAX_PRIMARY_BUTTON', '#e65b2f'),
-    collectionName: getEnv('FAX_COLLECTION_NAME', 'Dead Fellaz'),
-    contract: getEnv('FAX_COLLECTION_CONTRACT', '0x2acab3dea77832c09420663b0e1cb386031ba17b'),
-    chainId: Number(getEnv('FAX_CHAIN_ID', '1')) || 1,
-    rpc: getEnv('FAX_RPC', 'https://ethereum-rpc.publicnode.com'),
+    collectionName: getEnv('FAX_COLLECTION_NAME', 'FAX CHAIN'),
+    contract: getEnv('FAX_COLLECTION_CONTRACT', '0x07152bfde079b5319e5308C43fB1Dbc9C76cb4F9'),
+    chainId: Number(getEnv('FAX_CHAIN_ID', '8453')) || 8453,
+    rpc: getEnv('FAX_RPC', 'https://mainnet.base.org'),
   };
 }
 
@@ -103,8 +102,8 @@ export function getCollectionTheme(key: CollectionKey): Readonly<FaxTheme> {
   return { ...fallback, ...override, key } as Readonly<FaxTheme>;
 }
 
-const rawDefault = getEnv('FAX_DEFAULT_COLLECTION', 'deadfellaz') as CollectionKey;
-export const FAX_THEME = getCollectionTheme(COLLECTIONS[rawDefault] ? rawDefault : 'deadfellaz');
+const rawDefault = getEnv('FAX_DEFAULT_COLLECTION', 'chonk') as CollectionKey;
+export const FAX_THEME = getCollectionTheme(COLLECTIONS[rawDefault] ? rawDefault : 'chonk');
 
 export function backgroundStyle(theme: Pick<FaxTheme, 'backgroundImage' | 'backgroundOpacity'>) {
   const src = theme.backgroundImage ?? null;

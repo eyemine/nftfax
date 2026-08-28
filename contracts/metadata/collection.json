@@ -1,0 +1,8 @@
+{
+  "name": "FAX CHAIN",
+  "description": "FAX CHAIN is a chain-letter fax machine game on Base. Send a fax, forward it to keep the chain alive, and mint your link as a tradeable collectible.\n\n2,222 NFTs tiered by chain depth — from Dial Tone (1 hop) to Dead Letter (11+ hops). The deeper your chain, the rarer your mint. Forward without minting to push for a higher tier — but the thermal timer halves each time. Mint and the timer resets to72h for the next player. Push too far without minting and the line jams.\n\nAfter sellout, a transparent on-chain prize draw selects 10 winners — one from each of 11 tiers — using a future block hash as the random seed. Anyone can recompute and verify the draw. 4.04 ETH prize pool.\n\n5% royalty. Built on Base.",
+  "image": "https://costumes.mypinata.cloud/ipfs/bafkreihl3q3aqf7njgqdv4swkglcuc633krvpxottun455ttll2zsqn42a",
+  "external_link": "https://nftfax.app",
+  "seller_fee_basis_points": 500,
+  "fee_recipient": "0x1c63C3d9d211641e15cd3aF46De76b4bc84CC382"
+}

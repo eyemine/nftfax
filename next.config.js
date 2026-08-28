@@ -4,10 +4,6 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/tray/:path*',
-        destination: 'https://nftmail.box/api/tray/:path*',
-      },
-      {
         source: '/api/telegraph/:path*',
         destination: 'https://nftmail.box/api/telegraph/:path*',
       },

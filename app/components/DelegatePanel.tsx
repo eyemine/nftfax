@@ -200,7 +200,7 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
 
           {!result && !error && (
             <div className="text-[10px] font-bold uppercase tracking-[.12em] text-[#625e52]">
-              <p className="mb-2">Normie holders can keep their NFT in cold storage while a hot wallet plays the chain game.</p>
+              <p className="mb-2">NFT holders can keep their NFT in cold storage while a hot wallet plays the chain game.</p>
               <p>1. Connect your cold wallet to MetaMask.</p>
               <p>2. Enter the hot wallet address you want to use.</p>
               <p>3. Approve the Delegate.xyz transaction.</p>

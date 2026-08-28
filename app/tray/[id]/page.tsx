@@ -52,14 +52,14 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
     <main className="min-h-screen bg-[#c8c0ae] px-4 py-6 md:px-8 md:py-10">
       <div className="mx-auto max-w-5xl">
         <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={24} /></div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={20} /></div>
             <div>
-              <h1 className="text-2xl font-black tracking-[-0.08em]">{FAX_THEME.siteName}<span style={{ color: FAX_THEME.accent }}>™</span></h1>
-              <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-[#625e52]">{FAX_THEME.tagline}</p>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">{FAX_THEME.siteName}<span style={{ color: FAX_THEME.accent }}>™</span></h1>
+              <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{FAX_THEME.tagline}</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase">Open office</Link>
+          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap">Office</Link>
         </header>
 
         <SkinPanel className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">

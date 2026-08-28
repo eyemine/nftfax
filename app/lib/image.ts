@@ -103,17 +103,34 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
 export async function prepareImage(file: File): Promise<{ base64: string; preview: string; sizeKb: number }> {
   if (file.size > MAX_SOURCE_BYTES) throw new Error('Source image exceeds the 20MB intake limit.');
   const bitmap = await createImageBitmap(file);
-  const initialScale = Math.min(1, 1728 / bitmap.width, 2200 / bitmap.height);
-  let scale = initialScale;
+  const srcW = bitmap.width;
+  const srcH = bitmap.height;
+
+  // Chain-initiating fax canvas: minimum 800x800, landscape input becomes portrait 4:3.
+  const isLandscape = srcW > srcH;
+  const canvasW = 800;
+  const canvasH = isLandscape ? Math.round((canvasW * 4) / 3) : 800; // 800x1067 for landscape, 800x800 otherwise
+
+  const scale = Math.max(canvasW / srcW, canvasH / srcH);
+  const drawW = Math.round(srcW * scale);
+  const drawH = Math.round(srcH * scale);
+  const offsetX = Math.round((canvasW - drawW) / 2);
+  const offsetY = Math.round((canvasH - drawH) / 2);
+
   let dataUri = '';
+  let attemptScale = 1;
 
   for (let attempt = 0; attempt < 7; attempt += 1) {
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(320, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(400, Math.round(bitmap.height * scale));
+    canvas.width = Math.max(1, Math.round(canvasW * attemptScale));
+    canvas.height = Math.max(1, Math.round(canvasH * attemptScale));
     const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) throw new Error('This browser cannot operate the image processor.');
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, srcW, srcH, offsetX * attemptScale, offsetY * attemptScale, drawW * attemptScale, drawH * attemptScale);
+
     const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
     for (let index = 0; index < pixels.data.length; index += 4) {
       const grey = Math.round(pixels.data[index] * 0.299 + pixels.data[index + 1] * 0.587 + pixels.data[index + 2] * 0.114);
@@ -124,7 +141,7 @@ export async function prepareImage(file: File): Promise<{ base64: string; previe
     context.putImageData(pixels, 0, 0);
     dataUri = canvas.toDataURL('image/jpeg', 0.76);
     if (stripDataUri(dataUri).length <= MAX_ENCODED_LENGTH) break;
-    scale *= 0.8;
+    attemptScale *= 0.8;
   }
   bitmap.close();
   const base64 = stripDataUri(dataUri);

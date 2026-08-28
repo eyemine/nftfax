@@ -1,10 +1,11 @@
-/// Chain-letter collectible contracts (PLACEHOLDER).
+/// Chain-letter collectible contracts.
 ///
-/// These are stand-ins so the Mint (Base) and Save (Gnosis) buttons are wired
-/// end-to-end today. Until real contracts are deployed the on-chain broadcast
-/// is skipped and the action is recorded off-chain by the worker (the fax is
-/// still persisted / flagged). Swap in the deployed addresses + set a non-zero
-/// value and the gallery will broadcast the real transaction automatically.
+/// Base (mint) is live: BASE_FAX_COLLECTIBLE is the deployed NFTFaxCollectible
+/// (contracts/src/NFTFaxCollectible.sol) — see app/lib/fax-mint.ts for the
+/// actual mintFaxOnChain/mintFaxDirect calldata encoding. Gnosis (save) is
+/// still a placeholder: until GNOSIS_FAX_ARCHIVE is deployed, the on-chain
+/// broadcast is skipped and the action is recorded off-chain by the worker
+/// (the fax is still persisted / flagged).
 
 export interface ChainConfig {
   id: number;
@@ -33,32 +34,28 @@ export const GNOSIS_CHAIN: ChainConfig = {
   currency: { name: 'xDAI', symbol: 'xDAI', decimals: 18 },
 };
 
-// ---- PLACEHOLDER addresses — replace with deployed NFTfax contracts. ----
-// Base: the tradeable chain-letter collectible (mint).
-export const BASE_FAX_COLLECTIBLE = '0x0000000000000000000000000000000000000000';
-// Gnosis: the permanence / archive anchor (save).
-export const GNOSIS_FAX_ARCHIVE = '0x0000000000000000000000000000000000000000';
-
-// Intended mint/archive signatures for when the real contracts land.
-// e.g. keccak256('mintFax(string)').slice(0,10) — kept here for reference so
-// the encoder can be dropped in without hunting for the ABI.
-export const BASE_MINT_SIGNATURE = 'mintFax(string)';
-export const GNOSIS_ARCHIVE_SIGNATURE = 'archiveFax(string)';
+// Base: the tradeable chain-letter collectible (mint) — V2 deployed, live.
+// V1: 0x0093D896E677831D4e1fe92F3E548Ca72D3CD5FE
+export const BASE_FAX_COLLECTIBLE = '0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5';
+// Gnosis: the permanence / archive anchor (save) — FaxTray deployed on Gnosis mainnet.
+export const GNOSIS_FAX_ARCHIVE = '0xb337eb5f7dad6f7f441c17cdde03e08220e9650d';
 
 export function isPlaceholderAddress(addr: string): boolean {
   return !addr || /^0x0{40}$/i.test(addr);
 }
 
+/// Minting pause — set to false when V2 contract is deployed and ready.
+export const MINT_PAUSED = false;
+export const MINT_RESUME_AT = '24 Aug 2026, 02:00 UTC';
+
 export const MINT_CONFIG = {
   chain: BASE_CHAIN,
   contract: BASE_FAX_COLLECTIBLE,
-  signature: BASE_MINT_SIGNATURE,
 } as const;
 
 export const SAVE_CONFIG = {
   chain: GNOSIS_CHAIN,
   contract: GNOSIS_FAX_ARCHIVE,
-  signature: GNOSIS_ARCHIVE_SIGNATURE,
 } as const;
 
 type Eip1193Provider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };

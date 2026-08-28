@@ -28,6 +28,7 @@ interface InboxFax {
   forwardedTrayId?: string;
   encrypted?: boolean;
   channel?: string;
+  mintedBase?: { mintedAt: number; baseTx: string | null; baseTokenId: string | number | null } | null;
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -71,11 +72,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (fax.encrypted || fax.channel === 'private') {
       return NextResponse.json({ error: 'Private (encrypted) faxes cannot be minted to the public chain.' }, { status: 400, headers: NO_STORE });
     }
-    if (!fax.forwarded) {
+    if (!fax.forwarded && !body.baseTx) {
       return NextResponse.json({
         error: 'Forward this fax before minting. The chain letter must be passed on to unlock the Base mint.',
         code: 'FORWARD_REQUIRED',
       }, { status: 403, headers: NO_STORE });
+    }
+    if (fax.mintedBase) {
+      return NextResponse.json({
+        error: 'This fax has already been minted to Base.',
+        code: 'ALREADY_MINTED',
+      }, { status: 409, headers: NO_STORE });
     }
 
     const res = await fetch(WORKER_URL, {
