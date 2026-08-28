@@ -70,15 +70,6 @@ interface InTrayProps {
   getEthereumProvider?: () => Promise<Eip1193Provider>;
 }
 
-function contrastForElapsed(ms: number, jamMs: number): number {
-  const fadeStart = Math.min(24 * 60 * 60 * 1000, jamMs * 0.33);
-  if (ms <= fadeStart) return 1.0;
-  if (ms >= jamMs) return 0.1;
-  const window = jamMs - fadeStart;
-  const t = (ms - fadeStart) / window;
-  return 0.7 - t * 0.3;
-}
-
 function formatCountdown(msLeftToJam: number): string {
   if (msLeftToJam <= 0) return 'LINE JAMMED';
   const d = Math.floor(msLeftToJam / 86_400_000);
@@ -93,7 +84,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', overrideSrc, href, jamMs = DEFAULT_JAM_MS, fullOpacity = false }: { id: string; encrypted?: boolean; elapsed: number; jammed?: boolean; className?: string; overrideSrc?: string; href?: string; jamMs?: number; fullOpacity?: boolean }) {
+function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', overrideSrc, href, jamMs = DEFAULT_JAM_MS }: { id: string; encrypted?: boolean; elapsed: number; jammed?: boolean; className?: string; overrideSrc?: string; href?: string; jamMs?: number }) {
   const [src, setSrc] = useState('');
   const [failed, setFailed] = useState(false);
 
@@ -117,12 +108,12 @@ function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', override
   }, [id, encrypted, overrideSrc]);
 
   // A composite preview overrides the fetched bitmap and renders at full
-  // contrast (a fresh, un-faded link) inside the same fax frame.
+  // colour inside the same fax frame.
   if (overrideSrc) {
     return (
       <div className={`w-full overflow-hidden bg-[#e7e0d1] ${className}`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={overrideSrc} alt={`Composite ${id}`} className="h-full w-full object-contain grayscale" />
+        <img src={overrideSrc} alt={`Composite ${id}`} className="h-full w-full object-contain" />
       </div>
     );
   }
@@ -140,10 +131,9 @@ function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', override
   if (!src) {
     return <div className={`grid w-full place-items-center bg-[#e7e0d1] ${className}`}><Loader2 className="animate-spin text-[#847d6e]" size={18} /></div>;
   }
-  const isJammed = jammed && !fullOpacity;
   const thumb = (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={`Fax ${id}`} className="h-full w-full object-contain grayscale" style={{ filter: `grayscale(1) contrast(${isJammed ? 0.2 : contrastForElapsed(elapsed, jamMs)})`, opacity: isJammed ? 0.2 : (fullOpacity ? 1 : 0.4 + 0.6 * contrastForElapsed(elapsed, jamMs)) }} />
+    <img src={src} alt={`Fax ${id}`} className="h-full w-full object-contain" />
   );
   return (
     <div className={`w-full overflow-hidden bg-[#e7e0d1] ${className}`}>
@@ -639,7 +629,6 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                           encrypted={compositePreview ? false : selected.encrypted}
                           elapsed={compositePreview ? 0 : isForwardedImage ? 0 : now - selected.createdAt}
                           jammed={activeTab === 'inbox' && !compositePreview && !isForwardedImage && !selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)}
-                          fullOpacity
                           overrideSrc={compositePreview || undefined}
                           className="h-full"
                         />
