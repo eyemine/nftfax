@@ -106,16 +106,23 @@ export async function prepareImage(file: File): Promise<{ base64: string; previe
   const srcW = bitmap.width;
   const srcH = bitmap.height;
 
-  // Chain-initiating fax canvas: minimum 800x800, landscape input becomes portrait 4:3.
+  // Fax canvas rules:
+  //   - If the longest edge < 800px, upscale so the longest edge = 800px.
+  //   - If the longest edge >= 800px, keep the image at its original resolution.
+  //   - Landscape images are placed on a 4:3 portrait canvas (white padding,
+  //     no cropping). Portrait/square images use their own dimensions.
   const isLandscape = srcW > srcH;
-  const canvasW = 800;
-  const canvasH = isLandscape ? Math.round((canvasW * 4) / 3) : 800; // 800x1067 for landscape, 800x800 otherwise
+  const longestEdge = Math.max(srcW, srcH);
+  const scale = longestEdge < 800 ? 800 / longestEdge : 1;
+  const scaledW = Math.round(srcW * scale);
+  const scaledH = Math.round(srcH * scale);
 
-  const scale = Math.max(canvasW / srcW, canvasH / srcH);
-  const drawW = Math.round(srcW * scale);
-  const drawH = Math.round(srcH * scale);
-  const offsetX = Math.round((canvasW - drawW) / 2);
-  const offsetY = Math.round((canvasH - drawH) / 2);
+  const canvasW = isLandscape ? scaledW : scaledW;
+  const canvasH = isLandscape ? Math.round((scaledW * 4) / 3) : scaledH;
+  const drawW = scaledW;
+  const drawH = scaledH;
+  const offsetX = 0;
+  const offsetY = isLandscape ? Math.round((canvasH - drawH) / 2) : 0;
 
   let dataUri = '';
   let attemptScale = 1;
