@@ -34,6 +34,7 @@ interface MintEntry {
   community: number;
   sourceTokenId: number;
   trayId: string;
+  chainDepth?: number;
 }
 
 interface LeaderboardData {
@@ -180,6 +181,40 @@ export default function RolofaxClient() {
           </div>
         )}
 
+        {/* Prize winners board — placeholder until the first draw round is committed/finalized on-chain */}
+        <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+            <span className="flex items-center gap-2"><Trophy size={14} /> Prize winners</span>
+            <span className="text-[#615c50]">Draw round not yet committed</span>
+          </div>
+          <table className="w-full border-collapse text-left text-[10px]">
+            <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+              <tr>
+                <th className="border-b border-[#8f8878] p-3 font-bold">#</th>
+                <th className="border-b border-[#8f8878] p-3 font-bold">Fax ID</th>
+                <th className="border-b border-[#8f8878] p-3 font-bold">Token ID</th>
+                <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
+                <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
+                <th className="border-b border-[#8f8878] p-3 font-bold">Minter</th>
+                <th className="border-b border-[#8f8878] p-3 font-bold text-right">Prize</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((rank) => (
+                <tr key={rank} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
+                  <td className="p-3 font-bold">{rank}</td>
+                  <td className="p-3">–</td>
+                  <td className="p-3">–</td>
+                  <td className="p-3">–</td>
+                  <td className="p-3">–</td>
+                  <td className="p-3">–</td>
+                  <td className="p-3 text-right font-black text-[#e65b2f]">0.404 ETH</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
             <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
@@ -238,7 +273,7 @@ export default function RolofaxClient() {
                       </a>
                     </td>
                     <td className="p-3 font-mono">{mint.trayId || '—'}</td>
-                    <td className="p-3">{tierForDepth(mint.sourceTokenId)}</td>
+                    <td className="p-3">{tierForDepth(mint.chainDepth ?? 1)}</td>
                     <td className="p-3">{minterLabel(mint)}</td>
                   </tr>
                 ))}

@@ -1,5 +1,7 @@
 /// Reads totalMinted() from the V2 contract on Base. Scans FaxMinted events
-/// to build the per-collection leaderboard. No worker KV dependency.
+/// to build the per-collection leaderboard, then enriches each mint with the
+/// fax's real chain depth (tier) from the worker's tray KV — the contract
+/// event only carries the source NFT's tokenId, which is NOT the chain depth.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
@@ -10,6 +12,7 @@ const CONTRACT = BASE_FAX_COLLECTIBLE;
 const FAX_MINTED_TOPIC = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506e5629bcb0e5c';
 const DEPLOY_BLOCK = 50375000;
 const CHUNK_SIZE = 10_000;
+const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 
 const COMMUNITY_NAMES: Record<number, string> = {
   0: 'none', 1: 'chonk', 2: 'deadfellaz', 3: 'pow', 4: 'normie',
@@ -20,9 +23,24 @@ const COMMUNITY_PREFIXES: Record<number, string> = {
 };
 
 interface RpcLog { topics: string[]; data: string; blockNumber: string; transactionHash: string; }
-interface MintEntry { tokenId: number; minter: string; community: number; sourceTokenId: number; trayId: string; }
+interface MintEntry { tokenId: number; minter: string; community: number; sourceTokenId: number; trayId: string; chainDepth?: number; }
 interface LeaderboardEntry { collection: string; mints: number; maxTokenId: number; communities: number; }
 interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; contractBalanceEth: string; mints: MintEntry[]; }
+
+async function fetchChainDepth(trayId: string): Promise<number | undefined> {
+  try {
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getTrayDocument', id: trayId }),
+    });
+    if (!res.ok) return undefined;
+    const doc = await res.json().catch(() => null) as { chainDepth?: number } | null;
+    return typeof doc?.chainDepth === 'number' ? doc.chainDepth : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 async function rpc(method: string, params: unknown[]): Promise<unknown> {
   const res = await fetch(RPC_URL, {
@@ -122,6 +140,13 @@ export async function GET(_req: NextRequest) {
     const leaderboard: LeaderboardEntry[] = Array.from(byCollection.entries())
       .map(([collection, e]) => ({ collection, mints: e.mints, maxTokenId: e.maxTokenId, communities: e.communities.size }))
       .sort((a, b) => b.mints - a.mints);
+
+    const uniqueTrayIds = Array.from(new Set(allMints.map((m) => m.trayId).filter(Boolean)));
+    const depths = await Promise.all(uniqueTrayIds.map((id) => fetchChainDepth(id)));
+    const depthByTrayId = new Map(uniqueTrayIds.map((id, i) => [id, depths[i]]));
+    for (const mint of allMints) {
+      mint.chainDepth = depthByTrayId.get(mint.trayId);
+    }
 
     return NextResponse.json({ leaderboard, totalMints, contractBalanceEth, mints: allMints } as LeaderboardData, { headers: NO_STORE });
   } catch {
