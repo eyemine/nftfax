@@ -35,6 +35,7 @@ interface MintEntry {
   sourceTokenId: number;
   trayId: string;
   chainDepth?: number;
+  rootTrayId?: string;
 }
 
 interface LeaderboardData {

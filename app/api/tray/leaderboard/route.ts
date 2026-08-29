@@ -24,11 +24,11 @@ const COMMUNITY_PREFIXES: Record<number, string> = {
 };
 
 interface RpcLog { topics: string[]; data: string; blockNumber: string; transactionHash: string; }
-interface MintEntry { tokenId: number; minter: string; community: number; sourceTokenId: number; trayId: string; chainDepth?: number; }
+interface MintEntry { tokenId: number; minter: string; community: number; sourceTokenId: number; trayId: string; chainDepth?: number; rootTrayId?: string; }
 interface LeaderboardEntry { collection: string; mints: number; maxTokenId: number; communities: number; }
 interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; contractBalanceEth: string; mints: MintEntry[]; }
 
-async function fetchChainDepth(trayId: string): Promise<number | undefined> {
+async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string }> {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
@@ -37,11 +37,14 @@ async function fetchChainDepth(trayId: string): Promise<number | undefined> {
       headers,
       body: JSON.stringify({ action: 'getTrayDocument', id: trayId }),
     });
-    if (!res.ok) return undefined;
-    const doc = await res.json().catch(() => null) as { chainDepth?: number } | null;
-    return typeof doc?.chainDepth === 'number' ? doc.chainDepth : undefined;
+    if (!res.ok) return {};
+    const doc = await res.json().catch(() => null) as { chainDepth?: number; rootTrayId?: string } | null;
+    return {
+      chainDepth: typeof doc?.chainDepth === 'number' ? doc.chainDepth : undefined,
+      rootTrayId: typeof doc?.rootTrayId === 'string' ? doc.rootTrayId : undefined,
+    };
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -145,10 +148,12 @@ export async function GET(_req: NextRequest) {
       .sort((a, b) => b.mints - a.mints);
 
     const uniqueTrayIds = Array.from(new Set(allMints.map((m) => m.trayId).filter(Boolean)));
-    const depths = await Promise.all(uniqueTrayIds.map((id) => fetchChainDepth(id)));
-    const depthByTrayId = new Map(uniqueTrayIds.map((id, i) => [id, depths[i]]));
+    const metas = await Promise.all(uniqueTrayIds.map((id) => fetchTrayMeta(id)));
+    const metaByTrayId = new Map(uniqueTrayIds.map((id, i) => [id, metas[i]]));
     for (const mint of allMints) {
-      mint.chainDepth = depthByTrayId.get(mint.trayId);
+      const meta = metaByTrayId.get(mint.trayId);
+      mint.chainDepth = meta?.chainDepth;
+      mint.rootTrayId = meta?.rootTrayId;
     }
 
     return NextResponse.json({ leaderboard, totalMints, contractBalanceEth, mints: allMints } as LeaderboardData, { headers: NO_STORE });

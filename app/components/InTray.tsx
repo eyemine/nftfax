@@ -33,6 +33,7 @@ interface InboxFax {
   forwardedTrayId?: string;
   chainTrayId?: string;
   sourceTrayId?: string;
+  rootTrayId?: string;
   chainDepth?: number;
   chainTimerDuration?: number;
   chainParticipants?: string[];
