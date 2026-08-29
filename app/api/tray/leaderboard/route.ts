@@ -13,6 +13,7 @@ const FAX_MINTED_TOPIC = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506
 const DEPLOY_BLOCK = 50375000;
 const CHUNK_SIZE = 10_000;
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
+const WORKER_SECRET = process.env.WORKER_SECRET || '';
 
 const COMMUNITY_NAMES: Record<number, string> = {
   0: 'none', 1: 'chonk', 2: 'deadfellaz', 3: 'pow', 4: 'normie',
@@ -29,9 +30,11 @@ interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number;
 
 async function fetchChainDepth(trayId: string): Promise<number | undefined> {
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
     const res = await fetch(WORKER_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ action: 'getTrayDocument', id: trayId }),
     });
     if (!res.ok) return undefined;
