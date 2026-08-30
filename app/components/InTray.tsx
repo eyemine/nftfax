@@ -14,9 +14,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink } from 'lucide-react';
 import { compositeChain, CHAIN_OPS, type ChainOp } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
-import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax } from '../lib/fax-mint';
+import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity } from '../lib/fax-mint';
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
+
+/// Per-collection on-chain mint-limit reminder, shown above the tray tab
+/// strip whenever the connected mailbox resolves to a known collection.
+/// Chonk's claimed[] mapping has no chain dimension (mintFaxOnChain resolves
+/// the real sourceTokenId via on-chain ownerOf, so it can't be composited) —
+/// one mint ever. DeadFellaz/POW/Normie mint via mintFaxDirect, where
+/// sourceTokenId is app-encoded per chain (see encodeCompositeSourceTokenId
+/// in fax-mint.ts) — one mint per chain.
+const MINT_LIMIT_NOTICE: Record<string, string> = {
+  chonk: 'Chonks permits only one NFTFAX CHAIN mint per chonk.1234@fax account.',
+  pow: 'POW NFT permits one NFTFAX CHAIN mint per chain per atom.1234@fax account.',
+  deadfellaz: 'Deadfellaz permits one NFTFAX CHAIN mint per chain per dfz.1234@fax account.',
+  normie: 'Normies permits one NFTFAX CHAIN mint per chain per Normie.1234@fax account.',
+};
 
 const DEFAULT_JAM_MS = 72 * 60 * 60 * 1000;
 const DECAY_MS = 4 * 24 * 60 * 60 * 1000; // 96-hour decay
@@ -498,6 +512,11 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     }
   }
 
+  const mintLimitNotice = useMemo(() => {
+    const identity = parseFaxIdentity(cleanLocal);
+    return identity ? MINT_LIMIT_NOTICE[identity.collection] : null;
+  }, [cleanLocal]);
+
   const displayedFaxes: InboxFax[] = useMemo(() => {
     if (activeTab === 'sent') return sentFaxes;
     if (activeTab === 'saved') return faxes.filter((f) => f.savedGnosis);
@@ -530,6 +549,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           </button>
         </div>
       </div>
+
+      {mintLimitNotice && (
+        <div className="mb-4 border-l-4 border-[#26417d] bg-[#d3ddf2] p-3 text-[10px] font-bold uppercase text-[#26417d]">{mintLimitNotice}</div>
+      )}
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[#8f8878]">
