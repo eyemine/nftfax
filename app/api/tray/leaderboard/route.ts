@@ -95,12 +95,28 @@ async function fetchFaxMintedLogs(): Promise<RpcLog[]> {
   return allLogs;
 }
 
+// DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite
+// (realTokenId * 1_000_000 + chainSuffix) — see encodeCompositeSourceTokenId
+// in app/lib/fax-mint.ts — so the same real NFT can claim once per chain
+// instead of the contract's permanent once-ever claimed[] mapping. Chonk
+// mints always use the real ID (on-chain ownerOf() resolution requires it).
+// Real collection supplies are well under 1M, so any value >= 1_000_000
+// unambiguously indicates the new composite encoding.
+const CHAIN_SUFFIX_MOD = 1_000_000;
+
+function decodeSourceTokenId(raw: number, community: number): number {
+  if (community === 1) return raw; // Chonk: always the real ID
+  if (raw >= CHAIN_SUFFIX_MOD) return Math.floor(raw / CHAIN_SUFFIX_MOD);
+  return raw; // legacy pre-composite mint, already the real ID
+}
+
 function decodeLog(log: RpcLog): MintEntry {
   const tokenId = parseInt(log.topics[1] ?? '0x0', 16);
   const minter = '0x' + (log.topics[2] ?? '').slice(26).toLowerCase();
   const data = log.data.slice(2);
   const community = parseInt(data.slice(0, 64), 16);
-  const sourceTokenId = parseInt(data.slice(64, 128), 16);
+  const rawSourceTokenId = parseInt(data.slice(64, 128), 16);
+  const sourceTokenId = decodeSourceTokenId(rawSourceTokenId, community);
   // trayId is a dynamic string: offset (word 3), length, then UTF-8 bytes
   const stringOffset = parseInt(data.slice(128, 192), 16) * 2; // in hex chars
   const stringLen = parseInt(data.slice(stringOffset, stringOffset + 64), 16);

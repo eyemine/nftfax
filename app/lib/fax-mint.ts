@@ -72,6 +72,29 @@ function encodeAddress(addr: string): string {
   return addr.toLowerCase().replace(/^0x/, '').padStart(64, '0');
 }
 
+/// The contract's `claimed[community][sourceTokenId]` mapping is a
+/// permanent, one-time-ever claim with no reset/admin override (see
+/// NFTFaxCollectibleV2.sol) — a real NFT that mints once via mintFaxDirect
+/// can never mint again through this contract. For the three Ethereum-native
+/// communities (DeadFellaz/POW/Normie), sourceTokenId is caller-supplied with
+/// zero on-chain verification against the real NFT (unlike Chonk, which
+/// resolves the recipient on-chain via ownerOf(sourceTokenId) and so MUST use
+/// the real ID). That gives us room to encode a composite ID — real token ID
+/// + a small suffix derived from the chain's rootTrayId — so the same NFT can
+/// claim once per chain-letter chain instead of once ever, matching the
+/// off-chain per-chain gate (worker checkFaxMintEligibility) it's meant to
+/// mirror. Decoded back to the real ID for display by the leaderboard route.
+const CHAIN_SUFFIX_MOD = BigInt(1_000_000);
+
+function chainSuffixFromRoot(rootTrayId: string): bigint {
+  const hex = rootTrayId.replace(/[^0-9a-f]/gi, '').slice(0, 6) || '0';
+  return BigInt('0x' + hex) % CHAIN_SUFFIX_MOD;
+}
+
+function encodeCompositeSourceTokenId(realTokenId: bigint, rootTrayId: string): bigint {
+  return realTokenId * CHAIN_SUFFIX_MOD + chainSuffixFromRoot(rootTrayId);
+}
+
 /// ABI-encodes a single trailing dynamic `string` param appended after
 /// `staticWordCount` fixed 32-byte words: the offset word, then the
 /// length-prefixed, right-padded UTF-8 bytes.
@@ -147,6 +170,14 @@ export interface BuildMintTxParams {
   /** Off-chain fax tray ID being minted (passed through for event indexing). */
   trayId: string;
   /**
+   * Chain-letter root tray ID (chain.rootTrayId). Used to derive a composite
+   * on-chain sourceTokenId for the direct-mint communities (DeadFellaz/POW/
+   * Normie) so the same real NFT can claim once per chain instead of once
+   * ever — see encodeCompositeSourceTokenId. Ignored for Chonk (must use the
+   * real ID). Falls back to `trayId` if omitted.
+   */
+  rootTrayId?: string;
+  /**
    * Optional IPFS metadata URI (e.g. "ipfs://<cid>") to set as this token's
    * per-token URI atomically at mint time — see `pinFaxMetadata`. Only
    * meaningful against NFTFaxCollectibleV2; ignored (regular mint path used)
@@ -167,7 +198,7 @@ export interface BuildMintTxResult {
 /// collection/token, or if off-chain ownership/delegation verification fails
 /// for the Ethereum-native collections — fails closed rather than silently
 /// minting to a possibly-wrong wallet.
-export async function buildMintTx({ local, connectedWallet, trayId, tokenURI }: BuildMintTxParams): Promise<BuildMintTxResult> {
+export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, tokenURI }: BuildMintTxParams): Promise<BuildMintTxResult> {
   const identity = parseFaxIdentity(local);
   const price = await fetchMintPrice();
   const value = '0x' + price.toString(16);
@@ -201,16 +232,17 @@ export async function buildMintTx({ local, connectedWallet, trayId, tokenURI }: 
   }
 
   const community = COMMUNITY_ENUM[identity.collection];
+  const onChainSourceTokenId = encodeCompositeSourceTokenId(identity.tokenId, rootTrayId || trayId);
   const data = tokenURI
     ? MINT_FAX_DIRECT_WITH_URI_SELECTOR +
       encodeAddress(resolved.to) +
       encodeUint256(community) +
-      encodeUint256(identity.tokenId) +
+      encodeUint256(onChainSourceTokenId) +
       encodeTrailingStrings(3, [trayId, tokenURI])
     : MINT_FAX_DIRECT_SELECTOR +
       encodeAddress(resolved.to) +
       encodeUint256(community) +
-      encodeUint256(identity.tokenId) +
+      encodeUint256(onChainSourceTokenId) +
       encodeTrailingString(4, trayId);
   return { to: BASE_FAX_COLLECTIBLE, data, value };
 }
