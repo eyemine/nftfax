@@ -12,7 +12,7 @@
 /// fully blank if Alchemy is unavailable — same "never blank" principle as
 /// pinFaxMetadata's Lighthouse fallback.
 
-import { createPublicClient, http, parseAbiItem } from 'viem';
+import { createPublicClient, http, parseAbiItem, encodeFunctionData } from 'viem';
 import { base } from 'viem/chains';
 import { BASE_CHAIN, BASE_FAX_COLLECTIBLE } from './contracts';
 import { CHONKS_MAIN_CONTRACT, resolveChonkBackpack, ResolveChonkBackpackResult } from './chonks';
@@ -21,6 +21,18 @@ const publicClient = createPublicClient({ chain: base, transport: http(BASE_CHAI
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || '';
 const ALCHEMY_BASE_URL = `https://base-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}`;
+
+/// Chonk backpacks accumulate a lot of unrelated airdrop/spam NFTs (Klima
+/// staking badges, "visit X to claim" links, etc). Only surface NFTs from
+/// contracts the user has explicitly whitelisted as meaningful.
+const BACKPACK_CONTRACT_WHITELIST = new Set([
+  BASE_FAX_COLLECTIBLE.toLowerCase(),
+  '0x2530ffff980ae3400b0e4c1dc222f1536972077e',
+  '0x03c4738ee98ae44591e1a4a4f3cab6641d95dd9a',
+  '0x6b8f34e0559aa9a5507e74ad93374d9745cdbf09',
+  '0xba5e05cb26b78eda3a2f8e3b3814726305dcac83',
+  '0x827922686190790b37229fd06084350e74485b72',
+]);
 
 export interface TBANFT {
   contract: string;
@@ -56,17 +68,19 @@ export async function getTBANFTs(tbaAddress: `0x${string}`): Promise<TBANFT[]> {
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error(`Alchemy ${res.status}`);
       const data = await res.json() as { ownedNfts?: AlchemyNFT[] };
-      return (data.ownedNfts || []).map((nft) => {
-        const contract = (nft.contract?.address || nft.contractAddress || '').toLowerCase();
-        return {
-          contract,
-          tokenId: nft.tokenId || nft.id?.tokenId || '0',
-          tokenType: nft.tokenType || 'ERC721',
-          name: nft.name || nft.title || 'Unknown',
-          image: nft.image?.cachedUrl || nft.image?.pngUrl || nft.image?.thumbnailUrl || nft.media?.[0]?.gateway || '',
-          isFaxChain: contract === BASE_FAX_COLLECTIBLE.toLowerCase(),
-        };
-      });
+      return (data.ownedNfts || [])
+        .map((nft) => {
+          const contract = (nft.contract?.address || nft.contractAddress || '').toLowerCase();
+          return {
+            contract,
+            tokenId: nft.tokenId || nft.id?.tokenId || '0',
+            tokenType: nft.tokenType || 'ERC721',
+            name: nft.name || nft.title || 'Unknown',
+            image: nft.image?.cachedUrl || nft.image?.pngUrl || nft.image?.thumbnailUrl || nft.media?.[0]?.gateway || '',
+            isFaxChain: contract === BASE_FAX_COLLECTIBLE.toLowerCase(),
+          };
+        })
+        .filter((nft) => BACKPACK_CONTRACT_WHITELIST.has(nft.contract));
     } catch (err) {
       console.error('[tba] Alchemy getTBANFTs failed, falling back to RPC:', err);
     }
@@ -180,6 +194,32 @@ async function getOwnedChonks(walletAddress: `0x${string}`): Promise<number[]> {
   ));
 
   return candidateIds.filter((_, i) => (owners[i] as string | null)?.toLowerCase() === walletAddress.toLowerCase());
+}
+
+/// Build an executeCall() transaction for an ERC-6551 TBA to withdraw an
+/// ERC-721 NFT back to the Chonk owner's EOA. The TBA calls
+/// `nftContract.safeTransferFrom(tba, recipient, tokenId)` through its own
+/// `executeCall(to, value, data)` function. Returns the raw tx fields needed
+/// by the connected wallet.
+export function buildTBAWithdrawTx(
+  tbaAddress: `0x${string}`,
+  nftContract: `0x${string}`,
+  tokenId: string,
+  recipient: `0x${string}`,
+): { to: `0x${string}`; value: bigint; data: `0x${string}` } {
+  const transferData = encodeFunctionData({
+    abi: [{ type: 'function', name: 'safeTransferFrom', inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'tokenId', type: 'uint256' }], outputs: [], stateMutability: 'nonpayable' }],
+    functionName: 'safeTransferFrom',
+    args: [tbaAddress, recipient, BigInt(tokenId)],
+  });
+
+  const data = encodeFunctionData({
+    abi: [{ type: 'function', name: 'executeCall', inputs: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }], outputs: [], stateMutability: 'payable' }],
+    functionName: 'executeCall',
+    args: [nftContract, BigInt(0), transferData],
+  });
+
+  return { to: tbaAddress, value: BigInt(0), data };
 }
 
 export interface ChonkBackpack {

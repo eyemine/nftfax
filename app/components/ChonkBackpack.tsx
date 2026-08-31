@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSendTransaction } from '@privy-io/react-auth';
 import { Loader2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { buildTBAWithdrawTx } from '../lib/tba';
 
 interface BackpackNFT {
   contract: string;
@@ -28,6 +30,68 @@ interface BackpackSummary {
 
 interface ChonkBackpackProps {
   walletAddress: string;
+}
+
+interface WithdrawButtonProps {
+  tbaAddress: `0x${string}`;
+  nftContract: `0x${string}`;
+  tokenId: string;
+  recipient: `0x${string}`;
+}
+
+/// Withdraw an NFT from a Chonk's ERC-6551 backpack back to the owner's EOA.
+/// Builds an executeCall() on the TBA and signs it directly with the user's
+/// connected wallet — no intermediary, no tokenbound.org dependency.
+function WithdrawButton({ tbaAddress, nftContract, tokenId, recipient }: WithdrawButtonProps) {
+  const { sendTransaction } = useSendTransaction();
+  const [status, setStatus] = useState<'idle' | 'withdrawing' | 'success' | 'error'>('idle');
+  const [txHash, setTxHash] = useState('');
+  const [error, setError] = useState('');
+
+  if (status === 'success' && txHash) {
+    return (
+      <a
+        href={`https://basescan.org/tx/${txHash}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-1 text-[11px] font-bold uppercase text-[#456049] hover:text-[#2c4230]"
+      >
+        Sent ✓ <ExternalLink size={10} />
+      </a>
+    );
+  }
+
+  const disabled = status === 'withdrawing';
+
+  const handleWithdraw = async () => {
+    setStatus('withdrawing');
+    setError('');
+    try {
+      const tx = buildTBAWithdrawTx(tbaAddress, nftContract, tokenId, recipient);
+      const { hash } = await sendTransaction({ to: tx.to, data: tx.data, value: tx.value, chainId: 8453 });
+      setTxHash(hash);
+      setStatus(hash ? 'success' : 'error');
+      if (!hash) setError('No transaction hash returned');
+    } catch (err: unknown) {
+      setStatus('error');
+      setError(err instanceof Error ? err.message : 'Withdraw failed');
+      console.error('[WithdrawButton] error:', err);
+    }
+  };
+
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <button
+        onClick={handleWithdraw}
+        disabled={disabled}
+        className="flex items-center gap-1 text-[11px] font-bold uppercase text-[#8a3e1e] hover:text-[#e65b2f] disabled:text-[#a49c8b] disabled:hover:text-[#a49c8b]"
+      >
+        {status === 'withdrawing' ? <Loader2 className="animate-spin" size={10} /> : <ExternalLink size={10} />}
+        {status === 'withdrawing' ? 'Withdrawing…' : 'Withdraw'}
+      </button>
+      {status === 'error' && <span className="max-w-[160px] text-right text-[10px] font-bold uppercase text-[#a94228]">{error}</span>}
+    </span>
+  );
 }
 
 /// Chonks backpack viewer — built into nftfax.app so Chonk holders can see
@@ -131,6 +195,12 @@ export function ChonkBackpack({ walletAddress }: ChonkBackpackProps) {
                       >
                         BaseScan <ExternalLink size={10} />
                       </a>
+                      <WithdrawButton
+                        tbaAddress={bp.tbaAddress as `0x${string}`}
+                        nftContract={nft.contract as `0x${string}`}
+                        tokenId={nft.tokenId}
+                        recipient={walletAddress as `0x${string}`}
+                      />
                     </div>
                   ))
                 )}
