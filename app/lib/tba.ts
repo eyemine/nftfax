@@ -213,10 +213,16 @@ export function buildTBAWithdrawTx(
     args: [tbaAddress, recipient, BigInt(tokenId)],
   });
 
+  // Tokenbound AccountV3 (the actual ERC-6551 implementation Chonk backpacks use)
+  // implements the standard IERC6551Executable interface:
+  //   execute(address to, uint256 value, bytes data, uint8 operation)
+  // It does NOT have an `executeCall(address,uint256,bytes)` function — calling
+  // that selector silently no-ops via the account's Overridable fallback
+  // (no revert, no transfer, but the tx still reports success on-chain).
   const data = encodeFunctionData({
-    abi: [{ type: 'function', name: 'executeCall', inputs: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }], outputs: [], stateMutability: 'payable' }],
-    functionName: 'executeCall',
-    args: [nftContract, BigInt(0), transferData],
+    abi: [{ type: 'function', name: 'execute', inputs: [{ name: 'to', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }, { name: 'operation', type: 'uint8' }], outputs: [{ name: '', type: 'bytes' }], stateMutability: 'payable' }],
+    functionName: 'execute',
+    args: [nftContract, BigInt(0), transferData, 0],
   });
 
   return { to: tbaAddress, value: BigInt(0), data };
