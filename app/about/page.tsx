@@ -212,6 +212,17 @@ export default function AboutPage() {
               </p>
             </div>
           </SkinPanel>
+
+          <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">One mint per NFT, or one per chain?</div>
+            <div className="p-5 md:p-8 space-y-3 text-sm leading-relaxed text-[#3e3b34]">
+              <p>Mint limits differ by community, because Chonks are verified directly on Base while the other three are verified off-chain against Ethereum:</p>
+              <ul className="space-y-2 list-disc pl-4">
+                <li><strong>Chonks</strong> — one NFTFAX CHAIN mint <strong>ever</strong> per <code>chonk.1234@fax</code>. Ownership is resolved on-chain against the real Chonk, so a token that has minted once can never mint again.</li>
+                <li><strong>POW NFT, Deadfellaz, Normies</strong> — one mint <strong>per chain</strong> per <code>atom/dfz/normie.1234@fax</code>. The same NFT can mint again the next time it starts or joins a different chain-letter.</li>
+              </ul>
+            </div>
+          </SkinPanel>
         </div>
 
         <footer className="mx-auto mt-6 flex flex-col justify-between gap-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row">
