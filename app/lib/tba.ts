@@ -74,15 +74,54 @@ export async function getTBANFTs(tbaAddress: `0x${string}`): Promise<TBANFT[]> {
   return getTBANFTsViaRPC(tbaAddress);
 }
 
+/// Base's public RPC caps eth_getLogs to a 10,000 block range per call, so a
+/// from-genesis query always fails. Walk backward from the current block in
+/// bounded windows instead. Capped by MAX_LOOKBACK_BLOCKS so a single request
+/// can't hang for minutes — this fallback only needs to be "not blank", not
+/// exhaustive; Alchemy is the accurate/complete path.
+const LOG_WINDOW_BLOCKS = BigInt(9500);
+const MAX_LOOKBACK_BLOCKS = BigInt(500000); // ~11.5 days at 2s/block on Base
+
+const TRANSFER_EVENT = parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)');
+
+interface TransferLog {
+  address: `0x${string}`;
+  args: { from?: `0x${string}`; to?: `0x${string}`; tokenId?: bigint };
+}
+
+async function getTransferLogsWindowed(params: {
+  address?: `0x${string}`;
+  args: { to: `0x${string}` };
+}): Promise<TransferLog[]> {
+  const latest = await publicClient.getBlockNumber();
+  const floor = latest > MAX_LOOKBACK_BLOCKS ? latest - MAX_LOOKBACK_BLOCKS : BigInt(0);
+  const allLogs: TransferLog[] = [];
+
+  let toBlock = latest;
+  while (toBlock > floor) {
+    const fromBlock = toBlock - LOG_WINDOW_BLOCKS > floor ? toBlock - LOG_WINDOW_BLOCKS : floor;
+    try {
+      const logs = await publicClient.getLogs({ ...params, event: TRANSFER_EVENT, fromBlock, toBlock });
+      allLogs.push(...(logs as unknown as TransferLog[]));
+    } catch (err) {
+      console.error('[tba] getLogs window failed, skipping window:', err);
+    }
+    toBlock = fromBlock - BigInt(1);
+  }
+  return allLogs;
+}
+
 /// Fallback: scan ERC-721 Transfer events into the TBA. No metadata (no name
-/// image), but always works with just an RPC endpoint.
+/// image), bounded lookback window, but always works with just an RPC
+/// endpoint and never throws.
 async function getTBANFTsViaRPC(tbaAddress: `0x${string}`): Promise<TBANFT[]> {
-  const logs = await publicClient.getLogs({
-    event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-    args: { to: tbaAddress },
-    fromBlock: BigInt(0),
-    toBlock: 'latest',
-  });
+  let logs: TransferLog[] = [];
+  try {
+    logs = await getTransferLogsWindowed({ args: { to: tbaAddress } });
+  } catch (err) {
+    console.error('[tba] getTBANFTsViaRPC failed, returning empty:', err);
+    return [];
+  }
 
   const seen = new Set<string>();
   const nfts: TBANFT[] = [];
@@ -119,13 +158,16 @@ async function getOwnedChonks(walletAddress: `0x${string}`): Promise<number[]> {
     }
   }
 
-  const logs = await publicClient.getLogs({
-    address: CHONKS_MAIN_CONTRACT as `0x${string}`,
-    event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-    args: { to: walletAddress },
-    fromBlock: BigInt(0),
-    toBlock: 'latest',
-  });
+  let logs: TransferLog[] = [];
+  try {
+    logs = await getTransferLogsWindowed({
+      address: CHONKS_MAIN_CONTRACT as `0x${string}`,
+      args: { to: walletAddress },
+    });
+  } catch (err) {
+    console.error('[tba] getOwnedChonks RPC fallback failed, returning empty:', err);
+    return [];
+  }
 
   const candidateIds = Array.from(new Set(logs.map((log) => Number(log.args.tokenId ?? BigInt(0)))));
   const owners = await Promise.all(candidateIds.map((tokenId) =>
