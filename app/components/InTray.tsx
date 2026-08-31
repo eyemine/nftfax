@@ -492,7 +492,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fromLabel: cleanLocal,
+          fromLabel: fax.from || cleanLocal,
           ownerWallet: wallet,
           to: rerouteTo.trim(),
           chainTrayId: fax.chainTrayId || fax.id,
