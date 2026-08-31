@@ -37,10 +37,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       chainTrayId?: string;
     };
 
-    const fromLabel = (body.fromLabel || '').toLowerCase().trim();
+    let fromLabel = (body.fromLabel || '').toLowerCase().trim();
     const ownerWallet = (body.ownerWallet || '').toLowerCase().trim();
     const to = (body.to || '').toLowerCase().trim();
     const chainTrayId = (body.chainTrayId || originalTrayId).trim();
+
+    let fromDomain = 'nftmail.box';
+    const parts = fromLabel.split('@');
+    if (parts.length > 1) {
+      fromLabel = parts[0];
+      fromDomain = parts.slice(1).join('@');
+    }
+    const isFaxSender = fromDomain === 'fax';
 
     if (!fromLabel || !ownerWallet || !to) {
       return NextResponse.json({ error: 'Missing fromLabel, ownerWallet, or to' }, { status: 400, headers: NO_STORE });
@@ -53,24 +61,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
 
-    const resolveRes = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action: 'resolveAddress', name: fromLabel }),
-      cache: 'no-store',
-    });
-    if (!resolveRes.ok) {
-      return NextResponse.json({ error: 'Could not verify sender ownership' }, { status: 503, headers: NO_STORE });
-    }
-    const resolved = await resolveRes.json() as Record<string, unknown>;
-    if (resolved.exists === false) {
-      return NextResponse.json({ error: 'Sender mailbox does not exist' }, { status: 404, headers: NO_STORE });
-    }
-    const controller = (resolved.onChainOwner as string | undefined)?.toLowerCase();
-    if (!controller || controller !== ownerWallet) {
-      return NextResponse.json({ error: 'Wallet does not match the registered owner' }, { status: 403, headers: NO_STORE });
-    }
-
     const docRes = await fetch(WORKER_URL, {
       method: 'POST',
       headers,
@@ -82,11 +72,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     const doc = await docRes.json() as Record<string, unknown>;
     const docFrom = ((doc.from as string) || '').toLowerCase().trim();
-    const fromEmail = `${fromLabel}@nftmail.box`;
-    const fromFax = `${fromLabel}@fax`;
+    const fromAddress = `${fromLabel}@${fromDomain}`;
 
-    if (docFrom !== fromEmail && docFrom !== fromFax && docFrom !== fromLabel) {
+    if (docFrom !== fromAddress && docFrom !== fromLabel) {
       return NextResponse.json({ error: 'Only the original sender can re-route this fax' }, { status: 403, headers: NO_STORE });
+    }
+
+    // @fax senders are rolofax handles without on-chain ownership; skip resolve.
+    if (!isFaxSender) {
+      const resolveRes = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'resolveAddress', name: fromLabel, domain: fromDomain }),
+        cache: 'no-store',
+      });
+      if (!resolveRes.ok) {
+        return NextResponse.json({ error: 'Could not verify sender ownership' }, { status: 503, headers: NO_STORE });
+      }
+      const resolved = await resolveRes.json() as Record<string, unknown>;
+      if (resolved.exists === false) {
+        return NextResponse.json({ error: 'Sender mailbox does not exist' }, { status: 404, headers: NO_STORE });
+      }
+      const controller = (resolved.onChainOwner as string | undefined)?.toLowerCase();
+      if (!controller || controller !== ownerWallet) {
+        return NextResponse.json({ error: 'Wallet does not match the registered owner' }, { status: 403, headers: NO_STORE });
+      }
     }
 
     const createdAt = Number(doc.createdAt) || 0;
@@ -109,7 +119,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const trayPayload: Record<string, unknown> = {
       action: 'setTrayDocument',
       secret: WEBHOOK_SECRET,
-      from: fromEmail,
+      from: fromAddress,
       to,
       format: 'png',
       isMultipage: false,
