@@ -199,17 +199,17 @@ export default function DrawClient() {
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Dices size={20} /></div>
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">PRIZE DRAW<span className="text-[#e65b2f]">™</span></h1>
-              <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Commit / reveal on a Base block hash</p>
+              <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Commit / reveal on a Base block hash</p>
             </div>
           </div>
           <div className="flex gap-1.5 sm:gap-2">
-            <Link href="/verify" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase"><ShieldAlert size={12} /> Verify</Link>
-            <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap">Office</Link>
+            <Link href="/verify" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase"><ShieldAlert size={12} /> Verify</Link>
+            <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
           </div>
         </header>
 
         {!FAX_CONTRACT_DEPLOYED && (
-          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold uppercase">
+          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">
             Contract not deployed yet ({FAX_CONTRACT}). Draw state is unavailable.
           </div>
         )}
@@ -219,19 +219,19 @@ export default function DrawClient() {
         )}
 
         {error && (
-          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold uppercase">FAULT: {error}</div>
+          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">FAULT: {error}</div>
         )}
 
         {!loading && !error && FAX_CONTRACT_DEPLOYED && (
           <>
             {/* Pool status & draw lock */}
             <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
-              <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+              <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
                 Prize winners — {supplyReached ? `${MAX_SUPPLY.toLocaleString()} mints · ${formatEth(totalPoolWei)} pool` : `${totalMinted.toLocaleString()} / ${MAX_SUPPLY.toLocaleString()} mints · ${formatEth(remainingPoolWei)} pool`}
               </div>
               <div className="p-5 space-y-3 text-sm text-[#3e3b34]">
                 {!supplyReached ? (
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a3e1e]">
+                  <p className="text-[12px] font-bold uppercase tracking-wider text-[#8a3e1e]">
                     Prize draw unlocks once {MAX_SUPPLY.toLocaleString()} mints are complete. {MAX_SUPPLY - totalMinted} mint{MAX_SUPPLY - totalMinted === 1 ? '' : 's'} remaining.
                   </p>
                 ) : (
@@ -243,13 +243,13 @@ export default function DrawClient() {
                         <button
                           onClick={() => void handleWithdraw()}
                           disabled={withdrawing || balance === BigInt(0)}
-                          className="key-shadow border border-[#77705f] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50"
+                          className="key-shadow border border-[#77705f] bg-[#e65b2f] px-4 py-2 text-[12px] font-bold uppercase text-white disabled:opacity-50"
                         >
                           {withdrawing ? 'Withdrawing…' : `Withdraw remainder (${formatEth(remainingPoolWei)})`}
                         </button>
                       </div>
                     )}
-                    {withdrawMsg && <p className="text-[10px] font-mono break-all">{withdrawMsg}</p>}
+                    {withdrawMsg && <p className="text-[12px] font-mono break-all">{withdrawMsg}</p>}
                   </>
                 )}
               </div>
@@ -264,7 +264,7 @@ export default function DrawClient() {
 
             {supplyReached && data && (
               <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
-                <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+                <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
                   Round #{round}
                 </div>
 
@@ -272,7 +272,7 @@ export default function DrawClient() {
                   {PHASE_STEPS.map((s, i) => (
                     <div key={s.phase} className={`bg-[#c8c0ae] p-3 text-center ${i <= step ? 'bg-[#f5dcc8]' : ''}`}>
                       {i < step ? <CheckCircle2 size={16} className="mx-auto mb-1 text-[#56705a]" /> : i === step ? <Clock size={16} className="mx-auto mb-1 text-[#e65b2f]" /> : <Clock size={16} className="mx-auto mb-1 text-[#a49c8b]" />}
-                      <p className="text-[8px] font-bold uppercase leading-tight text-[#3e3b34]">{s.label}</p>
+                      <p className="text-[11px] font-bold uppercase leading-tight text-[#3e3b34]">{s.label}</p>
                     </div>
                   ))}
                 </div>
@@ -282,33 +282,33 @@ export default function DrawClient() {
                   <p><strong>Current block:</strong> #{currentBlock}</p>
 
                   {phase === 'committed' && (
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a3e1e]">
+                    <p className="text-[12px] font-bold uppercase tracking-wider text-[#8a3e1e]">
                       Waiting for block #{data.blockNumber} to be mined ({Math.max(0, data.blockNumber - currentBlock)} blocks remaining).
                     </p>
                   )}
 
                   {phase === 'seed-ready' && (
                     <div className="space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a3e1e]">
+                      <p className="text-[12px] font-bold uppercase tracking-wider text-[#8a3e1e]">
                         Committed block is mined. Anyone can capture the seed now — no owner permission required.
                       </p>
                       <button
                         onClick={handleCaptureSeed}
                         disabled={capturing || !ready}
-                        className="key-shadow border border-[#77705f] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50"
+                        className="key-shadow border border-[#77705f] bg-[#e65b2f] px-4 py-2 text-[12px] font-bold uppercase text-white disabled:opacity-50"
                       >
                         {capturing ? 'Capturing…' : authenticated ? 'Capture draw seed' : 'Connect wallet to capture'}
                       </button>
-                      {captureMsg && <p className="text-[10px] font-mono break-all">{captureMsg}</p>}
+                      {captureMsg && <p className="text-[12px] font-mono break-all">{captureMsg}</p>}
                     </div>
                   )}
 
                   {(phase === 'seed-captured' || phase === 'finalized') && (
-                    <p className="font-mono text-[10px] break-all"><strong>Seed:</strong> {data.seed}</p>
+                    <p className="font-mono text-[12px] break-all"><strong>Seed:</strong> {data.seed}</p>
                   )}
 
                   {phase === 'seed-captured' && (
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a3e1e]">
+                    <p className="text-[12px] font-bold uppercase tracking-wider text-[#8a3e1e]">
                       Seed is on-chain and public. Anyone can independently recompute winners now at <Link href="/verify" className="underline">/verify</Link>, ahead of the official payout.
                     </p>
                   )}
@@ -319,11 +319,11 @@ export default function DrawClient() {
             {/* Winners by tier */}
             {supplyReached && (
               <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
-                <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em] flex items-center gap-2">
+                <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em] flex items-center gap-2">
                   <Trophy size={14} /> Winners by tier
                 </div>
-                <table className="w-full border-collapse text-left text-[10px]">
-                  <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+                <table className="w-full border-collapse text-left text-[12px]">
+                  <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                     <tr>
                       <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
                       <th className="border-b border-[#8f8878] p-3 font-bold">Account</th>
@@ -365,12 +365,12 @@ export default function DrawClient() {
                                 <button
                                   onClick={() => void handleDistribute(tw.winner, index)}
                                   disabled={distributing[index] || prizePerWinner === BigInt(0)}
-                                  className="key-shadow border border-[#77705f] bg-[#e65b2f] px-3 py-1.5 text-[9px] font-bold uppercase text-white disabled:opacity-50"
+                                  className="key-shadow border border-[#77705f] bg-[#e65b2f] px-3 py-1.5 text-[11px] font-bold uppercase text-white disabled:opacity-50"
                                 >
                                   {distributing[index] ? 'Sending…' : `Distribute ${formatEth(prizePerWinner, 3)}`}
                                 </button>
                               ) : tw && tw.claimed ? (
-                                <span className="text-[#56705a] text-[9px] font-bold uppercase">Paid</span>
+                                <span className="text-[#56705a] text-[11px] font-bold uppercase">Paid</span>
                               ) : (
                                 <span className="text-[#847d6e]">—</span>
                               )}
@@ -383,7 +383,7 @@ export default function DrawClient() {
                 </table>
                 {distributeMsg && (
                   <div className="border-t border-[#8f8878] bg-[#eee8dc] p-3">
-                    <p className="text-[10px] font-mono break-all">{distributeMsg}</p>
+                    <p className="text-[12px] font-mono break-all">{distributeMsg}</p>
                   </div>
                 )}
               </div>
@@ -391,7 +391,7 @@ export default function DrawClient() {
           </>
         )}
 
-        <footer className="mx-auto mt-6 flex flex-col justify-between gap-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row">
+        <footer className="mx-auto mt-6 flex flex-col justify-between gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row">
           <span>Contract: {FAX_CONTRACT}</span>
           <Link href="/" className="underline"><ArrowLeft size={10} className="inline" /> Back to office</Link>
         </footer>

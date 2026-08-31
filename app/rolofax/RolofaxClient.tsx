@@ -110,25 +110,25 @@ export default function RolofaxClient() {
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radar size={20} /></div>
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">ROLOFAX<span className="text-[#e65b2f]">™</span></h1>
-              <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Leaderboard & chain log</p>
+              <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Leaderboard & chain log</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap">Office</Link>
+          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
         </header>
 
         {loading && (
           <div className="grid min-h-[200px] place-items-center"><Loader2 className="animate-spin text-[#847d6e]" size={28} /></div>
         )}
         {error && (
-          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold uppercase">FAULT: {error}</div>
+          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">FAULT: {error}</div>
         )}
         <div className="mb-4 flex justify-center">
-          <Link href="/about" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase tracking-[.12em]"><Info size={12} /> About</Link>
+          <Link href="/about" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[12px] font-bold uppercase tracking-[.12em]"><Info size={12} /> About</Link>
         </div>
 
         {data && (
           <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Network summary</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Network summary</div>
             <div className="grid grid-cols-2 gap-px border-b border-[#8f8878] bg-[#8f8878] md:grid-cols-5">
               {[
                 ['Public faxes', data.totalPublic ?? 0],
@@ -139,18 +139,18 @@ export default function RolofaxClient() {
               ].map(([label, value]) => (
                 <div key={String(label)} className="bg-[#c8c0ae] p-4 text-center">
                   <p className="text-2xl font-black text-[#e65b2f]">{value}</p>
-                  <p className="text-[9px] font-bold uppercase tracking-wider text-[#615c50]">{label}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#615c50]">{label}</p>
                 </div>
               ))}
             </div>
 
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Longest active chains</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Longest active chains</div>
             <div className="max-h-[280px] overflow-y-auto">
               {(data.topChains ?? []).length === 0 ? (
-                <div className="p-5 text-[10px] font-bold uppercase text-[#6e685a]">No public chains yet.</div>
+                <div className="p-5 text-[12px] font-bold uppercase text-[#6e685a]">No public chains yet.</div>
               ) : (
-                <table className="w-full border-collapse text-left text-[10px]">
-                  <thead className="sticky top-0 bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+                <table className="w-full border-collapse text-left text-[12px]">
+                  <thead className="sticky top-0 bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                     <tr>
                       <th className="border-b border-[#8f8878] p-3 font-bold">Fax ID</th>
                       <th className="border-b border-[#8f8878] p-3 font-bold">From</th>
@@ -168,7 +168,7 @@ export default function RolofaxClient() {
                       }, new Map<string, ChainEntry>()).values() ?? []
                     ).map((entry) => (
                       <tr key={entry.id} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
-                        <td className="p-3 font-mono text-[9px]">T/#{entry.id.toUpperCase()}</td>
+                        <td className="p-3 font-mono text-[11px]">T/#{entry.id.toUpperCase()}</td>
                         <td className="p-3">{entry.from}</td>
                         <td className="p-3">{entry.to}</td>
                         <td className="p-3">{entry.chainDepth}</td>
@@ -184,12 +184,12 @@ export default function RolofaxClient() {
 
         {/* Prize winners board — placeholder until the first draw round is committed/finalized on-chain */}
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span className="flex items-center gap-2"><Trophy size={14} /> Prize winners</span>
             <span className="text-[#615c50]">Draw round not yet committed</span>
           </div>
-          <table className="w-full border-collapse text-left text-[10px]">
-            <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+          <table className="w-full border-collapse text-left text-[12px]">
+            <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
               <tr>
                 <th className="border-b border-[#8f8878] p-3 font-bold">#</th>
                 <th className="border-b border-[#8f8878] p-3 font-bold">Fax ID</th>
@@ -217,13 +217,13 @@ export default function RolofaxClient() {
         </div>
 
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
             <span className="text-[#615c50]">{leaderboard.totalMints ?? 0} mints · {leaderboard.contractBalanceEth ?? '0'} ETH accumulated</span>
           </div>
           {leaderboard.leaderboard && leaderboard.leaderboard.length > 0 ? (
-            <table className="w-full border-collapse text-left text-[10px]">
-              <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+            <table className="w-full border-collapse text-left text-[12px]">
+              <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                 <tr>
                   <th className="border-b border-[#8f8878] p-3 font-bold">Collection</th>
                   <th className="border-b border-[#8f8878] p-3 font-bold text-right">Mints</th>
@@ -243,16 +243,16 @@ export default function RolofaxClient() {
               </tbody>
             </table>
           ) : (
-            <div className="p-5 text-center text-[10px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet — be the first to forward and mint a fax chain</div>
+            <div className="p-5 text-center text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet — be the first to forward and mint a fax chain</div>
           )}
         </div>
 
         {/* Per-mint collection panel */}
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Minted fax collection</div>
+          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Minted fax collection</div>
           {leaderboard.mints && leaderboard.mints.length > 0 ? (
-            <table className="w-full border-collapse text-left text-[10px]">
-              <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+            <table className="w-full border-collapse text-left text-[12px]">
+              <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                 <tr>
                   <th className="border-b border-[#8f8878] p-3 font-bold">Token ID</th>
                   <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
@@ -281,24 +281,24 @@ export default function RolofaxClient() {
               </tbody>
             </table>
           ) : (
-            <div className="p-5 text-center text-[10px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet</div>
+            <div className="p-5 text-center text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet</div>
           )}
 
           {/* View Fax form */}
           <div className="border-t border-[#8f8878] bg-[#b5ad9d] px-5 py-4">
             <div className="flex items-center gap-2">
-              <label className="text-[10px] font-bold uppercase tracking-[.12em] text-[#615c50]">View fax</label>
+              <label className="text-[12px] font-bold uppercase tracking-[.12em] text-[#615c50]">View fax</label>
               <input
                 type="text"
                 value={faxTrayInput}
                 onChange={(e) => setFaxTrayInput(e.target.value.trim())}
                 placeholder="FAX TRAY ID"
-                className="flex-1 border border-[#8f8878] bg-[#c8c0ae] px-3 py-1.5 text-[10px] font-mono outline-none focus:border-[#e65b2f]"
+                className="flex-1 border border-[#8f8878] bg-[#c8c0ae] px-3 py-1.5 text-[12px] font-mono outline-none focus:border-[#e65b2f]"
               />
               <button
                 onClick={() => { if (faxTrayInput) window.open(`https://nftmail.box/tray/${faxTrayInput}`, '_blank'); }}
                 disabled={!faxTrayInput}
-                className="key-shadow flex items-center gap-1 border border-[#77705f] bg-[#d8d0bf] px-3 py-1.5 text-[10px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40"
+                className="key-shadow flex items-center gap-1 border border-[#77705f] bg-[#d8d0bf] px-3 py-1.5 text-[12px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Search size={10} /> Submit
               </button>

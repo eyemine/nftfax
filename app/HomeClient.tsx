@@ -142,7 +142,7 @@ export default function HomeClient() {
             <LayersArrowDown size={28} className="text-[#1a1a14]" />
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}<span style={{ color: collectionTheme.accent }}>™</span></h1>
-              {(!showSplash || collection) && <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>}
+              {(!showSplash || collection) && <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>}
             </div>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function HomeClient() {
           <select
             value={collection}
             onChange={(e) => setCollection(e.target.value as CollectionKey)}
-            className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-2 py-1.5 text-[9px] sm:text-[10px] font-bold uppercase"
+            className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-2 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase"
           >
             <option value="" disabled>SELECT</option>
             {(['chonk', 'deadfellaz', 'normie', 'pow'] as const).map((k) => (
@@ -158,9 +158,9 @@ export default function HomeClient() {
             ))}
           </select>
           {isConnected && walletAddress ? (
-            <button onClick={handleDisconnect} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-1.5 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap hover:bg-[#c0392b] hover:text-white hover:border-[#9d3c20] transition-colors">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} · Disconnect</button>
+            <button onClick={handleDisconnect} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap hover:bg-[#c0392b] hover:text-white hover:border-[#9d3c20] transition-colors">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} · Disconnect</button>
           ) : (
-            <button onClick={() => login()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-3 sm:px-4 py-1.5 text-[9px] sm:text-[10px] font-bold uppercase text-white disabled:opacity-50">Connect</button>
+            <button onClick={() => login()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-3 sm:px-4 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase text-white disabled:opacity-50">Connect</button>
           )}
         </div>
       </header>
@@ -169,44 +169,44 @@ export default function HomeClient() {
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 sm:justify-self-start">
           <Link
             href="/pre-register"
-            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
             <Radar size={12} /> Rolofax
           </Link>
           <button
             onClick={() => { setShowSplash(false); setView('send'); }}
-            className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'send' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+            className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'send' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
             <Send size={12} /> Send
           </button>
           <button
             onClick={() => { setShowSplash(false); setView('tray'); }}
-            className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+            className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
             <Inbox size={12} /> In-Tray
           </button>
           <Link
             href="/rolofax"
-            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
             <Trophy size={12} /> <span className="hidden sm:inline">Leaderboard</span>
           </Link>
           <Link
             href="/draw"
-            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
             <Dices size={12} /> <span className="hidden sm:inline">Prize Draw</span>
           </Link>
         </div>
         <Link
           href="/about"
-          className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] sm:justify-self-center"
+          className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] sm:justify-self-center"
         >
           <Info size={12} /> About
         </Link>
         <button
           onClick={() => { setShowSplash(false); setView('delegate'); }}
-          className={`hidden sm:flex items-center gap-1.5 sm:gap-2 key-shadow border px-3 sm:px-4 py-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] sm:justify-self-end ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+          className={`hidden sm:flex items-center gap-1.5 sm:gap-2 key-shadow border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] sm:justify-self-end ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
         >
           <UserCheck size={12} /> Delegate
         </button>
@@ -219,11 +219,11 @@ export default function HomeClient() {
             <div className="relative z-10 flex flex-col items-center">
               <LayersArrowDown size={72} className="text-[#1a1a14] mb-4" />
               <h2 className="text-3xl sm:text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2">NFTFAX<span style={{ color: collectionTheme.accent }}>™</span></h2>
-              <p className="text-[10px] sm:text-[12px] font-bold uppercase tracking-[.24em] text-[#625e52] mb-6">Internet bitmap transmission office</p>
+              <p className="text-[12px] sm:text-[12px] font-bold uppercase tracking-[.24em] text-[#625e52] mb-6">Internet bitmap transmission office</p>
               <div className="border-t border-b border-[#8f8878] py-4 px-6 mb-6 max-w-md">
                 <p className="text-sm font-bold mb-2">Chain-letter fax game on Base</p>
                 <p className="text-[11px] text-[#575244] leading-relaxed">Forward faxes to keep the chain alive. Mint your Hop for a chance to win a share of the 4.04 ETH prize pool. 2,222 mints. 10 winners — one randomly selected from 11 tiers.</p>
-                <Link href="/draw" className="mt-2 inline-flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[.14em] text-[#8a3e1e] underline">
+                <Link href="/draw" className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#8a3e1e] underline">
                   <Dices size={11} /> Track the prize draw
                 </Link>
               </div>
@@ -235,7 +235,7 @@ export default function HomeClient() {
               </Link>
               <button
                 onClick={() => setShowSplash(false)}
-                className="mt-4 text-[9px] font-bold uppercase tracking-[.16em] text-[#625e52] underline hover:text-[#454138]"
+                className="mt-4 text-[11px] font-bold uppercase tracking-[.16em] text-[#625e52] underline hover:text-[#454138]"
               >
                 Enter the office →
               </button>
@@ -250,7 +250,7 @@ export default function HomeClient() {
             <select
               value={collection || FAX_THEME.key}
               onChange={(event) => setCollection(event.target.value as CollectionKey)}
-              className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-[10px] font-bold uppercase"
+              className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-[12px] font-bold uppercase"
             >
               {(['chonk', 'deadfellaz', 'normie', 'pow'] as const).map((k) => (
                 <option key={k} value={k}>{getCollectionTheme(k).collectionName}</option>
@@ -258,7 +258,7 @@ export default function HomeClient() {
             </select>
           </div>
           <label className="mb-5 block max-w-md">
-            <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Your mailbox</span>
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Your mailbox</span>
             {rolofaxEntries.length > 0 && (
               <select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]">
                 <option value="">Select a Rolofax handle…</option>
@@ -283,7 +283,7 @@ export default function HomeClient() {
       )}
 
       <SkinPanel theme={collectionTheme} className={`machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] ${view === 'send' ? '' : 'hidden'}`}>
-        <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+        <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
           <span>NF-8004 / Network facsimile</span>
           <span className="flex items-center gap-2 text-[#456049]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#56705a]" /> Line ready</span>
         </div>
@@ -292,11 +292,11 @@ export default function HomeClient() {
           <div className="border-b border-[#918978] p-5 md:p-8 lg:border-b-0 lg:border-r">
             <div className="mb-6 flex items-center justify-between">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[.24em] text-[#615c50]">Outgoing transmission</p>
+                <p className="text-[11px] font-bold uppercase tracking-[.24em] text-[#615c50]">Outgoing transmission</p>
                 <h2 className="mt-1 text-xl font-black uppercase">Document feeder</h2>
               </div>
               <div className="border border-[#8e8778] bg-[#ded7c8] px-3 py-2 text-right">
-                <p className="text-[8px] uppercase text-[#6e685a]">Job ticket</p><p className="font-bold">T/{ticket}</p>
+                <p className="text-[11px] uppercase text-[#6e685a]">Job ticket</p><p className="font-bold">T/{ticket}</p>
               </div>
             </div>
 
@@ -307,34 +307,34 @@ export default function HomeClient() {
               className="paper-noise relative grid min-h-[310px] w-full place-items-center overflow-hidden border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center transition hover:bg-[#eee8dc]"
             >
               {preview ? <img src={preview} alt="Fax preview" className="max-h-[290px] max-w-full object-contain grayscale" /> : (
-                <div><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full border border-[#9a9282] bg-[#d5cebf]"><Upload size={26} /></div><p className="font-bold uppercase">Insert document</p><p className="mt-2 text-[10px] uppercase tracking-wider text-[#696457]">PNG · JPG · BMP / maximum intake 20MB</p></div>
+                <div><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full border border-[#9a9282] bg-[#d5cebf]"><Upload size={26} /></div><p className="font-bold uppercase">Insert document</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">PNG · JPG · BMP / maximum intake 20MB</p></div>
               )}
-              {status === 'processing' && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/90"><Loader2 className="animate-spin" /><p className="mt-10 text-[10px] font-bold uppercase">Calibrating image…</p></div>}
+              {status === 'processing' && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/90"><Loader2 className="animate-spin" /><p className="mt-10 text-[12px] font-bold uppercase">Calibrating image…</p></div>}
             </button>
             <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.bmp,image/png,image/jpeg,image/bmp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void selectFile(file); }} />
-            <div className="mt-3 flex min-h-5 items-center justify-between text-[9px] font-bold uppercase text-[#615c50]"><span>{fileName || 'Feeder empty'}</span><span>{sizeKb ? `${sizeKb} KB / GREYSCALE` : 'Auto reduction enabled'}</span></div>
+            <div className="mt-3 flex min-h-5 items-center justify-between text-[11px] font-bold uppercase text-[#615c50]"><span>{fileName || 'Feeder empty'}</span><span>{sizeKb ? `${sizeKb} KB / GREYSCALE` : 'Auto reduction enabled'}</span></div>
           </div>
 
           <div className="bg-[#bbb3a2] p-5 md:p-8">
             <div className="mb-5 border border-[#5c5f50] bg-[#31372e] p-4 text-[#a9c99f] shadow-inner">
-              <div className="relative overflow-hidden"><div className="scanline absolute inset-y-0 w-1/3" /><p className="text-[8px] uppercase tracking-[.2em] text-[#7fa178]">Transmission monitor</p><p className="mt-2 text-sm font-bold">{status === 'sent' ? 'DELIVERY CONFIRMED' : status === 'sending' ? 'DIALING REMOTE STATION…' : status === 'ready' ? 'DOCUMENT READY' : 'AWAITING DOCUMENT'}</p></div>
+              <div className="relative overflow-hidden"><div className="scanline absolute inset-y-0 w-1/3" /><p className="text-[11px] uppercase tracking-[.2em] text-[#7fa178]">Transmission monitor</p><p className="mt-2 text-sm font-bold">{status === 'sent' ? 'DELIVERY CONFIRMED' : status === 'sending' ? 'DIALING REMOTE STATION…' : status === 'ready' ? 'DOCUMENT READY' : 'AWAITING DOCUMENT'}</p></div>
             </div>
 
-            <label className="mb-4 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">From mailbox</span>{rolofaxEntries.length > 0 && (<select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select a Rolofax handle…</option>{rolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></label>
-            <label className="mb-5 block"><span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Destination address</span>{otherRolofaxEntries.length > 0 && (<select value={recipient.includes('@fax') ? recipient.replace(/@fax$/, '') : ''} onChange={(event) => { const h = event.target.value; setRecipient(h ? `${h}@fax` : ''); }} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select from Rolofax directory…</option>{otherRolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></label>
+            <label className="mb-4 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">From mailbox</span>{rolofaxEntries.length > 0 && (<select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select a Rolofax handle…</option>{rolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></label>
+            <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Destination address</span>{otherRolofaxEntries.length > 0 && (<select value={recipient.includes('@fax') ? recipient.replace(/@fax$/, '') : ''} onChange={(event) => { const h = event.target.value; setRecipient(h ? `${h}@fax` : ''); }} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select from Rolofax directory…</option>{otherRolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></label>
 
-            {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold">FAULT: {error}</div>}
-            {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
+            {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">FAULT: {error}</div>}
+            {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
 
             <button onClick={() => isConnected ? void transmit() : login()} disabled={status === 'sending' || (isConnected && !base64)} className={`key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white transition-opacity ${!isConnected ? 'opacity-40' : 'disabled:cursor-not-allowed disabled:opacity-45'}`}>{status === 'sending' ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />} Transmit NFTfax</button>
-            <p className="mt-4 text-center text-[8px] uppercase tracking-[.16em] text-[#625d51]">Basic: earn send credits by forwarding · Pro: unlimited internal · Premium: external + colour</p>
+            <p className="mt-4 text-center text-[11px] uppercase tracking-[.16em] text-[#625d51]">Basic: earn send credits by forwarding · Pro: unlimited internal · Premium: external + colour</p>
           </div>
         </div>
       </SkinPanel>
       </>
       )}
 
-      <footer className="mx-auto mt-5 flex max-w-6xl flex-col justify-between gap-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row"><span>Powered by NFTmail.box / ERC-8004 identity</span><div className="flex gap-4"><a href="/pre-register" className="underline">Pre-register for launch →</a><a href="https://nftmail.box" className="underline">Open full mailbox console →</a></div></footer>
+      <footer className="mx-auto mt-5 flex max-w-6xl flex-col justify-between gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row"><span>Powered by NFTmail.box / ERC-8004 identity</span><div className="flex gap-4"><a href="/pre-register" className="underline">Pre-register for launch →</a><a href="https://nftmail.box" className="underline">Open full mailbox console →</a></div></footer>
     </main>
   );
 }

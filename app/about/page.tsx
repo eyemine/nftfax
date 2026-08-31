@@ -18,15 +18,15 @@ export default function AboutPage() {
             </div>
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">FAX CHAIN GAME<span className="text-[#e65b2f]">®</span></h1>
-              <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Rules of the chain letter</p>
+              <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Rules of the chain letter</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap">Office</Link>
+          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
         </header>
 
         <div className="space-y-4">
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">What it is</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">What it is</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <p>
                 NFTfax is a <strong className="text-[#25251f]">chain-letter game</strong> played over bitmap faxes.
@@ -41,7 +41,7 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">How to play</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">How to play</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
                 <li><strong>Register</strong> your <strong>@fax</strong> identity in the Rolofax directory before launch.</li>
@@ -55,7 +55,7 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Credits & limits</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Credits & limits</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
                 <li>New <strong>@fax</strong> identities start with <strong>2 credits</strong>.</li>
@@ -68,15 +68,15 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Halving timer per hop</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Halving timer per hop</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <p>
                 The 72-hour thermal timer is the base. But with each unminted hop, the timer <strong>halves</strong>:
                 the next player gets less time to act. A mint <strong>resets</strong> the timer to 72 hours for the next hop.
               </p>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-[10px] md:text-xs">
-                  <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+                <table className="w-full border-collapse text-left text-[12px] md:text-xs">
+                  <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                     <tr>
                       <th className="border border-[#8f8878] p-2">Hop</th>
                       <th className="border border-[#8f8878] p-2">Timer (no prior mint)</th>
@@ -98,13 +98,13 @@ export default function AboutPage() {
                   </tbody>
                 </table>
               </div>
-              <p className="text-[10px] uppercase tracking-wider text-[#696457]">Minimum timer is 3 minutes. A mint at any hop resets the next hop to 72 hours.</p>
-              <p className="text-[10px] uppercase tracking-wider text-[#696457]"><strong>Mint cap:</strong> once 2,222 faxes have been minted to Base, the halving timer is permanently deactivated. Chains continue indefinitely with no minting pressure — the game becomes a pure forwarding art chain.</p>
+              <p className="text-[12px] uppercase tracking-wider text-[#696457]">Minimum timer is 3 minutes. A mint at any hop resets the next hop to 72 hours.</p>
+              <p className="text-[12px] uppercase tracking-wider text-[#696457]"><strong>Mint cap:</strong> once 2,222 faxes have been minted to Base, the halving timer is permanently deactivated. Chains continue indefinitely with no minting pressure — the game becomes a pure forwarding art chain.</p>
             </div>
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Thermal fade</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Thermal fade</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <p>Public faxes age like thermal paper:</p>
               <ul className="space-y-2 list-disc pl-4">
@@ -117,7 +117,7 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Tray tabs</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Tray tabs</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
                 <li><strong>In-Tray</strong> — faxes you have received. Shows the thermal-fade countdown and chain link depth. Forward to unlock mint, save to rescue from decay.</li>
@@ -129,7 +129,7 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Relay window — keep the chain alive</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Relay window — keep the chain alive</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <p>If a recipient doesn't forward your fax in time, the chain is at risk of dying. The relay window gives the sender a way to keep it going:</p>
               <ul className="space-y-2 list-disc pl-4">
@@ -138,12 +138,12 @@ export default function AboutPage() {
                 <li><strong>After re-route:</strong> The original recipient can still forward the fax (slow lane), but their <strong>mint is disabled</strong>. The re-routed copy is the mintable one (fast lane).</li>
                 <li><strong>48h+:</strong> If still no forward, the sender gets a second nudge with additional relay suggestions.</li>
               </ul>
-              <p className="text-[10px] uppercase tracking-wider text-[#696457]">This ensures chains don't die from inactive recipients. The sender stays in control of the chain's survival.</p>
+              <p className="text-[12px] uppercase tracking-wider text-[#696457]">This ensures chains don't die from inactive recipients. The sender stays in control of the chain's survival.</p>
             </div>
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Public vs private</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Public vs private</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
                 <li><strong>@fax</strong> transmissions are <strong>public canvases</strong> — anyone can view them at <code>/tray/&#123;id&#125;</code>, with no encryption or private metadata.</li>
@@ -154,19 +154,19 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">The 2222 collection</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">The 2222 collection</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <p>
                 Deep chains can be minted into a fixed-supply <strong>2222 NFT collection</strong> tiered by hop depth.
                 The tier names are for clarity: two bookend names with meaning, nine literal hop descriptors in between.
                 A collector who sees <strong>7 Hop</strong> knows exactly what they earned.
               </p>
-              <p className="border-l-4 border-[#e65b2f] bg-[#f5dcc8] p-3 text-[10px] font-bold uppercase tracking-[.12em] text-[#8a3e1e]">
+              <p className="border-l-4 border-[#e65b2f] bg-[#f5dcc8] p-3 text-[12px] font-bold uppercase tracking-[.12em] text-[#8a3e1e]">
                 ⚡ Mint contract launches on Base — 16 August 2026, 12:00 UTC. Chain play and Rolofax registration open 15 August 2026.
               </p>
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-[10px] md:text-xs">
-                  <thead className="bg-[#b5ad9d] text-[9px] uppercase tracking-wider">
+                <table className="w-full border-collapse text-left text-[12px] md:text-xs">
+                  <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                     <tr>
                       <th className="border border-[#8f8878] p-2">Hops</th>
                       <th className="border border-[#8f8878] p-2">Supply</th>
@@ -192,7 +192,7 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Forwarding &amp; minting strategy</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Forwarding &amp; minting strategy</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <p>
                 Forwarding and minting are <strong>not the same action</strong>. You can forward a fax to keep the chain alive
@@ -214,7 +214,7 @@ export default function AboutPage() {
           </SkinPanel>
 
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">One mint per NFT, or one per chain?</div>
+            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">One mint per NFT, or one per chain?</div>
             <div className="p-5 md:p-8 space-y-3 text-sm leading-relaxed text-[#3e3b34]">
               <p>Mint limits differ by community, because Chonks are verified directly on Base while the other three are verified off-chain against Ethereum:</p>
               <ul className="space-y-2 list-disc pl-4">
@@ -225,7 +225,7 @@ export default function AboutPage() {
           </SkinPanel>
         </div>
 
-        <footer className="mx-auto mt-6 flex flex-col justify-between gap-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row">
+        <footer className="mx-auto mt-6 flex flex-col justify-between gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row">
           <span>Powered by NFTmail.box / ERC-8004 identity</span>
           <Link href="/" className="underline"><ArrowLeft size={10} className="inline" /> Back to office</Link>
         </footer>

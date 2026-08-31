@@ -136,12 +136,12 @@ function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', override
   if (encrypted) {
     return (
       <div className={`grid w-full place-items-center bg-[#25251f] text-[#8a836f] ${className}`}>
-        <div className="text-center"><Lock size={22} className="mx-auto mb-1" /><p className="text-[8px] uppercase tracking-widest">Encrypted · view in console</p></div>
+        <div className="text-center"><Lock size={22} className="mx-auto mb-1" /><p className="text-[11px] uppercase tracking-widest">Encrypted · view in console</p></div>
       </div>
     );
   }
   if (failed) {
-    return <div className={`grid w-full place-items-center bg-[#d5cebf] text-[8px] uppercase text-[#6e685a] ${className}`}>No preview</div>;
+    return <div className={`grid w-full place-items-center bg-[#d5cebf] text-[11px] uppercase text-[#6e685a] ${className}`}>No preview</div>;
   }
   if (!src) {
     return <div className={`grid w-full place-items-center bg-[#e7e0d1] ${className}`}><Loader2 className="animate-spin text-[#847d6e]" size={18} /></div>;
@@ -528,7 +528,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   if (!cleanLocal || !wallet) {
     return (
       <div className="grid min-h-[220px] place-items-center border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center">
-        <div><LayersArrowDown size={26} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">Connect + name your mailbox</p><p className="mt-2 text-[10px] uppercase tracking-wider text-[#696457]">Enter your NFTmail mailbox and connect a wallet to load your in-tray.</p></div>
+        <div><LayersArrowDown size={26} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">Connect + name your mailbox</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">Enter your NFTmail mailbox and connect a wallet to load your in-tray.</p></div>
       </div>
     );
   }
@@ -537,38 +537,38 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-[9px] font-bold uppercase tracking-[.24em] text-[#615c50]">Fax chain gallery</p>
+          <p className="text-[11px] font-bold uppercase tracking-[.24em] text-[#615c50]">Fax chain gallery</p>
           <h2 className="mt-1 text-xl font-black uppercase">Tray</h2>
         </div>
         <div className="flex items-center gap-3">
           {credits !== null && (
-            <span className="border border-[#77705f] bg-[#d8d0bf] px-2 py-2 text-[10px] font-bold uppercase text-[#615c50]">Send credits: {credits}</span>
+            <span className="border border-[#77705f] bg-[#d8d0bf] px-2 py-2 text-[12px] font-bold uppercase text-[#615c50]">Send credits: {credits}</span>
           )}
-          <button onClick={() => void load()} disabled={loading} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[10px] font-bold uppercase disabled:opacity-50">
+          <button onClick={() => void load()} disabled={loading} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[12px] font-bold uppercase disabled:opacity-50">
             {loading ? <Loader2 className="animate-spin" size={13} /> : 'Refresh'}
           </button>
         </div>
       </div>
 
       {mintLimitNotice && (
-        <div className="mb-4 border-l-4 border-[#26417d] bg-[#d3ddf2] p-3 text-[10px] font-bold uppercase text-[#26417d]">{mintLimitNotice}</div>
+        <div className="mb-4 border-l-4 border-[#26417d] bg-[#d3ddf2] p-3 text-[12px] font-bold uppercase text-[#26417d]">{mintLimitNotice}</div>
       )}
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[#8f8878]">
         {([['inbox', `In-Tray (${faxes.filter(f => !f.forwarded && !f.savedGnosis && !f.mintedBase).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length})`]] as [TabKey, string][]).map(([key, label]) => (
-          <button key={key} onClick={() => setActiveTab(key)} className={`px-4 py-2 text-[10px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
+          <button key={key} onClick={() => setActiveTab(key)} className={`px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
             {label}
           </button>
         ))}
       </div>
 
-      {notice && <div className="mb-4 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold uppercase">{notice}</div>}
-      {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold uppercase">FAULT: {error}</div>}
+      {notice && <div className="mb-4 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold uppercase">{notice}</div>}
+      {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">FAULT: {error}</div>}
 
       {!loading && displayedFaxes.length === 0 && (
         <div className="grid min-h-[180px] place-items-center border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center">
-          <div><Clock size={24} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">{activeTab === 'inbox' ? 'Tray empty' : activeTab === 'sent' ? 'Nothing sent' : activeTab === 'saved' ? 'Nothing saved' : 'Nothing minted'}</p><p className="mt-2 text-[10px] uppercase tracking-wider text-[#696457]">{activeTab === 'inbox' ? 'Received faxes appear here and fade after 96 hours unless saved.' : ''}</p></div>
+          <div><Clock size={24} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">{activeTab === 'inbox' ? 'Tray empty' : activeTab === 'sent' ? 'Nothing sent' : activeTab === 'saved' ? 'Nothing saved' : 'Nothing minted'}</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">{activeTab === 'inbox' ? 'Received faxes appear here and fade after 96 hours unless saved.' : ''}</p></div>
         </div>
       )}
 
@@ -582,7 +582,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           const canForward = activeTab !== 'sent' && !permanent && !jammed && !fax.forwarded && !fax.encrypted;
           return (
             <div key={fax.id} onClick={() => openDetail(fax)} className="machine-shadow cursor-pointer overflow-hidden border border-[#8f8878] bg-[#c8c0ae] hover:ring-2 hover:ring-[#e65b2f]">
-              <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-3 py-2 text-[9px] font-bold uppercase tracking-[.14em]">
+              <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-3 py-2 text-[11px] font-bold uppercase tracking-[.14em]">
                 <span>T/#{fax.id.toUpperCase()}</span>
                 <div className="flex items-center gap-2">
                   {canForward && <span className="text-[#e65b2f] underline">FORWARD</span>}
@@ -596,40 +596,40 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 <FaxThumb id={fax.id} encrypted={fax.encrypted} elapsed={permanent ? 0 : elapsed} jammed={jammed} jamMs={jamMs} href={`https://nftmail.box/tray/${fax.id}`} />
                 {jammed && (
                   <div className="pointer-events-none absolute inset-0 grid place-items-center">
-                    <span className="bg-[#f4f2ed]/80 px-2 py-1 text-[8px] font-bold uppercase tracking-widest text-[#a94228]">LINE JAMMED</span>
+                    <span className="bg-[#f4f2ed]/80 px-2 py-1 text-[11px] font-bold uppercase tracking-widest text-[#a94228]">LINE JAMMED</span>
                   </div>
                 )}
               </div>
 
               <div className="space-y-2 p-3">
-                <p className="truncate text-[10px] font-bold uppercase text-[#4a4638]">{activeTab === 'sent' && fax.sourceTrayId ? `Fwd from T/#${fax.sourceTrayId.toUpperCase()}` : activeTab === 'sent' ? `To: ${fax.to || '?'}` : `From: ${fax.from}`}</p>
+                <p className="truncate text-[12px] font-bold uppercase text-[#4a4638]">{activeTab === 'sent' && fax.sourceTrayId ? `Fwd from T/#${fax.sourceTrayId.toUpperCase()}` : activeTab === 'sent' ? `To: ${fax.to || '?'}` : `From: ${fax.from}`}</p>
                 <div className="flex flex-wrap gap-1">
-                  {fax.forwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#3d5a40]">Forwarded</span>}
-                  {fax.mintedBase && <span className="border border-[#3d6fd6] bg-[#d3ddf2] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#26417d]">Base</span>}
-                  {fax.savedGnosis && <span className="border border-[#c08a2f] bg-[#f0e4cd] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#7a5a15]">Gnosis</span>}
-                  {fax.chainDepth && fax.chainDepth > 1 && <span className="border border-[#7a6a5a] bg-[#e3dcc8] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#5a4d3e]">Link {fax.chainDepth}</span>}
-                  {jamMs < DEFAULT_JAM_MS && !permanent && !jammed && <span className="border border-[#b85a2f] bg-[#f5dcc8] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#8a3e1e]">Timer {jamMs < 60 * 60 * 1000 ? Math.round(jamMs / 60000) + 'm' : Math.round(jamMs / 3.6e6) + 'h'}</span>}
-                  {activeTab === 'sent' && fax.recipientForwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#3d5a40]">Recipient forwarded</span>}
-                  {activeTab === 'sent' && fax.reroutedAt && <span className="border border-[#b85a2f] bg-[#f5dcc8] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#8a3e1e]">Re-routed</span>}
+                  {fax.forwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#3d5a40]">Forwarded</span>}
+                  {fax.mintedBase && <span className="border border-[#3d6fd6] bg-[#d3ddf2] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#26417d]">Base</span>}
+                  {fax.savedGnosis && <span className="border border-[#c08a2f] bg-[#f0e4cd] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#7a5a15]">Gnosis</span>}
+                  {fax.chainDepth && fax.chainDepth > 1 && <span className="border border-[#7a6a5a] bg-[#e3dcc8] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#5a4d3e]">Link {fax.chainDepth}</span>}
+                  {jamMs < DEFAULT_JAM_MS && !permanent && !jammed && <span className="border border-[#b85a2f] bg-[#f5dcc8] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#8a3e1e]">Timer {jamMs < 60 * 60 * 1000 ? Math.round(jamMs / 60000) + 'm' : Math.round(jamMs / 3.6e6) + 'h'}</span>}
+                  {activeTab === 'sent' && fax.recipientForwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#3d5a40]">Recipient forwarded</span>}
+                  {activeTab === 'sent' && fax.reroutedAt && <span className="border border-[#b85a2f] bg-[#f5dcc8] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#8a3e1e]">Re-routed</span>}
                 </div>
                 {activeTab === 'sent' && !fax.recipientForwarded && !fax.reroutedAt && !fax.encrypted && (() => {
                   const sentElapsed = now - fax.createdAt;
                   const relayWindowMs = 24 * 60 * 60 * 1000;
                   if (sentElapsed >= relayWindowMs) {
-                    return <p className="text-[8px] uppercase tracking-wide text-[#b85a2f]">⚡ Relay window open — click to re-route</p>;
+                    return <p className="text-[11px] uppercase tracking-wide text-[#b85a2f]">⚡ Relay window open — click to re-route</p>;
                   } else {
                     const remaining = Math.ceil((relayWindowMs - sentElapsed) / (60 * 60 * 1000));
-                    return <p className="text-[8px] uppercase tracking-wide text-[#6e685a]">Relay opens in {remaining}h</p>;
+                    return <p className="text-[11px] uppercase tracking-wide text-[#6e685a]">Relay opens in {remaining}h</p>;
                   }
                 })()}
-                {activeTab === 'inbox' && !permanent && !jammed && !fax.forwarded && !fax.encrypted && <p className="text-[8px] uppercase tracking-wide text-[#6e685a]">Forward to unlock Base mint</p>}
-                {activeTab === 'inbox' && !permanent && jammed && !fax.encrypted && <p className="text-[8px] uppercase tracking-wide text-[#a94228]">LINE JAMMED — start a new chain with {fax.from}</p>}
+                {activeTab === 'inbox' && !permanent && !jammed && !fax.forwarded && !fax.encrypted && <p className="text-[11px] uppercase tracking-wide text-[#6e685a]">Forward to unlock Base mint</p>}
+                {activeTab === 'inbox' && !permanent && jammed && !fax.encrypted && <p className="text-[11px] uppercase tracking-wide text-[#a94228]">LINE JAMMED — start a new chain with {fax.from}</p>}
                 {activeTab === 'inbox' && !permanent && jammed && !fax.encrypted && (
-                  <button onClick={(e) => { e.stopPropagation(); void deleteFax(fax); }} disabled={busyId === fax.id} className="text-[8px] font-bold uppercase text-[#a94228] underline hover:text-[#c0392b] disabled:opacity-50">
+                  <button onClick={(e) => { e.stopPropagation(); void deleteFax(fax); }} disabled={busyId === fax.id} className="text-[11px] font-bold uppercase text-[#a94228] underline hover:text-[#c0392b] disabled:opacity-50">
                     {busyId === fax.id ? 'Deleting…' : 'Delete'}
                   </button>
                 )}
-                {activeTab === 'sent' && fax.forwarded && !fax.mintedBase && !fax.sourceMintedBase && <p className="text-[8px] uppercase tracking-wide text-[#26417d]">Mint available — click to mint</p>}
+                {activeTab === 'sent' && fax.forwarded && !fax.mintedBase && !fax.sourceMintedBase && <p className="text-[11px] uppercase tracking-wide text-[#26417d]">Mint available — click to mint</p>}
               </div>
             </div>
           );
@@ -641,7 +641,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           <div className="machine-shadow flex h-[75vh] w-[75vw] flex-col overflow-hidden border border-[#8f8878] bg-[#c8c0ae]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3">
               <div>
-                <p className="text-[9px] font-bold uppercase tracking-[.24em] text-[#615c50]">Transmission detail</p>
+                <p className="text-[11px] font-bold uppercase tracking-[.24em] text-[#615c50]">Transmission detail</p>
                 <h3 className="text-lg font-black uppercase">T/#{selected.id.toUpperCase()}</h3>
               </div>
               <button onClick={() => { resetForward(); setSelected(null); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] p-2"><X size={16} /></button>
@@ -669,9 +669,9 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                         {compositing && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/80"><Loader2 className="animate-spin" /></div>}
                       </div>
                       {compositePreview ? (
-                        <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-widest text-[#7a5a15]">Live composite · {CHAIN_OPS.find((o) => o.id === chainOp)?.label} operation</p>
+                        <p className="mt-2 text-center text-[11px] font-bold uppercase tracking-widest text-[#7a5a15]">Live composite · {CHAIN_OPS.find((o) => o.id === chainOp)?.label} operation</p>
                       ) : isForwardedImage ? (
-                        <p className="mt-2 text-center text-[8px] font-bold uppercase tracking-widest text-[#26417d]">Forwarded link · T/#{displayId.toUpperCase()} · mint/save this image</p>
+                        <p className="mt-2 text-center text-[11px] font-bold uppercase tracking-widest text-[#26417d]">Forwarded link · T/#{displayId.toUpperCase()} · mint/save this image</p>
                       ) : null}
                     </>
                   );
@@ -680,7 +680,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
               {/* Right: metadata + actions + chain builder */}
               <div className="min-h-0 overflow-auto bg-[#bbb3a2] p-5">
-                <div className="mb-5 grid gap-1.5 text-[10px] font-bold uppercase text-[#4a4638]">
+                <div className="mb-5 grid gap-1.5 text-[12px] font-bold uppercase text-[#4a4638]">
                   <p>{activeTab === 'sent' && selected.forwarded ? `Forwarded from: ${selected.from}` : activeTab === 'sent' ? `To: ${selected.to || '?'}` : `From: ${selected.from}`}</p>
                   <p>{activeTab === 'sent' && selected.forwarded ? 'Forwarded' : activeTab === 'sent' ? 'Sent' : 'Received'}: {formatDate(selected.createdAt)}</p>
                   {selected.chainDepth && selected.chainDepth > 1 && <p className="flex items-center gap-1 text-[#5a4d3e]"><Link2 size={12} /> Chain link {selected.chainDepth}</p>}
@@ -688,9 +688,9 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   {activeTab === 'sent' && selected.recipientForwarded && <p className="text-[#3d5a40]">✓ Recipient forwarded this fax</p>}
                   {activeTab === 'sent' && selected.reroutedAt && <p className="text-[#8a3e1e]">⚡ Re-routed at {formatDate(selected.reroutedAt)}</p>}
                   <div className="flex flex-wrap gap-1 pt-1">
-                    {selected.forwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#3d5a40]">Forwarded</span>}
-                    {selected.mintedBase && <span className="border border-[#3d6fd6] bg-[#d3ddf2] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#26417d]">Base</span>}
-                    {selected.savedGnosis && <span className="border border-[#c08a2f] bg-[#f0e4cd] px-1.5 py-0.5 text-[8px] font-bold uppercase text-[#7a5a15]">Gnosis</span>}
+                    {selected.forwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#3d5a40]">Forwarded</span>}
+                    {selected.mintedBase && <span className="border border-[#3d6fd6] bg-[#d3ddf2] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#26417d]">Base</span>}
+                    {selected.savedGnosis && <span className="border border-[#c08a2f] bg-[#f0e4cd] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#7a5a15]">Gnosis</span>}
                   </div>
                 </div>
 
@@ -702,17 +702,17 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   if (!relayOpen) {
                     const remaining = Math.ceil((relayWindowMs - sentElapsed) / (60 * 60 * 1000));
                     return (
-                      <div className="mb-5 border-l-4 border-[#8f8878] bg-[#e7e0d1] p-3 text-[10px] font-bold uppercase text-[#6e685a]">
+                      <div className="mb-5 border-l-4 border-[#8f8878] bg-[#e7e0d1] p-3 text-[12px] font-bold uppercase text-[#6e685a]">
                         Relay window opens in {remaining}h. If the recipient hasn't forwarded by then, you can re-route this fax to a new player.
                       </div>
                     );
                   }
                   return (
                     <div className="mb-5 border-2 border-[#b85a2f] bg-[#f5dcc8] p-4">
-                      <p className="mb-3 text-[10px] font-bold uppercase tracking-[.14em] text-[#8a3e1e]">⚡ Relay window open</p>
-                      <p className="mb-3 text-[10px] text-[#4a4638]">The recipient hasn't forwarded this fax. Re-route it to a new player to keep the chain alive. The original recipient can still forward but their mint is disabled.</p>
+                      <p className="mb-3 text-[12px] font-bold uppercase tracking-[.14em] text-[#8a3e1e]">⚡ Relay window open</p>
+                      <p className="mb-3 text-[12px] text-[#4a4638]">The recipient hasn't forwarded this fax. Re-route it to a new player to keep the chain alive. The original recipient can still forward but their mint is disabled.</p>
                       {!showReroute ? (
-                        <button onClick={() => { setShowReroute(true); void fetchRelaySuggestions(selected); }} className="key-shadow w-full border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[10px] font-black uppercase text-white">
+                        <button onClick={() => { setShowReroute(true); void fetchRelaySuggestions(selected); }} className="key-shadow w-full border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[12px] font-black uppercase text-white">
                           Re-route this fax
                         </button>
                       ) : (
@@ -725,10 +725,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                           />
                           {relaySuggestions.length > 0 && (
                             <div>
-                              <p className="mb-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#6e685a]">Suggested from Rolofax</p>
+                              <p className="mb-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#6e685a]">Suggested from Rolofax</p>
                               <div className="flex flex-wrap gap-1">
                                 {relaySuggestions.map((s) => (
-                                  <button key={s.handle} onClick={() => setRerouteTo(`${s.handle}@fax`)} className="border border-[#77705f] bg-[#d8d0bf] px-2 py-1 text-[8px] font-bold uppercase hover:bg-[#eee8dc]">
+                                  <button key={s.handle} onClick={() => setRerouteTo(`${s.handle}@fax`)} className="border border-[#77705f] bg-[#d8d0bf] px-2 py-1 text-[11px] font-bold uppercase hover:bg-[#eee8dc]">
                                     {s.handle}@fax
                                   </button>
                                 ))}
@@ -736,10 +736,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                             </div>
                           )}
                           <div className="flex gap-2">
-                            <button onClick={() => void reroute(selected)} disabled={busyId === selected.id || !rerouteTo.includes('@')} className="key-shadow flex flex-1 items-center justify-center gap-1 border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[10px] font-black uppercase text-white disabled:opacity-50">
+                            <button onClick={() => void reroute(selected)} disabled={busyId === selected.id || !rerouteTo.includes('@')} className="key-shadow flex flex-1 items-center justify-center gap-1 border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
                               {busyId === selected.id ? <Loader2 className="animate-spin" size={13} /> : <Send size={13} />} Confirm re-route
                             </button>
-                            <button onClick={() => { setShowReroute(false); setRerouteTo(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-3 text-[10px] font-bold uppercase">Cancel</button>
+                            <button onClick={() => { setShowReroute(false); setRerouteTo(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-3 text-[12px] font-bold uppercase">Cancel</button>
                           </div>
                         </div>
                       )}
@@ -749,18 +749,18 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
                 {selected.forwarded && !selected.mintedBase && !selected.sourceMintedBase && (
                   <div className="mb-5 border-2 border-[#3d6fd6] bg-[#d3ddf2] p-4">
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-[.14em] text-[#26417d]">✓ Forwarded — Mint unlocked</p>
-                    <p className="mb-3 text-[10px] text-[#26417d]">You've passed the chain on. Mint this fax to Base as a permanent collectible.</p>
-                    <a href={`https://nftmail.box/tray/${forwardedTrayId || selected.id}`} target="_blank" rel="noreferrer" className="mb-3 flex items-center gap-1 text-[9px] font-bold uppercase text-[#26417d] underline">
+                    <p className="mb-2 text-[12px] font-black uppercase tracking-[.14em] text-[#26417d]">✓ Forwarded — Mint unlocked</p>
+                    <p className="mb-3 text-[12px] text-[#26417d]">You've passed the chain on. Mint this fax to Base as a permanent collectible.</p>
+                    <a href={`https://nftmail.box/tray/${forwardedTrayId || selected.id}`} target="_blank" rel="noreferrer" className="mb-3 flex items-center gap-1 text-[11px] font-bold uppercase text-[#26417d] underline">
                       <ExternalLink size={11} /> View public fax
                     </a>
                     {MINT_PAUSED ? (
                       <div className="border-2 border-dashed border-[#8f8878] bg-[#e7e0d1] p-3 text-center">
-                        <p className="text-[10px] font-black uppercase text-[#615c50]">Minting Paused</p>
-                        <p className="mt-1 text-[9px] uppercase text-[#6e685a]">Resumes on V2 contract — {MINT_RESUME_AT}</p>
+                        <p className="text-[12px] font-black uppercase text-[#615c50]">Minting Paused</p>
+                        <p className="mt-1 text-[11px] uppercase text-[#6e685a]">Resumes on V2 contract — {MINT_RESUME_AT}</p>
                       </div>
                     ) : (
-                      <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[10px] font-black uppercase text-white disabled:opacity-50">
+                      <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
                         {busyId === selected.id ? <Loader2 className="animate-spin" size={14} /> : <Coins size={14} />} Mint to Base
                       </button>
                     )}
@@ -769,47 +769,47 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
                 {activeTab === 'inbox' && (
                 <div className="mb-5 grid grid-cols-3 gap-2">
-                  <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS))} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[9px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
+                  <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS))} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
                     <Send size={12} /> Forward
                   </button>
-                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || !!selected.sourceMintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
+                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || !!selected.sourceMintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
                     <Coins size={12} /> {MINT_PAUSED ? 'Paused' : 'Mint'}
                   </button>
-                  <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis || !selected.forwarded} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[9px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis || !selected.forwarded} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[11px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
                     <Archive size={12} /> Save
                   </button>
                 </div>
                 )}
                 {activeTab === 'sent' && !selected.mintedBase && !selected.sourceMintedBase && !selected.savedGnosis && !MINT_PAUSED && !selected.encrypted && (selected.sourceTrayId || selected.chainTrayId || selected.recipientForwarded || selected.forwarded) && (
                 <div className="mb-5 grid grid-cols-2 gap-2">
-                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
                   </button>
-                  <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[9px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[11px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
                     <Archive size={12} /> Save
                   </button>
                 </div>
                 )}
                 {activeTab === 'saved' && !selected.mintedBase && !MINT_PAUSED && !selected.encrypted && selected.forwarded && (
                 <div className="mb-5 grid grid-cols-1 gap-2">
-                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[9px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
                   </button>
                 </div>
                 )}
 
                 {activeTab === 'inbox' && !selected.savedGnosis && !selected.mintedBase && !selected.forwarded && !selected.encrypted && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS) && (
-                  <button onClick={() => void deleteFax(selected)} disabled={busyId === selected.id} className="mb-5 w-full border border-[#a94228] bg-[#e2c9bc] py-2 text-[9px] font-bold uppercase text-[#a94228] hover:bg-[#c0392b] hover:text-white disabled:opacity-50">
+                  <button onClick={() => void deleteFax(selected)} disabled={busyId === selected.id} className="mb-5 w-full border border-[#a94228] bg-[#e2c9bc] py-2 text-[11px] font-bold uppercase text-[#a94228] hover:bg-[#c0392b] hover:text-white disabled:opacity-50">
                     {busyId === selected.id ? 'Deleting…' : 'Delete jammed fax'}
                   </button>
                 )}
 
                 {forwardFor === selected.id && (
                   <div className="border-t-2 border-dashed border-[#8f8878] pt-5">
-                    <p className="mb-3 text-[9px] font-bold uppercase tracking-[.18em]">Continue the chain</p>
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[.18em]">Continue the chain</p>
 
                     {forwardError && (
-                      <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold uppercase text-[#a94228]">{forwardError}</div>
+                      <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">{forwardError}</div>
                     )}
 
                     {(() => {
@@ -817,7 +817,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                       const opts = rolofaxOptions.filter((e) => e.handle !== sender);
                       return (
                         <div className="mb-2">
-                          <span className="mb-1 block text-[8px] font-bold uppercase tracking-[.16em] text-[#615c50]">Rolofax directory</span>
+                          <span className="mb-1 block text-[11px] font-bold uppercase tracking-[.16em] text-[#615c50]">Rolofax directory</span>
                           <select
                             value={forwardTo.includes('@fax') ? forwardTo.replace(/@fax$/, '') : ''}
                             onChange={(e) => { const h = e.target.value; setForwardTo(h ? `${h}@fax` : ''); }}
@@ -850,19 +850,19 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={overlaySrc} alt="Your image" className="max-h-[90px] max-w-full object-contain grayscale" />
                       ) : (
-                        <div><div className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full border border-[#9a9282] bg-[#d5cebf]"><Upload size={18} /></div><p className="text-[10px] font-bold uppercase">Add your image to the chain</p><p className="text-[9px] uppercase text-[#696457]">PNG · JPG · BMP</p></div>
+                        <div><div className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full border border-[#9a9282] bg-[#d5cebf]"><Upload size={18} /></div><p className="text-[12px] font-bold uppercase">Add your image to the chain</p><p className="text-[11px] uppercase text-[#696457]">PNG · JPG · BMP</p></div>
                       )}
                     </button>
                     <input ref={fileInputRef} type="file" accept=".png,.jpg,.jpeg,.bmp,image/png,image/jpeg,image/bmp" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) selectForwardFile(file); }} />
-                    {forwardFileName && <p className="mb-3 text-[9px] font-bold uppercase text-[#615c50]">{forwardFileName} {compositeBase64 ? `· ${Math.round(compositeBase64.length * 0.75 / 1024)} KB` : ''}</p>}
+                    {forwardFileName && <p className="mb-3 text-[11px] font-bold uppercase text-[#615c50]">{forwardFileName} {compositeBase64 ? `· ${Math.round(compositeBase64.length * 0.75 / 1024)} KB` : ''}</p>}
 
                     {overlaySrc && (
                       <div className="mb-4">
                         <div className="mb-2 flex items-center justify-between">
-                          <p className="text-[8px] font-bold uppercase tracking-[.18em] text-[#615c50]">Chain operation</p>
+                          <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#615c50]">Chain operation</p>
                           <button
                             onClick={() => setNegative((n) => !n)}
-                            className={`border px-2 py-1 text-[8px] font-bold uppercase tracking-wider ${negative ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf] text-[#4a4638]'}`}
+                            className={`border px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${negative ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf] text-[#4a4638]'}`}
                             title="Invert the uploaded image (RGB only) before blending"
                           >
                             Negative {negative ? '· On' : '· Off'}
@@ -873,22 +873,22 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                             const Icon = OP_ICON[opt.id];
                             const active = chainOp === opt.id;
                             return (
-                              <button key={opt.id} onClick={() => setChainOp(opt.id)} title={opt.hint} className={`key-shadow flex flex-col items-center gap-1 border px-1 py-3 text-[9px] font-black uppercase ${active ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
+                              <button key={opt.id} onClick={() => setChainOp(opt.id)} title={opt.hint} className={`key-shadow flex flex-col items-center gap-1 border px-1 py-3 text-[11px] font-black uppercase ${active ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
                                 <Icon size={16} /> {opt.label}
                               </button>
                             );
                           })}
                         </div>
-                        <p className="mt-2 text-[9px] text-[#4a4638]">{CHAIN_OPS.find((o) => o.id === chainOp)?.hint}</p>
+                        <p className="mt-2 text-[11px] text-[#4a4638]">{CHAIN_OPS.find((o) => o.id === chainOp)?.hint}</p>
                       </div>
                     )}
-                    {!overlaySrc && <p className="mb-4 text-[9px] text-[#6e685a]">No image? The existing fax is forwarded unchanged.</p>}
+                    {!overlaySrc && <p className="mb-4 text-[11px] text-[#6e685a]">No image? The existing fax is forwarded unchanged.</p>}
 
                     <div className="flex gap-2">
-                      <button onClick={() => void forward(selected)} disabled={busyId === selected.id || compositing} className="key-shadow flex flex-1 items-center justify-center gap-1 border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[10px] font-black uppercase text-white disabled:opacity-50">
+                      <button onClick={() => void forward(selected)} disabled={busyId === selected.id || compositing} className="key-shadow flex flex-1 items-center justify-center gap-1 border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
                         {busyId === selected.id ? <Loader2 className="animate-spin" size={13} /> : <Send size={13} />} Send forward
                       </button>
-                      <button onClick={() => { const to = forwardTo; resetForward(); setForwardFor(selected.id); setForwardTo(to); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-3 text-[10px] font-bold uppercase">Clear</button>
+                      <button onClick={() => { const to = forwardTo; resetForward(); setForwardFor(selected.id); setForwardTo(to); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-3 text-[12px] font-bold uppercase">Clear</button>
                     </div>
                   </div>
                 )}

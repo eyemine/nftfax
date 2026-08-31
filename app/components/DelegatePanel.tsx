@@ -98,14 +98,14 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
 
   return (
     <div className="space-y-4">
-      <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+      <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
         <span>Delegate.xyz registry — {theme.collectionName}</span>
       </div>
 
       <div className="grid gap-4 p-5 md:grid-cols-2 md:p-8">
         <div className="space-y-4">
           <label className="block">
-            <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Token ID</span>
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Token ID</span>
             <input
               value={tokenId}
               onChange={(e) => setTokenId(e.target.value)}
@@ -115,31 +115,31 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Hot wallet (delegate)</span>
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Hot wallet (delegate)</span>
             <input
               value={hotWallet}
               onChange={(e) => setHotWallet(e.target.value)}
               placeholder={walletAddress || '0x...'}
               className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
             />
-            <p className="mt-1 text-[8px] uppercase tracking-wider text-[#625e52]">This wallet plays the fax game.</p>
+            <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">This wallet plays the fax game.</p>
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-[9px] font-bold uppercase tracking-[.18em]">Cold vault wallet (owner)</span>
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Cold vault wallet (owner)</span>
             <input
               value={vaultWallet}
               onChange={(e) => setVaultWallet(e.target.value)}
               placeholder="0x..."
               className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
             />
-            <p className="mt-1 text-[8px] uppercase tracking-wider text-[#625e52]">Holds the {theme.collectionName} NFT.</p>
+            <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">Holds the {theme.collectionName} NFT.</p>
           </label>
 
           <button
             onClick={() => void handleCheck()}
             disabled={status === 'checking' || status === 'granting'}
-            className="key-shadow flex w-full items-center justify-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-5 py-3 text-[10px] font-bold uppercase tracking-[.12em] disabled:opacity-50"
+            className="key-shadow flex w-full items-center justify-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-5 py-3 text-[12px] font-bold uppercase tracking-[.12em] disabled:opacity-50"
           >
             {status === 'checking' ? <Loader2 size={15} className="animate-spin" /> : <UserCheck size={15} />}
             Check delegation
@@ -148,7 +148,7 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
 
         <div className="space-y-4 border-t border-[#8f8878] pt-4 md:border-t-0 md:border-l md:pl-8 md:pt-0">
           {error && (
-            <div className="flex items-start gap-2 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold">
+            <div className="flex items-start gap-2 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">
               <AlertCircle size={15} />
               <span>{error}</span>
             </div>
@@ -157,19 +157,19 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
           {result && (
             <div className="space-y-3">
               {result.verified ? (
-                <div className="flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold">
+                <div className="flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold">
                   <Check size={15} />
                   {result.isOwner ? 'Connected wallet owns this token.' : 'Connected wallet is a delegated hot wallet.'}
                 </div>
               ) : (
-                <div className="flex items-start gap-2 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold">
+                <div className="flex items-start gap-2 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">
                   <AlertCircle size={15} />
                   <span>{result.error ?? 'Not verified.'}</span>
                 </div>
               )}
 
               {result.actualOwner && (
-                <p className="text-[9px] font-bold uppercase tracking-[.14em] text-[#625e52]">
+                <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#625e52]">
                   On-chain owner: {result.actualOwner.slice(0, 6)}…{result.actualOwner.slice(-4)}
                 </p>
               )}
@@ -178,7 +178,7 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
                 <button
                   onClick={() => void handleGrant()}
                   disabled={status === 'granting' || status === 'granted'}
-                  className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-3 text-[10px] font-bold uppercase tracking-[.12em] text-white disabled:opacity-50"
+                  className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-3 text-[12px] font-bold uppercase tracking-[.12em] text-white disabled:opacity-50"
                 >
                   {status === 'granting' ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
                   Grant delegation to hot wallet
@@ -190,7 +190,7 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
                   href={`https://basescan.org/tx/${txHash}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="block border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[10px] font-bold underline"
+                  className="block border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold underline"
                 >
                   Delegation transaction: {txHash.slice(0, 10)}…
                 </a>
@@ -199,7 +199,7 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
           )}
 
           {!result && !error && (
-            <div className="text-[10px] font-bold uppercase tracking-[.12em] text-[#625e52]">
+            <div className="text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">
               <p className="mb-2">NFT holders can keep their NFT in cold storage while a hot wallet plays the chain game.</p>
               <p>1. Connect your cold wallet to MetaMask.</p>
               <p>2. Enter the hot wallet address you want to use.</p>

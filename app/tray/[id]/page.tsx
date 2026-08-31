@@ -58,14 +58,14 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={20} /></div>
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">{FAX_THEME.siteName}<span style={{ color: FAX_THEME.accent }}>™</span></h1>
-              <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{FAX_THEME.tagline}</p>
+              <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{FAX_THEME.tagline}</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap">Office</Link>
+          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
         </header>
 
         <SkinPanel className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">
+          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span>Public transmission T/#{doc.id.slice(0, 4).toUpperCase()}</span>
             <span className={jammed ? 'text-[#a94228]' : 'text-[#456049]'}>{jammed ? 'LINE JAMMED' : 'LINE OPEN'}</span>
           </div>
@@ -75,11 +75,11 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
               {doc.encrypted || doc.channel === 'private' ? (
                 <div className="grid place-items-center text-center text-[#8a836f]">
                   <Lock size={32} className="mb-2" />
-                  <p className="text-[10px] font-bold uppercase">This transmission is private</p>
-                  <p className="text-[9px] uppercase tracking-wider text-[#6e685a]">Open in your NFTmail console to decrypt.</p>
+                  <p className="text-[12px] font-bold uppercase">This transmission is private</p>
+                  <p className="text-[11px] uppercase tracking-wider text-[#6e685a]">Open in your NFTmail console to decrypt.</p>
                 </div>
               ) : jammed ? (
-                <div className="grid w-full place-items-center bg-[#f4f2ed] text-[9px] font-bold uppercase tracking-widest text-[#9a9282]">
+                <div className="grid w-full place-items-center bg-[#f4f2ed] text-[11px] font-bold uppercase tracking-widest text-[#9a9282]">
                   LINE JAMMED
                 </div>
               ) : src ? (
@@ -90,21 +90,21 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
               )}
             </div>
 
-            <div className="space-y-4 text-[10px] font-bold uppercase text-[#4a4638]">
+            <div className="space-y-4 text-[12px] font-bold uppercase text-[#4a4638]">
               <p className="border-b border-[#8f8878] pb-2">From: {doc.from}</p>
               {doc.to && <p className="border-b border-[#8f8878] pb-2">To: {doc.to}</p>}
               <p className="border-b border-[#8f8878] pb-2">Received: {formatDate(doc.createdAt)}</p>
               {typeof doc.chainDepth === 'number' && (
                 <p className="border-b border-[#8f8878] pb-2">Chain link: {doc.chainDepth}</p>
               )}
-              <p className="pt-2 text-[8px] uppercase tracking-wider text-[#6e685a]">
+              <p className="pt-2 text-[11px] uppercase tracking-wider text-[#6e685a]">
                 Public faxes are thermal paper. This link decays after 72 hours unless saved.
               </p>
             </div>
           </div>
         </SkinPanel>
 
-        <footer className="mt-5 text-center text-[8px] font-bold uppercase tracking-[.14em] text-[#575347]">
+        <footer className="mt-5 text-center text-[11px] font-bold uppercase tracking-[.14em] text-[#575347]">
           Powered by NFTmail.box / ERC-8004 identity
         </footer>
       </div>
@@ -140,7 +140,7 @@ export default function TrayPage() {
   if (loading) {
     return (
       <div className="grid min-h-screen place-items-center bg-[#c8c0ae]">
-        <div className="text-center"><Loader2 className="mx-auto animate-spin text-[#847d6e]" size={32} /><p className="mt-3 text-[10px] font-bold uppercase text-[#6e685a]">Receiving transmission…</p></div>
+        <div className="text-center"><Loader2 className="mx-auto animate-spin text-[#847d6e]" size={32} /><p className="mt-3 text-[12px] font-bold uppercase text-[#6e685a]">Receiving transmission…</p></div>
       </div>
     );
   }
@@ -151,8 +151,8 @@ export default function TrayPage() {
         <div>
           <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-sm border border-[#8f8878] bg-[#d8d0bf]"><X size={22} className="text-[#a94228]" /></div>
           <h1 className="text-lg font-black uppercase">Transmission not found</h1>
-          <p className="mt-2 text-[10px] uppercase text-[#6e685a]">{error || 'This fax has faded or the ID is invalid.'}</p>
-          <Link href="/" className="mt-4 inline-block key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[10px] font-bold uppercase">Return to office</Link>
+          <p className="mt-2 text-[12px] uppercase text-[#6e685a]">{error || 'This fax has faded or the ID is invalid.'}</p>
+          <Link href="/" className="mt-4 inline-block key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[12px] font-bold uppercase">Return to office</Link>
         </div>
       </div>
     );

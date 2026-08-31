@@ -90,23 +90,23 @@ export default function VerifyClient() {
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><ShieldCheck size={20} /></div>
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">VERIFY DRAW<span className="text-[#e65b2f]">™</span></h1>
-              <p className="text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Recompute winners client-side from the on-chain seed</p>
+              <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Recompute winners client-side from the on-chain seed</p>
             </div>
           </div>
           <div className="flex gap-1.5 sm:gap-2">
-            <Link href="/draw" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap">Draw</Link>
-            <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap">Office</Link>
+            <Link href="/draw" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Draw</Link>
+            <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
           </div>
         </header>
 
         {!FAX_CONTRACT_DEPLOYED && (
-          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold uppercase">
+          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">
             Contract not deployed yet ({FAX_CONTRACT}). Verification is unavailable.
           </div>
         )}
 
         <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
-          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">How this works</div>
+          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">How this works</div>
           <div className="p-5 text-sm leading-relaxed text-[#3e3b34] space-y-2">
             <p>
               This page pulls the captured seed for a draw round directly from the NFTFaxCollectible contract on Base,
@@ -114,7 +114,7 @@ export default function VerifyClient() {
               public, deterministic shuffle (SHA-256 Fisher-Yates keyed by the seed) to pick one winner per tier.
               If it matches the on-chain <code>PrizeSent</code> events, the draw was fair given the published seed.
             </p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#8a3e1e]">
+            <p className="text-[12px] font-bold uppercase tracking-wider text-[#8a3e1e]">
               10 winners are selected — one randomly chosen from each of the 11 tiers. The tier order is shuffled by
               the seed, so if all 11 tiers have minters, one tier is randomly left out.
             </p>
@@ -122,9 +122,9 @@ export default function VerifyClient() {
         </div>
 
         <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
-          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em]">Inputs</div>
+          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Inputs</div>
           <div className="p-5 space-y-3">
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-[#625e52]">
+            <label className="block text-[12px] font-bold uppercase tracking-wider text-[#625e52]">
               Round number
               <input
                 value={round}
@@ -136,7 +136,7 @@ export default function VerifyClient() {
             <button
               onClick={handleVerify}
               disabled={loading || !FAX_CONTRACT_DEPLOYED}
-              className="key-shadow border border-[#77705f] bg-[#e65b2f] px-4 py-2 text-[10px] font-bold uppercase text-white disabled:opacity-50"
+              className="key-shadow border border-[#77705f] bg-[#e65b2f] px-4 py-2 text-[12px] font-bold uppercase text-white disabled:opacity-50"
             >
               {loading ? 'Verifying…' : 'Verify round'}
             </button>
@@ -148,18 +148,18 @@ export default function VerifyClient() {
         )}
 
         {error && (
-          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[10px] font-bold uppercase flex items-center gap-2"><AlertTriangle size={14} /> {error}</div>
+          <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase flex items-center gap-2"><AlertTriangle size={14} /> {error}</div>
         )}
 
         {result && (
           <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className={`border-b border-[#8f8878] px-5 py-3 text-[10px] font-bold uppercase tracking-[.16em] ${result.matches ? 'bg-[#c9d8c4]' : 'bg-[#e2c9bc]'}`}>
+            <div className={`border-b border-[#8f8878] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em] ${result.matches ? 'bg-[#c9d8c4]' : 'bg-[#e2c9bc]'}`}>
               {result.onChainWinners.length === 0
                 ? 'Seed captured, no distribution yet — showing computed winners only'
                 : result.matches ? 'MATCH — on-chain winners match the recomputed draw' : 'MISMATCH — on-chain winners do NOT match the recomputed draw'}
             </div>
             <div className="p-5 space-y-3 text-sm text-[#3e3b34]">
-              <p className="font-mono text-[10px] break-all"><strong>Seed:</strong> {result.seed}</p>
+              <p className="font-mono text-[12px] break-all"><strong>Seed:</strong> {result.seed}</p>
               <p><strong>Eligible mint entries:</strong> {result.minterCount}</p>
               {result.tiersFound.length > 0 && (
                 <p><strong>Tiers found:</strong> {result.tiersFound.join(', ')}</p>
@@ -167,8 +167,8 @@ export default function VerifyClient() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[#8f8878]">
               <div className="bg-[#c8c0ae] p-4">
-                <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#625e52]">Recomputed winners (tier-aware)</p>
-                <ul className="space-y-1 font-mono text-[10px]">
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#625e52]">Recomputed winners (tier-aware)</p>
+                <ul className="space-y-1 font-mono text-[12px]">
                   {result.tieredWinners.map((w, i) => (
                     <li key={w.winner + w.tier + i}>
                       <span className="text-[#8a3e1e] font-bold">{w.tier}</span> — {truncate(w.winner)}
@@ -177,11 +177,11 @@ export default function VerifyClient() {
                 </ul>
               </div>
               <div className="bg-[#c8c0ae] p-4">
-                <p className="mb-2 text-[9px] font-bold uppercase tracking-wider text-[#625e52]">On-chain PrizeSent winners</p>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#625e52]">On-chain PrizeSent winners</p>
                 {result.onChainWinners.length === 0 ? (
-                  <p className="text-[10px] text-[#847d6e]">No distribution recorded yet.</p>
+                  <p className="text-[12px] text-[#847d6e]">No distribution recorded yet.</p>
                 ) : (
-                  <ul className="space-y-1 font-mono text-[10px]">
+                  <ul className="space-y-1 font-mono text-[12px]">
                     {result.onChainWinners.map((w) => <li key={w}>{truncate(w)}</li>)}
                   </ul>
                 )}
@@ -190,7 +190,7 @@ export default function VerifyClient() {
           </div>
         )}
 
-        <footer className="mx-auto mt-6 flex flex-col justify-between gap-2 text-[8px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row">
+        <footer className="mx-auto mt-6 flex flex-col justify-between gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row">
           <span>Contract: {FAX_CONTRACT}</span>
           <Link href="/" className="underline"><ArrowLeft size={10} className="inline" /> Back to office</Link>
         </footer>
