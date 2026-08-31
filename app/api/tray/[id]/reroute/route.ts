@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const docRes = await fetch(WORKER_URL, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ action: 'getTrayDocument', trayId: originalTrayId }),
+      body: JSON.stringify({ action: 'getTrayDocument', id: originalTrayId, secret: WEBHOOK_SECRET }),
       cache: 'no-store',
     });
     if (!docRes.ok) {
