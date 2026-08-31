@@ -15,8 +15,8 @@ interface Backpack {
   chonkTokenId: string;
   tbaAddress: string;
   tbaViewerUrl: string;
-  faxChainNFTs: BackpackNFT[];
-  otherNFTs: number;
+  nfts: BackpackNFT[];
+  faxChainCount: number;
 }
 
 interface BackpackSummary {
@@ -98,21 +98,21 @@ export function ChonkBackpack({ walletAddress }: ChonkBackpackProps) {
             >
               <div className="flex items-center gap-2">
                 <span className="text-[12px] font-bold uppercase">Chonk #{bp.chonkTokenId}</span>
-                <span className="border border-[#c08a2f] bg-[#f5dcc8] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#8a3e1e]">{bp.faxChainNFTs.length} FAX</span>
-                {bp.otherNFTs > 0 && <span className="text-[11px] font-bold uppercase text-[#847d6e]">+{bp.otherNFTs} other</span>}
+                {bp.faxChainCount > 0 && <span className="border border-[#c08a2f] bg-[#f5dcc8] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#8a3e1e]">{bp.faxChainCount} FAX</span>}
+                <span className="text-[11px] font-bold uppercase text-[#847d6e]">{bp.nfts.length} item{bp.nfts.length !== 1 ? 's' : ''}</span>
               </div>
               {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
 
             {isOpen && (
               <div className="space-y-2 p-3">
-                {bp.faxChainNFTs.length === 0 ? (
+                {bp.nfts.length === 0 ? (
                   <p className="text-[11px] font-bold uppercase text-[#696457]">
-                    No FAX CHAIN NFTs in this backpack yet. <a href="/" className="underline text-[#e65b2f]">Mint one →</a>
+                    Nothing saved in this backpack yet. <a href="/" className="underline text-[#e65b2f]">Mint a FAX CHAIN NFT →</a>
                   </p>
                 ) : (
-                  bp.faxChainNFTs.map((nft) => (
-                    <div key={`${nft.contract}-${nft.tokenId}`} className="flex items-center gap-3 border border-[#a9a189] bg-[#eee8dc] p-2">
+                  bp.nfts.map((nft) => (
+                    <div key={`${nft.contract}-${nft.tokenId}`} className={`flex items-center gap-3 border p-2 ${nft.isFaxChain ? 'border-[#c08a2f] bg-[#f5dcc8]' : 'border-[#a9a189] bg-[#eee8dc]'}`}>
                       {nft.image ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={nft.image} alt={nft.name} className="h-10 w-10 rounded-sm bg-[#d5cebf] object-cover" />
@@ -120,7 +120,7 @@ export function ChonkBackpack({ walletAddress }: ChonkBackpackProps) {
                         <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#d5cebf] text-[9px] uppercase text-[#847d6e]">NFT</div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[12px] font-bold">{nft.name}</p>
+                        <p className="truncate text-[12px] font-bold">{nft.name}{nft.isFaxChain && <span className="ml-1.5 border border-[#c08a2f] bg-[#f5dcc8] px-1 py-0.5 text-[9px] font-bold uppercase text-[#8a3e1e]">FAX</span>}</p>
                         <p className="truncate font-mono text-[11px] text-[#847d6e]">#{nft.tokenId}</p>
                       </div>
                       <a

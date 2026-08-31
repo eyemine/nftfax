@@ -15,7 +15,7 @@
 import { createPublicClient, http, parseAbiItem } from 'viem';
 import { base } from 'viem/chains';
 import { BASE_CHAIN, BASE_FAX_COLLECTIBLE } from './contracts';
-import { CHONKS_MAIN_CONTRACT, resolveChonkBackpack } from './chonks';
+import { CHONKS_MAIN_CONTRACT, resolveChonkBackpack, ResolveChonkBackpackResult } from './chonks';
 
 const publicClient = createPublicClient({ chain: base, transport: http(BASE_CHAIN.rpcUrl) });
 
@@ -188,21 +188,38 @@ export interface ChonkBackpack {
   nfts: TBANFT[];
 }
 
+const BACKPACK_CONCURRENCY = 5;
+
+/// Resolve a single Chonk's backpack, retrying once on a transient RPC error
+/// (e.g. public RPC rate-limiting under concurrent load) before treating it
+/// as "no TBA deployed yet" — resolveChonkBackpack otherwise returns the same
+/// { backpack: null } shape for both cases.
+async function resolveChonkBackpackWithRetry(tokenId: number): Promise<ResolveChonkBackpackResult> {
+  const first = await resolveChonkBackpack(tokenId, BASE_CHAIN.rpcUrl);
+  if (!first.error) return first;
+  return resolveChonkBackpack(tokenId, BASE_CHAIN.rpcUrl);
+}
+
 /// For a given wallet, find all Chonks they hold and the contents of each
 /// Chonk's ERC-6551 backpack (TBA), highlighting any FAX CHAIN NFTs saved
-/// there.
+/// there. Resolved in bounded batches (BACKPACK_CONCURRENCY) to avoid
+/// rate-limiting the public RPC when a wallet holds many Chonks.
 export async function getChonkBackpacks(walletAddress: `0x${string}`): Promise<ChonkBackpack[]> {
   const chonks = await getOwnedChonks(walletAddress);
   if (chonks.length === 0) return [];
 
-  const backpacks = await Promise.all(chonks.map((tokenId) => resolveChonkBackpack(tokenId, BASE_CHAIN.rpcUrl)));
-
   const results: ChonkBackpack[] = [];
-  for (let i = 0; i < chonks.length; i++) {
-    const { backpack } = backpacks[i];
-    if (!backpack) continue; // no deployed TBA for this Chonk yet
-    const nfts = await getTBANFTs(backpack as `0x${string}`);
-    results.push({ chonkTokenId: chonks[i].toString(), tbaAddress: backpack, nfts });
+  for (let i = 0; i < chonks.length; i += BACKPACK_CONCURRENCY) {
+    const batch = chonks.slice(i, i + BACKPACK_CONCURRENCY);
+    const resolved = await Promise.all(batch.map((tokenId) => resolveChonkBackpackWithRetry(tokenId)));
+    const withNfts = await Promise.all(resolved.map(({ backpack }) =>
+      backpack ? getTBANFTs(backpack as `0x${string}`) : Promise.resolve(null),
+    ));
+    for (let j = 0; j < batch.length; j++) {
+      const { backpack } = resolved[j];
+      if (!backpack) continue; // confirmed: no deployed TBA for this Chonk
+      results.push({ chonkTokenId: batch[j].toString(), tbaAddress: backpack, nfts: withNfts[j] as TBANFT[] });
+    }
   }
   return results;
 }

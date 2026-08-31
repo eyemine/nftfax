@@ -297,11 +297,11 @@ export default function HomeClient() {
       {view === 'backpack' && (
         <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            Chonk backpacks — FAX CHAIN NFTs saved on-chain
+            Chonk backpacks — everything saved on-chain
           </div>
           <div className="p-5 md:p-8">
             <p className="mb-4 text-[11px] font-bold uppercase text-[#696457]">
-              tokenbound.org is currently down — this is nftfax.app's own viewer for what's inside your Chonks' ERC-6551 backpacks.
+              nftfax.app's own viewer for what's inside your Chonks' ERC-6551 backpacks on Base.
             </p>
             <ChonkBackpack walletAddress={walletAddress} />
           </div>

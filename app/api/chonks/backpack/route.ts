@@ -28,8 +28,9 @@ export async function GET(req: NextRequest) {
         chonkTokenId: bp.chonkTokenId,
         tbaAddress: bp.tbaAddress,
         tbaViewerUrl: `https://tokenbound.org/wallet/${bp.tbaAddress}`, // fallback link, in case tokenbound.org comes back
-        faxChainNFTs: bp.nfts.filter((n) => n.isFaxChain),
-        otherNFTs: bp.nfts.filter((n) => !n.isFaxChain).length,
+        // FAX CHAIN NFTs first so they surface at the top of each backpack.
+        nfts: [...bp.nfts].sort((a, b) => Number(b.isFaxChain) - Number(a.isFaxChain)),
+        faxChainCount: bp.nfts.filter((n) => n.isFaxChain).length,
       })),
     };
 
