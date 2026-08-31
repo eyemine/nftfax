@@ -230,35 +230,66 @@ export interface ChonkBackpack {
 
 const BACKPACK_CONCURRENCY = 5;
 
-/// Resolve a single Chonk's backpack, retrying once on a transient RPC error
-/// (e.g. public RPC rate-limiting under concurrent load) before treating it
-/// as "no TBA deployed yet" — resolveChonkBackpack otherwise returns the same
-/// { backpack: null } shape for both cases.
-async function resolveChonkBackpackWithRetry(tokenId: number): Promise<ResolveChonkBackpackResult> {
-  const first = await resolveChonkBackpack(tokenId, BASE_CHAIN.rpcUrl);
-  if (!first.error) return first;
-  return resolveChonkBackpack(tokenId, BASE_CHAIN.rpcUrl);
+/// Resolve TBA addresses for all owned Chonk token IDs in a single Multicall3
+/// `eth_call` instead of one call per token. This avoids public RPC rate
+/// limits when a wallet holds many Chonks (24 calls at once were dropping
+/// most results). allowFailure=true means one revert doesn't sink the batch.
+async function resolveChonkBackpacks(tokenIds: number[]): Promise<Map<number, string>> {
+  const abi = [{ inputs: [{ name: 'tokenId', type: 'uint256' }], name: 'tokenIdToTBAAccountAddress', outputs: [{ name: '', type: 'address' }], stateMutability: 'view', type: 'function' }] as const;
+  const contracts = tokenIds.map((tokenId) => ({
+    address: CHONKS_MAIN_CONTRACT as `0x${string}`,
+    abi,
+    functionName: 'tokenIdToTBAAccountAddress' as const,
+    args: [BigInt(tokenId)] as const,
+  }));
+
+  const results = await publicClient.multicall({ contracts, allowFailure: true }).catch((err: unknown) => {
+    console.error('[tba] multicall TBA resolution failed, falling back to one-by-one:', err);
+    return null;
+  });
+
+  const map = new Map<number, string>();
+  if (!results) {
+    // Fallback: resolve individually and keep the ones that don't error.
+    const resolved = await Promise.all(tokenIds.map((tokenId) => resolveChonkBackpack(tokenId, BASE_CHAIN.rpcUrl)));
+    tokenIds.forEach((tokenId, i) => {
+      const { backpack } = resolved[i];
+      if (backpack) map.set(tokenId, backpack);
+    });
+    return map;
+  }
+
+  for (let i = 0; i < tokenIds.length; i++) {
+    const result = results[i];
+    if (!result || 'error' in result) continue;
+    const addr = (result as unknown as { result?: `0x${string}` }).result;
+    if (!addr || /^0x0{40}$/i.test(addr)) continue;
+    map.set(tokenIds[i], addr.toLowerCase());
+  }
+  return map;
 }
 
 /// For a given wallet, find all Chonks they hold and the contents of each
 /// Chonk's ERC-6551 backpack (TBA), highlighting any FAX CHAIN NFTs saved
-/// there. Resolved in bounded batches (BACKPACK_CONCURRENCY) to avoid
-/// rate-limiting the public RPC when a wallet holds many Chonks.
+/// there. TBA addresses are resolved in a single Multicall3 call; backpack
+/// contents are still read with Alchemy to avoid spam.
 export async function getChonkBackpacks(walletAddress: `0x${string}`): Promise<ChonkBackpack[]> {
   const chonks = await getOwnedChonks(walletAddress);
   if (chonks.length === 0) return [];
 
+  const tbaMap = await resolveChonkBackpacks(chonks);
   const results: ChonkBackpack[] = [];
   for (let i = 0; i < chonks.length; i += BACKPACK_CONCURRENCY) {
     const batch = chonks.slice(i, i + BACKPACK_CONCURRENCY);
-    const resolved = await Promise.all(batch.map((tokenId) => resolveChonkBackpackWithRetry(tokenId)));
-    const withNfts = await Promise.all(resolved.map(({ backpack }) =>
-      backpack ? getTBANFTs(backpack as `0x${string}`) : Promise.resolve(null),
-    ));
+    const withNfts = await Promise.all(batch.map((tokenId) => {
+      const backpack = tbaMap.get(tokenId);
+      return backpack ? getTBANFTs(backpack as `0x${string}`) : Promise.resolve([]);
+    }));
     for (let j = 0; j < batch.length; j++) {
-      const { backpack } = resolved[j];
-      if (!backpack) continue; // confirmed: no deployed TBA for this Chonk
-      results.push({ chonkTokenId: batch[j].toString(), tbaAddress: backpack, nfts: withNfts[j] as TBANFT[] });
+      const tokenId = batch[j];
+      const backpack = tbaMap.get(tokenId);
+      if (!backpack) continue; // no TBA resolved for this Chonk
+      results.push({ chonkTokenId: tokenId.toString(), tbaAddress: backpack, nfts: withNfts[j] as TBANFT[] });
     }
   }
   return results;
