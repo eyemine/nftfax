@@ -3,16 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
-import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Trophy, Dices } from 'lucide-react';
+import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Trophy, Dices, Backpack as BackpackIcon } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
-type View = 'send' | 'tray' | 'delegate';
+type View = 'send' | 'tray' | 'delegate' | 'backpack';
 
 import { prepareImage } from './lib/image';
 import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
 import { SkinPanel } from './components/SkinPanel';
 import { DelegatePanel } from './components/DelegatePanel';
+import { ChonkBackpack } from './components/ChonkBackpack';
 import Link from 'next/link';
 
 export default function HomeClient() {
@@ -204,12 +205,23 @@ export default function HomeClient() {
         >
           <Info size={12} /> About
         </Link>
-        <button
-          onClick={() => { setShowSplash(false); setView('delegate'); }}
-          className={`hidden sm:flex items-center gap-1.5 sm:gap-2 key-shadow border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] sm:justify-self-end ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
-        >
-          <UserCheck size={12} /> Delegate
-        </button>
+        <div className="flex items-center gap-1.5 sm:gap-2 sm:justify-self-end">
+          {(collection || FAX_THEME.key) === 'chonk' && (
+            <button
+              onClick={() => { setShowSplash(false); setView('backpack'); }}
+              className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'backpack' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+              title="View your Chonk backpacks (tokenbound.org replacement)"
+            >
+              <BackpackIcon size={12} /> <span className="hidden sm:inline">Backpack</span>
+            </button>
+          )}
+          <button
+            onClick={() => { setShowSplash(false); setView('delegate'); }}
+            className={`hidden sm:flex items-center gap-1.5 sm:gap-2 key-shadow border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+          >
+            <UserCheck size={12} /> Delegate
+          </button>
+        </div>
       </div>
 
       {showSplash ? (
@@ -279,6 +291,20 @@ export default function HomeClient() {
       {view === 'delegate' && (
         <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
           <DelegatePanel collection={collection || FAX_THEME.key} walletAddress={walletAddress} />
+        </SkinPanel>
+      )}
+
+      {view === 'backpack' && (
+        <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
+            Chonk backpacks — FAX CHAIN NFTs saved on-chain
+          </div>
+          <div className="p-5 md:p-8">
+            <p className="mb-4 text-[11px] font-bold uppercase text-[#696457]">
+              tokenbound.org is currently down — this is nftfax.app's own viewer for what's inside your Chonks' ERC-6551 backpacks.
+            </p>
+            <ChonkBackpack walletAddress={walletAddress} />
+          </div>
         </SkinPanel>
       )}
 
