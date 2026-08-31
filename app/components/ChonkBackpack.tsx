@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSendTransaction } from '@privy-io/react-auth';
+import { useActiveWallet } from '@privy-io/react-auth';
 import { Loader2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 import { buildTBAWithdrawTx } from '../lib/tba';
 
@@ -42,8 +42,13 @@ interface WithdrawButtonProps {
 /// Withdraw an NFT from a Chonk's ERC-6551 backpack back to the owner's EOA.
 /// Builds an executeCall() on the TBA and signs it directly with the user's
 /// connected wallet — no intermediary, no tokenbound.org dependency.
+interface EthereumWallet {
+  address: `0x${string}`;
+  getEthereumProvider: () => Promise<{ request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }>;
+}
+
 function WithdrawButton({ tbaAddress, nftContract, tokenId, recipient }: WithdrawButtonProps) {
-  const { sendTransaction } = useSendTransaction();
+  const { wallet } = useActiveWallet();
   const [status, setStatus] = useState<'idle' | 'withdrawing' | 'success' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
@@ -61,15 +66,28 @@ function WithdrawButton({ tbaAddress, nftContract, tokenId, recipient }: Withdra
     );
   }
 
-  const disabled = status === 'withdrawing';
+  const ethWallet = wallet && typeof (wallet as unknown as EthereumWallet).getEthereumProvider === 'function'
+    ? (wallet as unknown as EthereumWallet)
+    : null;
+  const disabled = !ethWallet || status === 'withdrawing';
 
   const handleWithdraw = async () => {
+    if (!ethWallet) return;
     setStatus('withdrawing');
     setError('');
     try {
       const tx = buildTBAWithdrawTx(tbaAddress, nftContract, tokenId, recipient);
-      const { hash } = await sendTransaction({ to: tx.to, data: tx.data, value: tx.value, chainId: 8453 });
-      setTxHash(hash);
+      const provider = await ethWallet.getEthereumProvider();
+      const hash = await provider.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: ethWallet.address,
+          to: tx.to,
+          data: tx.data,
+          value: '0x0',
+        }],
+      });
+      setTxHash(hash as string);
       setStatus(hash ? 'success' : 'error');
       if (!hash) setError('No transaction hash returned');
     } catch (err: unknown) {
