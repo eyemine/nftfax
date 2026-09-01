@@ -149,12 +149,25 @@ export async function POST(req: NextRequest) {
 
     const fromEmail = `${fromLabel}@${fromDomain}`;
 
+    // Detect the actual image format from magic bytes when the client doesn't
+    // explicitly declare one (e.g. bare chain forwards with no composite).
+    let resolvedFormat = (format || '').toLowerCase() === 'jpeg' ? 'jpg' : (format || '').toLowerCase();
+    if (!resolvedFormat && rawDataBase64) {
+      try {
+        const hdr = Buffer.from(rawDataBase64.slice(0, 24), 'base64');
+        if (hdr[0] === 0x89 && hdr[1] === 0x50) resolvedFormat = 'png';
+        else if (hdr[0] === 0xff && hdr[1] === 0xd8) resolvedFormat = 'jpg';
+        else if (hdr[0] === 0x42 && hdr[1] === 0x4d) resolvedFormat = 'bmp';
+      } catch { /* fall through */ }
+    }
+    if (!resolvedFormat) resolvedFormat = 'png';
+
     const trayPayload: Record<string, unknown> = {
       action: 'setTrayDocument',
       secret: WEBHOOK_SECRET,
       from: fromEmail,
       to,
-      format: 'png',
+      format: resolvedFormat,
       colorMode: body.colorMode || 'greyscale',
     };
     if (chainTrayId) {
