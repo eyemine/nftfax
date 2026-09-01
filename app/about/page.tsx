@@ -46,9 +46,9 @@ export default function AboutPage() {
               <ul className="space-y-2 list-disc pl-4">
                 <li><strong>Register</strong> your <strong>@fax</strong> identity in the Rolofax directory before launch.</li>
                 <li><strong>Send</strong> a greyscale image to any <code>prefix.tokenId@fax</code> address.</li>
-                <li><strong>Forward</strong> public faxes you receive to keep the chain alive and earn +1 send credit.</li>
-                <li><strong>Mint</strong> a fax to Base only after forwarding — the collectible is unlocked by participation.</li>
-                <li><strong>Save</strong> a fax to Gnosis for permanence — rescues it from the 96-hour decay.</li>
+                <li><strong>Forward</strong> public faxes you receive to keep the chain alive. <strong>Every forward spends 1 credit</strong>. Hops 1–5 also credit the recipient +1 (capped at 5). Hop 6+ forwards do not credit the recipient — the chain must be unlocked by a mint.</li>
+                <li><strong>Mint</strong> a fax to Base only after forwarding — the collectible costs 1 credit and credits the next recipient +1, giving them a fresh 72-hour timer.</li>
+                <li><strong>Save</strong> a fax to Gnosis for permanence — rescues it from the hop timer and 96-hour gallery decay.</li>
                 <li><strong>No loops</strong> — each participant can only appear once in a chain. You cannot forward back to the sender or any previous hop.</li>
               </ul>
             </div>
@@ -58,10 +58,12 @@ export default function AboutPage() {
             <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Credits & limits</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
-                <li>New <strong>@fax</strong> identities start with <strong>2 credits</strong>.</li>
-                <li>Each <strong>forward</strong> earns <strong>+1 credit</strong>.</li>
-                <li>You <strong>cannot send</strong> if your balance is <strong>0</strong>.</li>
-                <li>When a line <strong>jams</strong> (72 hours pass), credits are drained. Clear the jam to reset to 1 credit.</li>
+                <li>New <strong>@fax</strong> identities start with <strong>2 credits</strong>. The first 100 joiners start with <strong>5 credits</strong>.</li>
+                <li>Hard <strong>credit cap</strong> is <strong>5</strong> per @fax handle.</li>
+                <li><strong>Every forward</strong> costs the sender <strong>1 credit</strong>. Hops 1–5 credit the recipient +1 (capped). Hop 6+ do not — the chain stalls unless the recipient mints.</li>
+                <li><strong>Minting</strong> costs the minter <strong>1 credit</strong> and credits the next recipient +1 (capped), resetting their hop to 72 hours.</li>
+                <li><strong>You cannot forward or mint</strong> when your credit balance is <strong>0</strong>.</li>
+                <li>When a line <strong>jams</strong> (the hop timer expires), that hop dies. Your credits are not drained — only the action is blocked.</li>
                 <li>Sending your first <strong>@fax</strong> activates a free <strong>@nftmail.box</strong> basic inbox with 10 private sends.</li>
               </ul>
             </div>
@@ -106,11 +108,11 @@ export default function AboutPage() {
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
             <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Thermal fade</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
-              <p>Public faxes age like thermal paper:</p>
+              <p>Public faxes age like thermal paper. Each hop has its own relay timer based on depth:</p>
               <ul className="space-y-2 list-disc pl-4">
-                <li><strong>0–24h:</strong> crisp, full contrast.</li>
-                <li><strong>24–72h:</strong> image fades to grey.</li>
-                <li><strong>After 72h:</strong> the line is <strong>JAMMED</strong>. The image turns blank, the chain can no longer be forwarded, and the card is removed from the inbox after a total of 96 hours.</li>
+                <li><strong>Hop 1:</strong> 72 hours. Hops 2–11 halve (or nearly halve) each time, down to 3 minutes at hop 11.</li>
+                <li><strong>After a mint:</strong> the next hop always starts fresh at 72 hours.</li>
+                <li><strong>After the timer expires:</strong> the line is <strong>JAMMED</strong>. The chain can no longer be forwarded from that hop, and the card is removed from the inbox after a total of 96 hours if not saved or minted.</li>
                 <li>The sender address stays visible after a jam so someone can start a fresh chain with that player.</li>
               </ul>
             </div>
