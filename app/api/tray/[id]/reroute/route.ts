@@ -15,7 +15,7 @@
 /// to disable mint for the original recipient.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { earnForwardCredit } from '@/app/lib/fax-credits';
+import { transferForwardCredit, getChainTimerMs } from '@/app/lib/fax-credits';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -116,6 +116,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }, { status: 409, headers: NO_STORE });
     }
 
+    const sourceChainDepth = Number(doc.chainDepth) || 0;
+    const sourceMintedBase = Boolean(doc.sourceMintedBase);
+    const nextHop = sourceChainDepth + 1;
+    const chainTimerDuration = getChainTimerMs(nextHop, sourceMintedBase);
+
     const trayPayload: Record<string, unknown> = {
       action: 'setTrayDocument',
       secret: WEBHOOK_SECRET,
@@ -124,8 +129,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       format: 'png',
       isMultipage: false,
       colorMode: 'greyscale',
+      channel: 'public',
       chainTrayId,
+      chainDepth: nextHop,
+      chainTimerDuration,
     };
+
+    // Re-route is a forward: the sender spends a credit and the new recipient
+    // is credited for hops 1-5.
+    try {
+      await transferForwardCredit(fromLabel, to.split('@')[0], ownerWallet, nextHop);
+    } catch (cause: unknown) {
+      const message = cause instanceof Error ? cause.message : 'Credit transfer failed';
+      return NextResponse.json({ error: message }, { status: 402, headers: NO_STORE });
+    }
 
     if (body.dataBase64) {
       trayPayload.dataBase64 = body.dataBase64;
@@ -167,8 +184,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }),
       });
     } catch { /* non-fatal — the new fax is already sent */ }
-
-    await earnForwardCredit(fromLabel, ownerWallet);
 
     return NextResponse.json({
       success: true,

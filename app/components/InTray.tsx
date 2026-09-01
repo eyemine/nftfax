@@ -15,6 +15,7 @@ import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload,
 import { compositeChain, CHAIN_OPS, type ChainOp } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
 import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity } from '../lib/fax-mint';
+import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
 
@@ -32,7 +33,6 @@ const MINT_LIMIT_NOTICE: Record<string, string> = {
   normie: 'Normies permits one NFTFAX CHAIN mint per chain per Normie.1234@fax account.',
 };
 
-const DEFAULT_JAM_MS = 72 * 60 * 60 * 1000;
 const DECAY_MS = 4 * 24 * 60 * 60 * 1000; // 96-hour decay
 
 interface InboxFax {
@@ -204,7 +204,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         fetch(`/api/tray/credits?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store' }),
       ]);
       const inboxData = await inboxRes.json() as { faxes?: InboxFax[]; error?: string };
-      if (!inboxRes.ok) throw new Error(inboxData.error || 'Could not load in-tray');
+      if (!inboxRes.ok) throw new Error(inboxData.error || 'Could not load fax-tray');
       setFaxes(inboxData.faxes || []);
       if (sentRes.ok) {
         const sentData = await sentRes.json() as { faxes?: InboxFax[] };
@@ -215,7 +215,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         setCredits(typeof creditData.credits === 'number' ? creditData.credits : null);
       }
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'Could not load in-tray');
+      setError(cause instanceof Error ? cause.message : 'Could not load fax-tray');
     } finally {
       setLoading(false);
     }
@@ -287,6 +287,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   async function forward(fax: InboxFax) {
     if (!forwardTo.includes('@')) { setForwardError('Enter a valid recipient address.'); return; }
     if (overlaySrc && !compositeBase64) { setForwardError('Still compositing your image — try again in a moment.'); return; }
+    if ((credits ?? 0) <= 0) { setForwardError('No send credits. Forwarding a fax costs 1 credit.'); setNotice('No send credits. Forwarding a fax costs 1 credit.'); return; }
     setBusyId(fax.id);
     setNotice('');
     setForwardError('');
@@ -297,6 +298,8 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         ownerWallet: wallet,
         to: forwardTo.trim(),
         chainTrayId: fax.id,
+        sourceChainDepth: String(fax.chainDepth || 1),
+        sourceMintedBase: String(!!fax.mintedBase),
       };
       if (compositeBase64) {
         payload.format = compositeFormat;
@@ -338,6 +341,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     // (the link they received and are re-broadcasting), not fax.id (the outgoing
     // copy addressed to someone else's inbox).
     const targetId = activeTab === 'sent' ? (fax.sourceTrayId || fax.id) : fax.id;
+    if (kind === 'mint' && (credits ?? 0) <= 0) {
+      setNotice('No send credits. Minting a fax costs 1 credit.');
+      return;
+    }
     setBusyId(fax.id);
     setNotice('');
     try {
@@ -523,14 +530,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     if (activeTab === 'sent') return sentFaxes;
     if (activeTab === 'saved') return faxes.filter((f) => f.savedGnosis);
     if (activeTab === 'minted') return faxes.filter((f) => f.mintedBase);
-    // In-Tray: exclude forwarded, saved, and minted faxes
+    // Fax-Tray: exclude forwarded, saved, and minted faxes
     return faxes.filter((f) => !f.forwarded && !f.savedGnosis && !f.mintedBase);
   }, [activeTab, faxes, sentFaxes]);
 
   if (!cleanLocal || !wallet) {
     return (
       <div className="grid min-h-[220px] place-items-center border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center">
-        <div><LayersArrowDown size={26} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">Connect + name your mailbox</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">Enter your NFTmail mailbox and connect a wallet to load your in-tray.</p></div>
+        <div><LayersArrowDown size={26} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">CONNECT + ADD YOUR FAX HANDLE TO THE ROLOFAX</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">Start a Chain, Fax an image to a player in the Rolofax. CHECK YOUR FAX-TRAY, YOU'VE GOT FAX?</p></div>
       </div>
     );
   }
@@ -544,7 +551,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         </div>
         <div className="flex items-center gap-3">
           {credits !== null && (
-            <span className="border border-[#77705f] bg-[#d8d0bf] px-2 py-2 text-[12px] font-bold uppercase text-[#615c50]">Send credits: {credits}</span>
+            <span className="border border-[#77705f] bg-[#d8d0bf] px-2 py-2 text-[12px] font-bold uppercase text-[#615c50]">Send credits: {credits}/{MAX_CREDITS}</span>
           )}
           <button onClick={() => void load()} disabled={loading} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-2 text-[12px] font-bold uppercase disabled:opacity-50">
             {loading ? <Loader2 className="animate-spin" size={13} /> : 'Refresh'}
@@ -558,7 +565,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[#8f8878]">
-        {([['inbox', `In-Tray (${faxes.filter(f => !f.forwarded && !f.savedGnosis && !f.mintedBase).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length})`]] as [TabKey, string][]).map(([key, label]) => (
+        {([['inbox', `Fax-Tray (${faxes.filter(f => !f.forwarded && !f.savedGnosis && !f.mintedBase).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length})`]] as [TabKey, string][]).map(([key, label]) => (
           <button key={key} onClick={() => { setActiveTab(key); setNotice(''); }} className={`px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
             {label}
           </button>
@@ -576,11 +583,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 max-w-[75%]">
         {displayedFaxes.map((fax) => {
-          const jamMs = fax.chainTimerDuration || DEFAULT_JAM_MS;
+          const sourceMinted = !!fax.sourceMintedBase;
+          const chainDepth = fax.chainDepth || 1;
+          const jamMs = fax.chainTimerDuration || getChainTimerMs(chainDepth, sourceMinted) || DEFAULT_JAM_MS;
           const elapsed = now - fax.createdAt;
           const msLeftToJam = jamMs - elapsed;
           const permanent = !!fax.savedGnosis || !!fax.mintedBase || !!fax.forwarded;
-          const jammed = activeTab === 'inbox' && !permanent && elapsed > jamMs;
+          const isDead = chainDepth > 11;
+          const jammed = activeTab === 'inbox' && !permanent && (isDead || elapsed > jamMs);
           const canForward = activeTab !== 'sent' && !permanent && !jammed && !fax.forwarded && !fax.encrypted;
           return (
             <div key={fax.id} onClick={() => openDetail(fax)} className="machine-shadow cursor-pointer overflow-hidden border border-[#8f8878] bg-[#c8c0ae] hover:ring-2 hover:ring-[#e65b2f]">
@@ -664,7 +674,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                           id={displayId}
                           encrypted={compositePreview ? false : selected.encrypted}
                           elapsed={compositePreview ? 0 : isForwardedImage ? 0 : now - selected.createdAt}
-                          jammed={activeTab === 'inbox' && !compositePreview && !isForwardedImage && !selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)}
+                          jammed={activeTab === 'inbox' && !compositePreview && !isForwardedImage && !selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))}
                           overrideSrc={compositePreview || undefined}
                           className="h-full"
                         />
@@ -762,7 +772,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                         <p className="mt-1 text-[11px] uppercase text-[#6e685a]">Resumes on V2 contract — {MINT_RESUME_AT}</p>
                       </div>
                     ) : (
-                      <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
+                      <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
                         {busyId === selected.id ? <Loader2 className="animate-spin" size={14} /> : <Coins size={14} />} Mint to Base
                       </button>
                     )}
@@ -771,10 +781,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
                 {activeTab === 'inbox' && (
                 <div className="mb-5 grid grid-cols-3 gap-2">
-                  <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS))} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
+                  <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase)))} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
                     <Send size={12} /> Forward
                   </button>
-                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || !!selected.sourceMintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
+                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || !!selected.sourceMintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
                     <Coins size={12} /> {MINT_PAUSED ? 'Paused' : 'Mint'}
                   </button>
                   <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis || !selected.forwarded} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[11px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
@@ -784,7 +794,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 )}
                 {activeTab === 'sent' && !selected.mintedBase && !selected.sourceMintedBase && !selected.savedGnosis && !MINT_PAUSED && !selected.encrypted && (selected.sourceTrayId || selected.chainTrayId || selected.recipientForwarded || selected.forwarded) && (
                 <div className="mb-5 grid grid-cols-2 gap-2">
-                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
                   </button>
                   <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[11px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
@@ -794,13 +804,13 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 )}
                 {activeTab === 'saved' && !selected.mintedBase && !MINT_PAUSED && !selected.encrypted && selected.forwarded && (
                 <div className="mb-5 grid grid-cols-1 gap-2">
-                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS)} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
                   </button>
                 </div>
                 )}
 
-                {activeTab === 'inbox' && !selected.savedGnosis && !selected.mintedBase && !selected.forwarded && !selected.encrypted && (now - selected.createdAt) > (selected.chainTimerDuration || DEFAULT_JAM_MS) && (
+                {activeTab === 'inbox' && !selected.savedGnosis && !selected.mintedBase && !selected.forwarded && !selected.encrypted && (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase)) && (
                   <button onClick={() => void deleteFax(selected)} disabled={busyId === selected.id} className="mb-5 w-full border border-[#a94228] bg-[#e2c9bc] py-2 text-[11px] font-bold uppercase text-[#a94228] hover:bg-[#c0392b] hover:text-white disabled:opacity-50">
                     {busyId === selected.id ? 'Deleting…' : 'Delete jammed fax'}
                   </button>

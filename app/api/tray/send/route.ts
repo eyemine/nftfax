@@ -1,11 +1,15 @@
 /// POST /api/tray/send
 ///
-/// Standalone nftfax send route — public chain only (no encryption, no credits).
-/// Proxies to the worker's setTrayDocument action.
+/// Standalone nftfax send route — public chain only (no encryption).
+/// Proxies to the worker's setTrayDocument action and runs the v2 credit
+/// economy: every forward spends one sender credit and credits the recipient
+/// for hops 1-5; hop 6+ forwards do not credit the recipient.
 ///
-/// Body: { fromLabel, fromDomain, ownerWallet, to, format, dataBase64, chainTrayId?, collection? }
+/// Body: { fromLabel, fromDomain, ownerWallet, to, format, dataBase64,
+///   chainTrayId?, sourceChainDepth?, sourceMintedBase?, collection? }
 
 import { NextRequest, NextResponse } from 'next/server';
+import { transferForwardCredit, getChainTimerMs } from '@/app/lib/fax-credits';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -34,7 +38,7 @@ function matchesFormat(base64: string, format: string): boolean {
   }
 }
 
-async function getChainDocument(id: string): Promise<{ dataBase64: string; from: string; to?: string } | null> {
+async function getChainDocument(id: string): Promise<{ dataBase64: string; from: string; to?: string; chainDepth?: number; chainTimerDuration?: number; sourceMintedBase?: boolean } | null> {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
@@ -64,6 +68,8 @@ export async function POST(req: NextRequest) {
       colorMode?: 'greyscale' | '256';
       fromDomain?: string;
       collection?: string;
+      sourceChainDepth?: number;
+      sourceMintedBase?: boolean;
     };
 
     let { fromLabel, ownerWallet, to, format, dataBase64, chainTrayId } = body;
@@ -90,9 +96,10 @@ export async function POST(req: NextRequest) {
 
     let isForward = false;
     let rawDataBase64: string | undefined;
+    let chain: { dataBase64: string; from: string; to?: string; chainDepth?: number; sourceMintedBase?: boolean } | null = null;
 
     if (chainTrayId) {
-      const chain = await getChainDocument(chainTrayId);
+      chain = await getChainDocument(chainTrayId);
       if (!chain || !chain.dataBase64) {
         return NextResponse.json({ error: 'Chain tray not found' }, { status: 404 });
       }
@@ -149,6 +156,28 @@ export async function POST(req: NextRequest) {
 
     const fromEmail = `${fromLabel}@${fromDomain}`;
 
+    // Determine the next hop's depth and timer for the v2 chain-letter economy.
+    const sourceChainDepth = isForward
+      ? (body.sourceChainDepth ?? chain?.chainDepth ?? 0)
+      : 0;
+    const sourceMintedBase = isForward
+      ? (body.sourceMintedBase ?? chain?.sourceMintedBase ?? false)
+      : false;
+    const nextHop = isForward ? sourceChainDepth + 1 : 1;
+    const chainTimerDuration = getChainTimerMs(nextHop, sourceMintedBase);
+    const toLocal = (to || '').split('@')[0].toLowerCase();
+
+    // Every relay spends one credit from the sender and, for hops 1-5, credits
+    // the recipient. If the sender has no credits, the chain cannot continue.
+    if (nextHop <= 11) {
+      try {
+        await transferForwardCredit(fromLabel, toLocal, ownerWallet, nextHop);
+      } catch (cause: unknown) {
+        const message = cause instanceof Error ? cause.message : 'Credit transfer failed';
+        return NextResponse.json({ error: message }, { status: 402 });
+      }
+    }
+
     // Detect the actual image format from magic bytes when the client doesn't
     // explicitly declare one (e.g. bare chain forwards with no composite).
     let resolvedFormat = (format || '').toLowerCase() === 'jpeg' ? 'jpg' : (format || '').toLowerCase();
@@ -169,12 +198,14 @@ export async function POST(req: NextRequest) {
       to,
       format: resolvedFormat,
       colorMode: body.colorMode || 'greyscale',
+      channel: 'public',
+      dataBase64: rawDataBase64,
+      chainDepth: nextHop,
+      chainTimerDuration,
     };
     if (chainTrayId) {
       trayPayload.chainTrayId = chainTrayId;
     }
-    trayPayload.channel = 'public';
-    trayPayload.dataBase64 = rawDataBase64;
 
     const setRes = await fetch(WORKER_URL, {
       method: 'POST',

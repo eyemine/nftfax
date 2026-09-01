@@ -199,7 +199,7 @@ export default function PreRegisterPage() {
           <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radar size={20} /></div>
           <div>
             <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">ROLOFAX<span style={{ color: theme.accent }}>™</span></h1>
-            <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Pre-registration for 15/08/2026</p>
+            <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Player directory</p>
           </div>
         </div>
         <Link href="/" className="key-shadow text-[11px] sm:text-[12px] font-bold uppercase tracking-[.12em] underline text-[#625e52] whitespace-nowrap"><ArrowLeft size={13} className="inline" /> Fax</Link>
@@ -208,7 +208,7 @@ export default function PreRegisterPage() {
       <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[.9fr_1.1fr]">
         <SkinPanel theme={theme} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            <span>Join the launch directory</span>
+            <span>Join the player directory</span>
             <span className="flex items-center gap-2 text-[#456049]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#56705a]" /> Active</span>
           </div>
 
@@ -218,7 +218,7 @@ export default function PreRegisterPage() {
             </div>
 
             <p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">
-              Add your wallet and handle to the Day-1 player directory. Other players can forward faxes to active participants when their own chains stall.
+              Connect your wallet to add your chonk/deadfellaz/normie/pow NFT to the directory and claim your @fax. Players can find your handle to build a chain.
             </p>
 
             <label className="block">

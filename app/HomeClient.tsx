@@ -148,16 +148,6 @@ export default function HomeClient() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          <select
-            value={collection}
-            onChange={(e) => setCollection(e.target.value as CollectionKey)}
-            className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-2 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase"
-          >
-            <option value="" disabled>SELECT</option>
-            {(['chonk', 'deadfellaz', 'normie', 'pow'] as const).map((k) => (
-              <option key={k} value={k}>{getCollectionTheme(k).collectionName}</option>
-            ))}
-          </select>
           {isConnected && walletAddress ? (
             <button onClick={handleDisconnect} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap hover:bg-[#c0392b] hover:text-white hover:border-[#9d3c20] transition-colors">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} · Disconnect</button>
           ) : (
@@ -184,7 +174,7 @@ export default function HomeClient() {
             onClick={() => { setShowSplash(false); setView('tray'); }}
             className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
-            <Inbox size={12} /> <span className="hidden sm:inline">In-Tray</span>
+            <Inbox size={12} /> <span className="hidden sm:inline">Fax-Tray</span>
           </button>
           <Link
             href="/rolofax"
@@ -235,7 +225,7 @@ export default function HomeClient() {
               <div className="border-t border-b border-[#8f8878] py-4 px-6 mb-6 max-w-xl">
                 <p className="text-sm font-bold mb-2">Chain-letter fax game on Base</p>
                 <p className="text-[11px] text-[#575244] leading-relaxed">Welcome Chonks, &lsquo;sup Deadfellaz, howdy-doo-dee Normies, g&rsquo;day POW NFTers</p>
-                <p className="text-[11px] text-[#575244] leading-relaxed">In the Rolofax, add your NFT to join the game and find a player to send an art fax to — start a Fax Chain. Check your in-tray, got a fax? Select to forward then upload art and build the collage. Send to another @fax account to keep the chain alive! If you forward, you can mint your Hop for a chance to win a 0.404 ETH prize from the pool of 2,222 mints — 10 randomly selected winners.</p>
+                <p className="text-[11px] text-[#575244] leading-relaxed">In the Rolofax, add your NFT to join the game and find a player to send an art fax to — start a Fax Chain. Check your fax-tray, got a fax? Select to forward then upload art and build the collage. Send to another @fax account to keep the chain alive! If you forward, you can mint your Hop for a chance to win a 0.404 ETH prize from the pool of 2,222 mints — 10 randomly selected winners.</p>
                 <Link href="/draw" className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#8a3e1e] underline">
                   <Dices size={11} /> Track the prize draw
                 </Link>
@@ -260,7 +250,7 @@ export default function HomeClient() {
       {view === 'tray' && (
         <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
           <label className="mb-5 block max-w-md">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Your mailbox</span>
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Your fax handle</span>
             {rolofaxEntries.length > 0 && (
               <select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]">
                 <option value="">Select a Rolofax handle…</option>
@@ -336,7 +326,7 @@ export default function HomeClient() {
               <div className="relative overflow-hidden"><div className="scanline absolute inset-y-0 w-1/3" /><p className="text-[11px] uppercase tracking-[.2em] text-[#7fa178]">Transmission monitor</p><p className="mt-2 text-sm font-bold">{status === 'sent' ? 'DELIVERY CONFIRMED' : status === 'sending' ? 'DIALING REMOTE STATION…' : status === 'ready' ? 'DOCUMENT READY' : 'AWAITING DOCUMENT'}</p></div>
             </div>
 
-            <label className="mb-4 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">From mailbox</span>{rolofaxEntries.length > 0 && (<select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select a Rolofax handle…</option>{rolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></label>
+            <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">From fax handle</span>{rolofaxEntries.length > 0 && (<select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select a Rolofax handle…</option>{rolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></label>
             <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Destination address</span>{otherRolofaxEntries.length > 0 && (<select value={recipient.includes('@fax') ? recipient.replace(/@fax$/, '') : ''} onChange={(event) => { const h = event.target.value; setRecipient(h ? `${h}@fax` : ''); }} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select from Rolofax directory…</option>{otherRolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></label>
 
             {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">FAULT: {error}</div>}

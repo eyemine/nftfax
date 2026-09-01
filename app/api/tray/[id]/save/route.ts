@@ -69,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { faxes = [] } = await listRes.json() as { faxes?: InboxFax[] };
     const fax = faxes.find((f) => f.id === id);
     if (!fax) {
-      return NextResponse.json({ error: 'Fax not found in your in-tray (it may have decayed).' }, { status: 404, headers: NO_STORE });
+      return NextResponse.json({ error: 'Fax not found in your fax-tray (it may have decayed).' }, { status: 404, headers: NO_STORE });
     }
     if (fax.encrypted || fax.channel === 'private') {
       return NextResponse.json({ error: 'Private (encrypted) faxes cannot be saved.' }, { status: 400, headers: NO_STORE });

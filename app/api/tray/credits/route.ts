@@ -5,7 +5,7 @@
 /// `local` is the address (e.g. `dfz.1234` for @fax or `name` for @nftmail.box).
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCredits, spendCredit, earnForwardCredit, clearJam, ensureJoinerBonus } from '@/app/lib/fax-credits';
+import { getCredits, spendCredit, earnSendCredit, clearJam, ensureJoinerBonus } from '@/app/lib/fax-credits';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -105,8 +105,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok, credits }, { status: ok ? 200 : 402, headers: NO_STORE });
       }
       case 'earn': {
-        await earnForwardCredit(local, wallet);
-        const credits = await getCredits(local);
+        const credits = await earnSendCredit(local, wallet, 1);
         return NextResponse.json({ ok: true, credits }, { status: 200, headers: NO_STORE });
       }
       case 'clear': {

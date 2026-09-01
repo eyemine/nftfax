@@ -9,6 +9,7 @@
 /// letter — you must pass the chain on before you can claim the collectible.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { transferMintCredit } from '@/app/lib/fax-credits';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { faxes = [] } = await listRes.json() as { faxes?: InboxFax[] };
     const fax = faxes.find((f) => f.id === id);
     if (!fax) {
-      return NextResponse.json({ error: 'Fax not found in your in-tray (it may have decayed).' }, { status: 404, headers: NO_STORE });
+      return NextResponse.json({ error: 'Fax not found in your fax-tray (it may have decayed).' }, { status: 404, headers: NO_STORE });
     }
     if (fax.encrypted || fax.channel === 'private') {
       return NextResponse.json({ error: 'Private (encrypted) faxes cannot be minted to the public chain.' }, { status: 400, headers: NO_STORE });
@@ -83,6 +84,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         error: 'This fax has already been minted to Base.',
         code: 'ALREADY_MINTED',
       }, { status: 409, headers: NO_STORE });
+    }
+
+    // v2 credit economy: minting spends one credit from the minter and credits
+    // the next recipient (the player who received the forwarded hop) +1.
+    if (fax.forwardedTrayId) {
+      try {
+        const fwdRes = await fetch(WORKER_URL, {
+          method: 'POST',
+          headers: workerHeaders(),
+          body: JSON.stringify({ action: 'getTrayDocument', id: fax.forwardedTrayId, secret: WEBHOOK_SECRET }),
+          cache: 'no-store',
+        });
+        const fwdDoc = await fwdRes.json().catch(() => ({})) as Record<string, unknown>;
+        const nextRecipient = (fwdDoc.to as string | undefined)?.split('@')[0].toLowerCase();
+        if (nextRecipient) {
+          await transferMintCredit(local, nextRecipient, wallet);
+        }
+      } catch (cause: unknown) {
+        const message = cause instanceof Error ? cause.message : 'Mint credit transfer failed';
+        return NextResponse.json({ error: message }, { status: 402, headers: NO_STORE });
+      }
     }
 
     const res = await fetch(WORKER_URL, {

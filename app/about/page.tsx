@@ -120,7 +120,7 @@ export default function AboutPage() {
             <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Tray tabs</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
-                <li><strong>In-Tray</strong> — faxes you have received. Shows the thermal-fade countdown and chain link depth. Forward to unlock mint, save to rescue from decay.</li>
+                <li><strong>Fax-Tray</strong> — faxes you have received. Shows the thermal-fade countdown and chain link depth. Forward to unlock mint, save to rescue from decay.</li>
                 <li><strong>Sent</strong> — faxes you have sent to other players. Shows the recipient, chain position, and a relay countdown. If the recipient hasn't forwarded within 24 hours, a re-route button appears — you can send the fax to a new player to keep the chain alive. The original recipient can still forward, but their mint is disabled.</li>
                 <li><strong>Saved</strong> — faxes you have saved to Gnosis. These are permanent and no longer decay.</li>
                 <li><strong>Minted</strong> — faxes you have minted to Base as tradeable collectibles. Once the contract is deployed, these will link to OpenSea.</li>
