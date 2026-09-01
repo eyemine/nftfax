@@ -182,19 +182,19 @@ export default function HomeClient() {
           </button>
           <button
             onClick={() => { setShowSplash(false); setView('tray'); }}
-            className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+            className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
-            <Inbox size={12} /> In-Tray
+            <Inbox size={12} /> <span className="hidden sm:inline">In-Tray</span>
           </button>
           <Link
             href="/rolofax"
-            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
             <Trophy size={12} /> <span className="hidden sm:inline">Leaderboard</span>
           </Link>
           <Link
             href="/draw"
-            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
             <Dices size={12} /> <span className="hidden sm:inline">Prize Draw</span>
           </Link>
@@ -209,7 +209,7 @@ export default function HomeClient() {
           {(collection || FAX_THEME.key) === 'chonk' && (
             <button
               onClick={() => { setShowSplash(false); setView('backpack'); }}
-              className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'backpack' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+              className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'backpack' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
               title="View your Chonk backpacks (tokenbound.org replacement)"
             >
               <BackpackIcon size={12} /> <span className="hidden sm:inline">Backpack</span>
@@ -229,12 +229,13 @@ export default function HomeClient() {
           <div className="relative min-h-[420px] flex flex-col items-center justify-center p-8 md:p-12 text-center">
             <div className="paper-noise absolute inset-0 opacity-30" />
             <div className="relative z-10 flex flex-col items-center">
-              <LayersArrowDown size={72} className="text-[#1a1a14] mb-4" />
-              <h2 className="text-3xl sm:text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2">NFTFAX<span style={{ color: collectionTheme.accent }}>™</span></h2>
+              <LayersArrowDown className="mb-4 h-36 w-36 text-[#1a1a14] sm:h-[90px] sm:w-[90px]" />
+              <h2 className="text-6xl font-black tracking-[-0.06em] leading-[0.9] mb-2">NFTFAX<span style={{ color: collectionTheme.accent }}>™</span></h2>
               <p className="text-[12px] sm:text-[12px] font-bold uppercase tracking-[.24em] text-[#625e52] mb-6">Internet bitmap transmission office</p>
-              <div className="border-t border-b border-[#8f8878] py-4 px-6 mb-6 max-w-md">
+              <div className="border-t border-b border-[#8f8878] py-4 px-6 mb-6 max-w-xl">
                 <p className="text-sm font-bold mb-2">Chain-letter fax game on Base</p>
-                <p className="text-[11px] text-[#575244] leading-relaxed">Forward faxes to keep the chain alive. Mint your Hop for a chance to win a share of the 4.04 ETH prize pool. 2,222 mints. 10 winners — one randomly selected from 11 tiers.</p>
+                <p className="text-sm font-bold mb-2">Welcome Chonks, &lsquo;sup Deadfellaz, howdy-doo-dee Normies, g&rsquo;day POW NFTers</p>
+                <p className="text-[11px] text-[#575244] leading-relaxed">In the Rolofax, add your NFT to join the game and find a player to send an art fax to — start a Fax Chain. Check your in-tray, got a fax? Select to forward then upload art and build the collage. Send to another @fax account to keep the chain alive! If you forward, you can mint your Hop for a chance to win a 0.404 ETH prize from the pool of 2,222 mints — 10 randomly selected winners.</p>
                 <Link href="/draw" className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#8a3e1e] underline">
                   <Dices size={11} /> Track the prize draw
                 </Link>

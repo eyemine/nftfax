@@ -33,7 +33,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 /// Composite an overlay image onto a base fax bitmap using a chain operation.
 /// Both are reduced to greyscale, scaled to the base dimensions, then combined
 /// pixel-by-pixel. Returns a fax-sized JPEG (base64 + preview data URI).
-export async function compositeChain(baseSrc: string, overlaySrc: string, op: ChainOp, negative = false): Promise<{ base64: string; preview: string; sizeKb: number }> {
+export async function compositeChain(baseSrc: string, overlaySrc: string, op: ChainOp, negative = false): Promise<{ base64: string; preview: string; sizeKb: number; format: 'png' | 'jpg' }> {
   const [base, overlay] = await Promise.all([loadImage(baseSrc), loadImage(overlaySrc)]);
   const width = Math.max(1, base.naturalWidth || base.width);
   const height = Math.max(1, base.naturalHeight || base.height);
@@ -74,13 +74,23 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   const b = baseData.data;
   const o = overData.data;
   const r = out.data;
+  // Ghost (XOR) is bit-exact and both source images are themselves
+  // recompressed JPEGs, so small DCT quantization noise (typically +/- a
+  // few levels) between chain links can flip bits and turn the intended
+  // "reveal" into visual noise. Quantizing both operands to the nearest 16
+  // before XOR-ing makes the op robust to that noise while still producing
+  // a multi-level reveal.
+  const QUANT = 16;
   for (let i = 0; i < b.length; i += 4) {
     const bg = Math.round(b[i] * 0.299 + b[i + 1] * 0.587 + b[i + 2] * 0.114);
     const og = Math.round(o[i] * 0.299 + o[i + 1] * 0.587 + o[i + 2] * 0.114);
     let v: number;
     if (op === 'stamp') v = Math.min(bg, og);
-    else if (op === 'ghost') v = (bg ^ og) & 0xff;
-    else v = Math.max(bg, og);
+    else if (op === 'ghost') {
+      const bq = Math.round(bg / QUANT) * QUANT;
+      const oq = Math.round(og / QUANT) * QUANT;
+      v = (bq ^ oq) & 0xff;
+    } else v = Math.max(bg, og);
     r[i] = v;
     r[i + 1] = v;
     r[i + 2] = v;
@@ -88,16 +98,37 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   }
   ctx.putImageData(out, 0, 0);
 
-  let dataUri = canvas.toDataURL('image/jpeg', 0.76);
-  // Re-encode at lower quality if the composite exceeds the fax size cap.
-  let quality = 0.76;
-  while (stripDataUri(dataUri).length > MAX_ENCODED_LENGTH && quality > 0.4) {
-    quality -= 0.12;
-    dataUri = canvas.toDataURL('image/jpeg', quality);
+  let dataUri: string;
+  let format: 'png' | 'jpg' = 'jpg';
+  if (op === 'ghost') {
+    // XOR output is mostly large uniform/blank regions with sparse sharp
+    // detail — JPEG compresses this pattern poorly (ringing/blocking) and
+    // can further corrupt the reveal. PNG is lossless and compresses this
+    // shape of data well, so prefer it and only fall back to JPEG if it
+    // doesn't fit the fax size cap.
+    dataUri = canvas.toDataURL('image/png');
+    format = 'png';
+    if (stripDataUri(dataUri).length > MAX_ENCODED_LENGTH) {
+      let quality = 0.76;
+      dataUri = canvas.toDataURL('image/jpeg', quality);
+      format = 'jpg';
+      while (stripDataUri(dataUri).length > MAX_ENCODED_LENGTH && quality > 0.4) {
+        quality -= 0.12;
+        dataUri = canvas.toDataURL('image/jpeg', quality);
+      }
+    }
+  } else {
+    dataUri = canvas.toDataURL('image/jpeg', 0.76);
+    // Re-encode at lower quality if the composite exceeds the fax size cap.
+    let quality = 0.76;
+    while (stripDataUri(dataUri).length > MAX_ENCODED_LENGTH && quality > 0.4) {
+      quality -= 0.12;
+      dataUri = canvas.toDataURL('image/jpeg', quality);
+    }
   }
   const base64 = stripDataUri(dataUri);
   if (!base64 || base64.length > MAX_ENCODED_LENGTH) throw new Error('The composite could not be reduced to fax size.');
-  return { base64, preview: dataUri, sizeKb: Math.round(base64.length * 0.75 / 1024) };
+  return { base64, preview: dataUri, sizeKb: Math.round(base64.length * 0.75 / 1024), format };
 }
 
 export async function prepareImage(file: File): Promise<{ base64: string; preview: string; sizeKb: number }> {

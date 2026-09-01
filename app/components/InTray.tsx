@@ -26,9 +26,9 @@ const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, ill
 /// sourceTokenId is app-encoded per chain (see encodeCompositeSourceTokenId
 /// in fax-mint.ts) — one mint per chain.
 const MINT_LIMIT_NOTICE: Record<string, string> = {
-  chonk: 'Chonks permits only one NFTFAX CHAIN mint per chonk.1234@fax account.',
-  pow: 'POW NFT permits one NFTFAX CHAIN mint per chain per atom.1234@fax account.',
-  deadfellaz: 'Deadfellaz permits one NFTFAX CHAIN mint per chain per dfz.1234@fax account.',
+  chonk: 'Chonks backpacks can mint only one fax chain NFT per chonk.****@fax account.',
+  pow: 'POW NFT can one fax chain mint per chain NFT per atom.****@fax account.',
+  deadfellaz: 'Deadfellaz can mint one fax chain NFT per chain per dfz.****@fax account.',
   normie: 'Normies permits one NFTFAX CHAIN mint per chain per Normie.1234@fax account.',
 };
 
@@ -180,6 +180,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [negative, setNegative] = useState(false);
   const [compositeBase64, setCompositeBase64] = useState('');
   const [compositePreview, setCompositePreview] = useState('');
+  const [compositeFormat, setCompositeFormat] = useState<'png' | 'jpg'>('jpg');
   const [compositing, setCompositing] = useState(false);
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState<InboxFax | null>(null);
@@ -238,6 +239,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setNegative(false);
     setCompositeBase64('');
     setCompositePreview('');
+    setCompositeFormat('jpg');
     setCompositing(false);
     setForwardError('');
   }
@@ -264,7 +266,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     (async () => {
       try {
         const result = await compositeChain(baseSrc, overlaySrc, chainOp, negative);
-        if (!cancelled) { setCompositeBase64(result.base64); setCompositePreview(result.preview); }
+        if (!cancelled) { setCompositeBase64(result.base64); setCompositePreview(result.preview); setCompositeFormat(result.format); }
       } catch (cause: unknown) {
         if (!cancelled) setNotice(cause instanceof Error ? cause.message : 'Compositing failed.');
       } finally {
@@ -297,7 +299,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         chainTrayId: fax.id,
       };
       if (compositeBase64) {
-        payload.format = 'jpg';
+        payload.format = compositeFormat;
         payload.dataBase64 = compositeBase64;
       }
       const res = await fetch('/api/tray/send', {
@@ -557,7 +559,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[#8f8878]">
         {([['inbox', `In-Tray (${faxes.filter(f => !f.forwarded && !f.savedGnosis && !f.mintedBase).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length})`]] as [TabKey, string][]).map(([key, label]) => (
-          <button key={key} onClick={() => setActiveTab(key)} className={`px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
+          <button key={key} onClick={() => { setActiveTab(key); setNotice(''); }} className={`px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
             {label}
           </button>
         ))}
@@ -583,7 +585,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           return (
             <div key={fax.id} onClick={() => openDetail(fax)} className="machine-shadow cursor-pointer overflow-hidden border border-[#8f8878] bg-[#c8c0ae] hover:ring-2 hover:ring-[#e65b2f]">
               <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-3 py-2 text-[11px] font-bold uppercase tracking-[.14em]">
-                <span>T/#{fax.id.toUpperCase()}</span>
+                <span title={`T/#${fax.id.toUpperCase()}`}>T/#{fax.id.slice(0, 3).toUpperCase()}…</span>
                 <div className="flex items-center gap-2">
                   {canForward && <span className="text-[#e65b2f] underline">FORWARD</span>}
                   <span className={permanent ? 'text-[#456049]' : jammed ? 'text-[#a94228]' : 'text-[#615c50]'}>
@@ -637,14 +639,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-4" onClick={() => { resetForward(); setSelected(null); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-4" onClick={() => { resetForward(); setSelected(null); setNotice(''); }}>
           <div className="machine-shadow flex h-[75vh] w-[75vw] flex-col overflow-hidden border border-[#8f8878] bg-[#c8c0ae]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[.24em] text-[#615c50]">Transmission detail</p>
                 <h3 className="text-lg font-black uppercase">T/#{selected.id.toUpperCase()}</h3>
               </div>
-              <button onClick={() => { resetForward(); setSelected(null); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] p-2"><X size={16} /></button>
+              <button onClick={() => { resetForward(); setSelected(null); setNotice(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] p-2"><X size={16} /></button>
             </div>
 
             <div className="grid min-h-0 flex-1 lg:grid-cols-[1.2fr_1fr]">
