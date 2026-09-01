@@ -229,12 +229,12 @@ export default function HomeClient() {
           <div className="relative min-h-[420px] flex flex-col items-center justify-center p-8 md:p-12 text-center">
             <div className="paper-noise absolute inset-0 opacity-30" />
             <div className="relative z-10 flex flex-col items-center">
-              <LayersArrowDown className="mb-4 h-36 w-36 text-[#1a1a14] sm:h-[90px] sm:w-[90px]" />
-              <h2 className="text-6xl font-black tracking-[-0.06em] leading-[0.9] mb-2">NFTFAX<span style={{ color: collectionTheme.accent }}>™</span></h2>
+              <LayersArrowDown size={72} className="mb-4 text-[#1a1a14]" />
+              <h2 className="text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2">NFTFAX<span style={{ color: collectionTheme.accent }}>™</span></h2>
               <p className="text-[12px] sm:text-[12px] font-bold uppercase tracking-[.24em] text-[#625e52] mb-6">Internet bitmap transmission office</p>
               <div className="border-t border-b border-[#8f8878] py-4 px-6 mb-6 max-w-xl">
                 <p className="text-sm font-bold mb-2">Chain-letter fax game on Base</p>
-                <p className="text-sm font-bold mb-2">Welcome Chonks, &lsquo;sup Deadfellaz, howdy-doo-dee Normies, g&rsquo;day POW NFTers</p>
+                <p className="text-[11px] text-[#575244] leading-relaxed">Welcome Chonks, &lsquo;sup Deadfellaz, howdy-doo-dee Normies, g&rsquo;day POW NFTers</p>
                 <p className="text-[11px] text-[#575244] leading-relaxed">In the Rolofax, add your NFT to join the game and find a player to send an art fax to — start a Fax Chain. Check your in-tray, got a fax? Select to forward then upload art and build the collage. Send to another @fax account to keep the chain alive! If you forward, you can mint your Hop for a chance to win a 0.404 ETH prize from the pool of 2,222 mints — 10 randomly selected winners.</p>
                 <Link href="/draw" className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#8a3e1e] underline">
                   <Dices size={11} /> Track the prize draw
@@ -259,17 +259,6 @@ export default function HomeClient() {
       <>
       {view === 'tray' && (
         <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
-          <div className="mb-3 flex gap-2">
-            <select
-              value={collection || FAX_THEME.key}
-              onChange={(event) => setCollection(event.target.value as CollectionKey)}
-              className="key-shadow border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-[12px] font-bold uppercase"
-            >
-              {(['chonk', 'deadfellaz', 'normie', 'pow'] as const).map((k) => (
-                <option key={k} value={k}>{getCollectionTheme(k).collectionName}</option>
-              ))}
-            </select>
-          </div>
           <label className="mb-5 block max-w-md">
             <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Your mailbox</span>
             {rolofaxEntries.length > 0 && (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Radar, Info, Trophy, ExternalLink, Search } from 'lucide-react';
+import { Loader2, Info, Trophy, ExternalLink, Search } from 'lucide-react';
 import Link from 'next/link';
 
 interface ChainEntry {
@@ -107,9 +107,9 @@ export default function RolofaxClient() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radar size={20} /></div>
+            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Trophy size={20} /></div>
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">ROLOFAX<span className="text-[#e65b2f]">™</span></h1>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">LEADERBOARD<span className="text-[#e65b2f]">™</span></h1>
               <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Leaderboard & chain log</p>
             </div>
           </div>
