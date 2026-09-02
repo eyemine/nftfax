@@ -526,13 +526,22 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     return identity ? MINT_LIMIT_NOTICE[identity.collection] : null;
   }, [cleanLocal]);
 
+  const sentMintedIds = useMemo(() => new Set(
+    sentFaxes.filter((f) => f.mintedBase || f.sourceMintedBase).map((f) => f.id),
+  ), [sentFaxes]);
+
   const displayedFaxes: InboxFax[] = useMemo(() => {
     if (activeTab === 'sent') return sentFaxes;
     if (activeTab === 'saved') return faxes.filter((f) => f.savedGnosis);
-    if (activeTab === 'minted') return faxes.filter((f) => f.mintedBase);
-    // Fax-Tray: exclude forwarded, saved, and minted faxes
-    return faxes.filter((f) => !f.forwarded && !f.savedGnosis && !f.mintedBase);
-  }, [activeTab, faxes, sentFaxes]);
+    if (activeTab === 'minted') {
+      const inboxMinted = faxes.filter((f) => f.mintedBase);
+      const inboxMintedIds = new Set(inboxMinted.map((f) => f.id));
+      const sentMinted = sentFaxes.filter((f) => (f.mintedBase || f.sourceMintedBase) && !inboxMintedIds.has(f.id));
+      return [...inboxMinted, ...sentMinted];
+    }
+    // Fax-Tray: show all received faxes (forwarded/minted retained with status badges)
+    return faxes.filter((f) => !f.savedGnosis);
+  }, [activeTab, faxes, sentFaxes, sentMintedIds]);
 
   if (!cleanLocal || !wallet) {
     return (
@@ -565,7 +574,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[#8f8878]">
-        {([['inbox', `Fax-Tray (${faxes.filter(f => !f.forwarded && !f.savedGnosis && !f.mintedBase).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length})`]] as [TabKey, string][]).map(([key, label]) => (
+        {([['inbox', `Fax-Tray (${faxes.filter(f => !f.savedGnosis).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length + sentMintedIds.size})`]] as [TabKey, string][]).map(([key, label]) => (
           <button key={key} onClick={() => { setActiveTab(key); setNotice(''); }} className={`px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
             {label}
           </button>
@@ -588,7 +597,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           const jamMs = fax.chainTimerDuration || getChainTimerMs(chainDepth, sourceMinted) || DEFAULT_JAM_MS;
           const elapsed = now - fax.createdAt;
           const msLeftToJam = jamMs - elapsed;
-          const permanent = !!fax.savedGnosis || !!fax.mintedBase || !!fax.forwarded;
+          const permanent = !!fax.savedGnosis || !!fax.mintedBase;
           const isDead = chainDepth > 11;
           const jammed = activeTab === 'inbox' && !permanent && (isDead || elapsed > jamMs);
           const canForward = activeTab !== 'sent' && !permanent && !jammed && !fax.forwarded && !fax.encrypted;
@@ -619,6 +628,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   {fax.forwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#3d5a40]">Forwarded</span>}
                   {fax.mintedBase && <span className="border border-[#3d6fd6] bg-[#d3ddf2] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#26417d]">Base</span>}
                   {fax.savedGnosis && <span className="border border-[#c08a2f] bg-[#f0e4cd] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#7a5a15]">Gnosis</span>}
+                  {fax.sourceMintedBase && <span className="border border-[#3d6fd6] bg-[#d3ddf2] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#26417d]">Source Minted</span>}
                   {fax.chainDepth && fax.chainDepth > 1 && <span className="border border-[#7a6a5a] bg-[#e3dcc8] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#5a4d3e]">Link {fax.chainDepth}</span>}
                   {jamMs < DEFAULT_JAM_MS && !permanent && !jammed && <span className="border border-[#b85a2f] bg-[#f5dcc8] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#8a3e1e]">Timer {jamMs < 60 * 60 * 1000 ? Math.round(jamMs / 60000) + 'm' : Math.round(jamMs / 3.6e6) + 'h'}</span>}
                   {activeTab === 'sent' && fax.recipientForwarded && <span className="border border-[#7fa178] bg-[#dbe6d6] px-1.5 py-0.5 text-[11px] font-bold uppercase text-[#3d5a40]">Recipient forwarded</span>}
