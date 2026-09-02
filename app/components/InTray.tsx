@@ -11,7 +11,7 @@
 /// Unsaved / unminted faxes decay after 96 hours so the gallery stays uncluttered.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink } from 'lucide-react';
+import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
 import { compositeChain, CHAIN_OPS, type ChainOp } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
 import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity } from '../lib/fax-mint';
@@ -99,7 +99,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', overrideSrc, href, jamMs = DEFAULT_JAM_MS }: { id: string; encrypted?: boolean; elapsed: number; jammed?: boolean; className?: string; overrideSrc?: string; href?: string; jamMs?: number }) {
+function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', overrideSrc, href, jamMs = DEFAULT_JAM_MS, zoom = 1 }: { id: string; encrypted?: boolean; elapsed: number; jammed?: boolean; className?: string; overrideSrc?: string; href?: string; jamMs?: number; zoom?: number }) {
   const [src, setSrc] = useState('');
   const [failed, setFailed] = useState(false);
 
@@ -126,9 +126,9 @@ function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', override
   // colour inside the same fax frame.
   if (overrideSrc) {
     return (
-      <div className={`w-full overflow-hidden bg-[#e7e0d1] ${className}`}>
+      <div className={`w-full overflow-auto bg-[#e7e0d1] ${className}`} style={{ cursor: zoom > 1 ? 'grab' : 'default' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={overrideSrc} alt={`Composite ${id}`} className="h-full w-full object-contain" />
+        <img src={overrideSrc} alt={`Composite ${id}`} className="h-full w-full object-contain" style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }} />
       </div>
     );
   }
@@ -182,6 +182,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [compositePreview, setCompositePreview] = useState('');
   const [compositeFormat, setCompositeFormat] = useState<'png' | 'jpg'>('jpg');
   const [compositing, setCompositing] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(1);
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState<InboxFax | null>(null);
   const [relaySuggestions, setRelaySuggestions] = useState<RelaySuggestion[]>([]);
@@ -241,6 +242,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setCompositePreview('');
     setCompositeFormat('jpg');
     setCompositing(false);
+    setPreviewZoom(1);
     setForwardError('');
   }
 
@@ -678,7 +680,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   const isForwardedImage = showForwardedImage;
                   return (
                     <>
-                      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden">
+                      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-auto bg-[#e7e0d1]">
                         <FaxThumb
                           id={displayId}
                           encrypted={compositePreview ? false : selected.encrypted}
@@ -686,8 +688,28 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                           jammed={activeTab === 'inbox' && !compositePreview && !isForwardedImage && !selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))}
                           overrideSrc={compositePreview || undefined}
                           className="h-full"
+                          zoom={previewZoom}
                         />
                         {compositing && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/80"><Loader2 className="animate-spin" /></div>}
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded border border-[#847d6e] bg-[#c8c0ae]/90 px-1 py-0.5">
+                          <button
+                            type="button"
+                            onClick={() => setPreviewZoom((z) => Math.max(1, z - 0.25))}
+                            className="text-[#4a4638] hover:text-[#e65b2f] disabled:opacity-30"
+                            disabled={previewZoom <= 1}
+                          >
+                            <ZoomOut size={14} />
+                          </button>
+                          <span className="text-[10px] font-bold tabular-nums text-[#4a4638]">{Math.round(previewZoom * 100)}%</span>
+                          <button
+                            type="button"
+                            onClick={() => setPreviewZoom((z) => Math.min(4, z + 0.25))}
+                            className="text-[#4a4638] hover:text-[#e65b2f] disabled:opacity-30"
+                            disabled={previewZoom >= 4}
+                          >
+                            <ZoomIn size={14} />
+                          </button>
+                        </div>
                       </div>
                       {compositePreview ? (
                         <p className="mt-2 text-center text-[11px] font-bold uppercase tracking-widest text-[#7a5a15]">Live composite · {CHAIN_OPS.find((o) => o.id === chainOp)?.label} operation</p>

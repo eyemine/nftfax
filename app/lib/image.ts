@@ -30,13 +30,26 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+}
+
 /// Composite an overlay image onto a base fax bitmap using a chain operation.
 /// Both are reduced to greyscale, scaled to the base dimensions, then combined
 /// pixel-by-pixel. Returns a fax-sized JPEG (base64 + preview data URI).
 export async function compositeChain(baseSrc: string, overlaySrc: string, op: ChainOp, negative = false): Promise<{ base64: string; preview: string; sizeKb: number; format: 'png' | 'jpg' }> {
   const [base, overlay] = await Promise.all([loadImage(baseSrc), loadImage(overlaySrc)]);
-  const width = Math.max(1, base.naturalWidth || base.width);
-  const height = Math.max(1, base.naturalHeight || base.height);
+  let width = Math.max(1, base.naturalWidth || base.width);
+  let height = Math.max(1, base.naturalHeight || base.height);
+
+  if (op === 'ghost') {
+    const longest = Math.max(width, height);
+    if (longest > 800) {
+      const s = 800 / longest;
+      width = Math.round(width * s);
+      height = Math.round(height * s);
+    }
+  }
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -77,10 +90,11 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   // Ghost (XOR) is bit-exact and both source images are themselves
   // recompressed JPEGs, so small DCT quantization noise (typically +/- a
   // few levels) between chain links can flip bits and turn the intended
-  // "reveal" into visual noise. Quantizing both operands to the nearest 16
+  // "reveal" into visual noise. Quantizing both operands to the nearest 32
   // before XOR-ing makes the op robust to that noise while still producing
-  // a multi-level reveal.
-  const QUANT = 16;
+  // a multi-level reveal. 32 is aggressive enough to absorb JPEG artifacts
+  // across multiple chain links.
+  const QUANT = 32;
   for (let i = 0; i < b.length; i += 4) {
     const bg = Math.round(b[i] * 0.299 + b[i + 1] * 0.587 + b[i + 2] * 0.114);
     const og = Math.round(o[i] * 0.299 + o[i + 1] * 0.587 + o[i + 2] * 0.114);
@@ -98,24 +112,31 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   }
   ctx.putImageData(out, 0, 0);
 
+  // Yield so the compositing spinner can render before the synchronous toDataURL.
+  await yieldToBrowser();
+
   let dataUri: string;
   let format: 'png' | 'jpg' = 'jpg';
   if (op === 'ghost') {
     // XOR output is mostly large uniform/blank regions with sparse sharp
     // detail — JPEG compresses this pattern poorly (ringing/blocking) and
     // can further corrupt the reveal. PNG is lossless and compresses this
-    // shape of data well, so prefer it and only fall back to JPEG if it
-    // doesn't fit the fax size cap.
+    // shape of data well. If the PNG exceeds the fax size cap, progressively
+    // downscale the canvas and re-encode as PNG (never lossy JPEG for ghost).
     dataUri = canvas.toDataURL('image/png');
     format = 'png';
-    if (stripDataUri(dataUri).length > MAX_ENCODED_LENGTH) {
-      let quality = 0.76;
-      dataUri = canvas.toDataURL('image/jpeg', quality);
-      format = 'jpg';
-      while (stripDataUri(dataUri).length > MAX_ENCODED_LENGTH && quality > 0.4) {
-        quality -= 0.12;
-        dataUri = canvas.toDataURL('image/jpeg', quality);
-      }
+    let scale = 1;
+    while (stripDataUri(dataUri).length > MAX_ENCODED_LENGTH && scale > 0.3) {
+      scale *= 0.75;
+      const sw = Math.max(1, Math.round(width * scale));
+      const sh = Math.max(1, Math.round(height * scale));
+      const sc = document.createElement('canvas');
+      sc.width = sw;
+      sc.height = sh;
+      const sctx = sc.getContext('2d');
+      if (!sctx) break;
+      sctx.drawImage(canvas, 0, 0, sw, sh);
+      dataUri = sc.toDataURL('image/png');
     }
   } else {
     dataUri = canvas.toDataURL('image/jpeg', 0.76);
