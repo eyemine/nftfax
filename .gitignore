@@ -7,3 +7,4 @@ out
 .netlify
 windsurf_deployment.yaml
 .DS_Store
+netlify.toml
