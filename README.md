@@ -22,12 +22,21 @@ Copy `.env.example` to `.env.local`, set `NEXT_PUBLIC_PRIVY_APP_ID`, then open `
 
 ## Production
 
+The live site is on Hetzner (`46.225.158.75`). After merging to `main`, deploy with:
+
 ```bash
-npm run build
+ssh root@46.225.158.75
+cd /opt/nftfax
+git pull
+docker compose up --build -d
 ```
 
-Netlify site: `nftfax-office-core`
+Verify:
 
-Production fallback URL: `https://nftfax-office-core.netlify.app`
+```bash
+docker logs nftfax-nftfax-1 --tail 20
+```
 
-Custom domain: `https://fax.nftmail.box`
+The app is exposed on host port `3002` (Docker maps container `3000` to host `3002`).
+
+Custom domain: `https://nftfax.app`
