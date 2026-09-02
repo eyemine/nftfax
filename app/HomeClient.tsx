@@ -159,7 +159,7 @@ export default function HomeClient() {
       <div className="mx-auto mb-4 flex max-w-6xl flex-wrap items-center gap-2 sm:grid sm:grid-cols-3">
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 sm:justify-self-start">
           <Link
-            href="/pre-register"
+            href="/rolofax"
             className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
             <Radar size={12} /> Rolofax
@@ -177,7 +177,7 @@ export default function HomeClient() {
             <Inbox size={12} /> <span className="hidden sm:inline">Fax-Tray</span>
           </button>
           <Link
-            href="/rolofax"
+            href="/leaderboard"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
             <Trophy size={12} /> <span className="hidden sm:inline">Leaderboard</span>
@@ -231,7 +231,7 @@ export default function HomeClient() {
                 </Link>
               </div>
               <Link
-                href="/pre-register"
+                href="/rolofax"
                 className="key-shadow flex items-center gap-2 border border-[#9d3c20] bg-[#e65b2f] px-6 py-3 text-xs font-black uppercase tracking-[.14em] text-white hover:bg-[#c0392b] transition-colors"
               >
                 <Radar size={16} /> Join the Rolofax directory
@@ -290,7 +290,7 @@ export default function HomeClient() {
 
       <SkinPanel theme={collectionTheme} className={`machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] ${view === 'send' ? '' : 'hidden'}`}>
         <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-          <span>NF-8004 / Network facsimile</span>
+          <span>Network facsimile</span>
           <span className="flex items-center gap-2 text-[#456049]"><span className="h-2 w-2 animate-pulse rounded-full bg-[#56705a]" /> Line ready</span>
         </div>
 
@@ -340,7 +340,7 @@ export default function HomeClient() {
       </>
       )}
 
-      <footer className="mx-auto mt-5 flex max-w-6xl flex-col justify-between gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row"><span>Powered by NFTmail.box / ERC-8004 identity</span><div className="flex gap-4"><a href="/pre-register" className="underline">Pre-register for launch →</a><a href="https://nftmail.box" className="underline">Open full mailbox console →</a></div></footer>
+      <footer className="mx-auto mt-5 flex max-w-6xl flex-col justify-between gap-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#575347] sm:flex-row"><span>Powered by NFTmail.box / ERC-8004 identity</span><div className="flex gap-4"><a href="/rolofax" className="underline">Join the Rolofax directory →</a><a href="https://nftmail.box" className="underline">Open full mailbox console →</a></div></footer>
     </main>
   );
 }

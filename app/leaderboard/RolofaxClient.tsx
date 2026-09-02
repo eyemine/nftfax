@@ -38,6 +38,35 @@ interface MintEntry {
   rootTrayId?: string;
 }
 
+function MintPreview({ trayId }: { trayId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (!trayId) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(`/api/tray/${trayId}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const doc = await res.json() as { dataBase64?: string; format?: string };
+        if (cancelled || !doc.dataBase64) return;
+        const mime = doc.format === 'png' ? 'image/png' : 'image/jpeg';
+        setSrc(`data:${mime};base64,${doc.dataBase64}`);
+      } catch { /* non-fatal */ }
+    })();
+    return () => { cancelled = true; };
+  }, [trayId]);
+  if (!trayId) return <span className="text-[#847d6e]">—</span>;
+  if (!src) return <Loader2 size={14} className="animate-spin text-[#847d6e]" />;
+  return (
+    <img
+      src={src}
+      alt={`Fax ${trayId}`}
+      className="h-10 w-10 object-cover border border-[#847d6e]"
+      loading="lazy"
+    />
+  );
+}
+
 interface LeaderboardData {
   leaderboard?: LeaderboardEntry[];
   totalMints?: number;
@@ -182,40 +211,6 @@ export default function RolofaxClient() {
           </div>
         )}
 
-        {/* Prize winners board — placeholder until the first draw round is committed/finalized on-chain */}
-        <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            <span className="flex items-center gap-2"><Trophy size={14} /> Prize winners</span>
-            <span className="text-[#615c50]">Draw round not yet committed</span>
-          </div>
-          <table className="w-full border-collapse text-left text-[12px]">
-            <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
-              <tr>
-                <th className="border-b border-[#8f8878] p-3 font-bold">#</th>
-                <th className="border-b border-[#8f8878] p-3 font-bold">Fax ID</th>
-                <th className="border-b border-[#8f8878] p-3 font-bold">Token ID</th>
-                <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
-                <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
-                <th className="border-b border-[#8f8878] p-3 font-bold">Minter</th>
-                <th className="border-b border-[#8f8878] p-3 font-bold text-right">Prize</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: 10 }, (_, i) => i + 1).map((rank) => (
-                <tr key={rank} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
-                  <td className="p-3 font-bold">{rank}</td>
-                  <td className="p-3">–</td>
-                  <td className="p-3">–</td>
-                  <td className="p-3">–</td>
-                  <td className="p-3">–</td>
-                  <td className="p-3">–</td>
-                  <td className="p-3 text-right font-black text-[#e65b2f]">0.404 ETH</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
@@ -251,35 +246,39 @@ export default function RolofaxClient() {
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Minted fax collection</div>
           {leaderboard.mints && leaderboard.mints.length > 0 ? (
-            <table className="w-full border-collapse text-left text-[12px]">
-              <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
-                <tr>
-                  <th className="border-b border-[#8f8878] p-3 font-bold">Token ID</th>
-                  <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
-                  <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
-                  <th className="border-b border-[#8f8878] p-3 font-bold">Minter</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.mints.map((mint) => (
-                  <tr key={mint.tokenId} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
-                    <td className="p-3">
-                      <a
-                        href={`https://opensea.io/assets/base/${'0xcc121bf9e3a13d03eacd55e15495e3e8de61fac5'}/${mint.tokenId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 font-bold text-[#e65b2f] hover:underline"
-                      >
-                        #{mint.tokenId} <ExternalLink size={10} />
-                      </a>
-                    </td>
-                    <td className="p-3 font-mono">{mint.trayId || '—'}</td>
-                    <td className="p-3">{tierForDepth(mint.chainDepth ?? 1)}</td>
-                    <td className="p-3">{minterLabel(mint)}</td>
+            <div className="max-h-[280px] overflow-y-auto">
+              <table className="w-full border-collapse text-left text-[12px]">
+                <thead className="sticky top-0 bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
+                  <tr>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">Preview</th>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">Token ID</th>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">Minter</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {leaderboard.mints.map((mint) => (
+                    <tr key={mint.tokenId} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
+                      <td className="p-3"><MintPreview trayId={mint.trayId} /></td>
+                      <td className="p-3">
+                        <a
+                          href={`https://opensea.io/assets/base/${'0xcc121bf9e3a13d03eacd55e15495e3e8de61fac5'}/${mint.tokenId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 font-bold text-[#e65b2f] hover:underline"
+                        >
+                          #{mint.tokenId} <ExternalLink size={10} />
+                        </a>
+                      </td>
+                      <td className="p-3 font-mono">{mint.trayId || '—'}</td>
+                      <td className="p-3">{tierForDepth(mint.chainDepth ?? 1)}</td>
+                      <td className="p-3">{minterLabel(mint)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <div className="p-5 text-center text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet</div>
           )}

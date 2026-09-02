@@ -100,7 +100,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       name: `FAX CHAIN`,
       description: `NFTFax Collectible — minted from ${local || 'a fax mailbox'} (fax ${id}). A chain-letter fax machine collectible on Base.`,
       image: imageUri,
-      external_url: `https://fax.nftmail.box/tray/${id}`,
+      external_url: `https://nftmail.box/tray/${id}`,
       attributes: [
         { trait_type: 'Tier', value: tier },
         ...(hopCount != null ? [{ trait_type: 'Chain Depth', value: hopCount }] : []),

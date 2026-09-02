@@ -27,10 +27,10 @@ const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, ill
 /// sourceTokenId is app-encoded per chain (see encodeCompositeSourceTokenId
 /// in fax-mint.ts) — one mint per chain.
 const MINT_LIMIT_NOTICE: Record<string, string> = {
-  chonk: 'Chonks backpacks can mint only one fax chain NFT per chonk.****@fax account.',
-  pow: 'POW NFT can one fax chain mint per chain NFT per atom.****@fax account.',
-  deadfellaz: 'Deadfellaz can mint one fax chain NFT per chain per dfz.****@fax account.',
-  normie: 'Normies permits one NFTFAX CHAIN mint per chain per Normie.1234@fax account.',
+  chonk: 'CHONKS BACKPACKS CAN MINT ONLY ONE FAX CHAIN NFT PER CHONK.0000@FAX ACCOUNT.',
+  pow: 'POW NFT CAN MINT ONE FAX CHAIN NFT PER CHAIN PER ATOM.0000@FAX ACCOUNT.',
+  deadfellaz: 'DEADFELLAZ CAN MINT ONE FAX CHAIN NFT PER CHAIN PER DFZ.0000@FAX ACCOUNT.',
+  normie: 'NORMIES PERMITS ONE NFTFAX CHAIN MINT PER CHAIN PER NORMIE.0000@FAX ACCOUNT.',
 };
 
 const DECAY_MS = 4 * 24 * 60 * 60 * 1000; // 96-hour decay
@@ -555,8 +555,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[.24em] text-[#615c50]">Fax chain gallery</p>
-          <h2 className="mt-1 text-xl font-black uppercase">Tray</h2>
+          <h2 className="text-xl font-black uppercase">Tray</h2>
         </div>
         <div className="flex items-center gap-3">
           {credits !== null && (

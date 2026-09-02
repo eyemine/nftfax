@@ -37,6 +37,7 @@ function getNumericEnv(key: string, fallback: number): number {
 /// Default fallbacks for the three fax chain-letter games.
 const COLLECTIONS: Record<CollectionKey, Partial<FaxTheme>> = {
   chonk: {
+    siteName: 'CHONKS NFTFAX',
     tagline: 'Base NFT chain letter',
     mailboxPlaceholder: 'chonk.1234',
     mailboxHint: 'chonk.1234',

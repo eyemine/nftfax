@@ -186,7 +186,7 @@ async function findFaxMinted(tokenId: number): Promise<{
 async function getFaxData(trayId: string): Promise<{ image: string | null; chainDepth: number | null }> {
   if (!trayId) return { image: null, chainDepth: null };
   try {
-    const res = await fetch(`https://fax.nftmail.box/api/tray/${trayId}`, { cache: 'no-store' });
+    const res = await fetch(`https://nftmail.box/api/tray/${trayId}`, { cache: 'no-store' });
     if (!res.ok) return { image: null, chainDepth: null };
     const doc = await res.json() as { dataBase64?: string; format?: string; chainDepth?: number };
     const image = doc.dataBase64
@@ -234,7 +234,7 @@ export async function GET(
     name,
     description,
     image,
-    external_url: `https://fax.nftmail.box/tray/${mintInfo?.trayId ?? ''}`,
+    external_url: `https://nftmail.box/tray/${mintInfo?.trayId ?? ''}`,
     attributes: [
       { trait_type: 'Tier', value: tier },
       ...(hopCount != null ? [{ trait_type: 'Chain Depth', value: hopCount }] : []),
