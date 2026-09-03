@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Loader2, Info, Trophy, ExternalLink, Search } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader2, Info, Trophy, ExternalLink, Search, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 
 interface ChainEntry {
@@ -38,32 +38,61 @@ interface MintEntry {
   rootTrayId?: string;
 }
 
+// Only fetches the tray image once the row scrolls into view — at 2200+
+// mints, eagerly fetching every thumbnail on mount would fire hundreds of
+// concurrent requests and make loading appear stalled/inconsistent.
 function MintPreview({ trayId }: { trayId: string }) {
   const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const elRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    if (!trayId) return;
+    if (!trayId || visible) return;
+    const el = elRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setVisible(true);
+    }, { rootMargin: '200px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [trayId, visible]);
+
+  useEffect(() => {
+    if (!trayId || !visible) return;
     let cancelled = false;
     void (async () => {
       try {
         const res = await fetch(`/api/tray/${trayId}`, { cache: 'no-store' });
-        if (!res.ok) return;
+        if (!res.ok) { if (!cancelled) setFailed(true); return; }
         const doc = await res.json() as { dataBase64?: string; format?: string };
-        if (cancelled || !doc.dataBase64) return;
+        if (cancelled) return;
+        if (!doc.dataBase64) { setFailed(true); return; }
         const mime = doc.format === 'png' ? 'image/png' : 'image/jpeg';
         setSrc(`data:${mime};base64,${doc.dataBase64}`);
-      } catch { /* non-fatal */ }
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
     })();
     return () => { cancelled = true; };
-  }, [trayId]);
+  }, [trayId, visible]);
+
   if (!trayId) return <span className="text-[#847d6e]">—</span>;
-  if (!src) return <Loader2 size={14} className="animate-spin text-[#847d6e]" />;
   return (
-    <img
-      src={src}
-      alt={`Fax ${trayId}`}
-      className="h-10 w-10 object-cover border border-[#847d6e]"
-      loading="lazy"
-    />
+    <div ref={elRef} className="grid h-10 w-10 place-items-center">
+      {failed ? (
+        <span className="text-[10px] text-[#847d6e]">N/A</span>
+      ) : src ? (
+        <img
+          src={src}
+          alt={`Fax ${trayId}`}
+          className="h-10 w-10 object-cover border border-[#847d6e]"
+          loading="lazy"
+        />
+      ) : (
+        <Loader2 size={14} className="animate-spin text-[#847d6e]" />
+      )}
+    </div>
   );
 }
 
@@ -72,6 +101,9 @@ interface LeaderboardData {
   totalMints?: number;
   contractBalanceEth?: string;
   mints?: MintEntry[];
+  mintsTotal?: number;
+  page?: number;
+  pageSize?: number;
   error?: string;
 }
 
@@ -99,29 +131,48 @@ function minterLabel(mint: MintEntry): string {
   return mint.sourceTokenId > 0 ? `${prefix}.${mint.sourceTokenId}@fax` : `${prefix}@fax`;
 }
 
+const MINTS_PAGE_SIZE = 20;
+
 export default function RolofaxClient() {
   const [data, setData] = useState<RolofaxData | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardData>({ leaderboard: [], totalMints: 0, contractBalanceEth: '0', mints: [] });
+  const [leaderboard, setLeaderboard] = useState<LeaderboardData>({ leaderboard: [], totalMints: 0, contractBalanceEth: '0', mints: [], mintsTotal: 0, page: 1, pageSize: MINTS_PAGE_SIZE });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [mintsLoading, setMintsLoading] = useState(false);
+  const [mintsError, setMintsError] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [mintsPage, setMintsPage] = useState(1);
   const [faxTrayInput, setFaxTrayInput] = useState('');
+
+  const loadLeaderboard = useCallback(async (page: number, opts?: { refresh?: boolean }) => {
+    setMintsLoading(true);
+    setMintsError('');
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(MINTS_PAGE_SIZE) });
+      if (opts?.refresh) params.set('refresh', '1');
+      const res = await fetch(`/api/tray/leaderboard?${params.toString()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Leaderboard request failed');
+      const lbJson = await res.json() as LeaderboardData;
+      if (lbJson.error) throw new Error(lbJson.error);
+      setLeaderboard(lbJson);
+      setMintsPage(page);
+    } catch (cause: unknown) {
+      setMintsError(cause instanceof Error ? cause.message : 'Could not load leaderboard');
+    } finally {
+      setMintsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [telegraphRes, lbRes] = await Promise.all([
-          fetch('/api/tray/telegraph', { cache: 'no-store' }).catch(() => null),
-          fetch('/api/tray/leaderboard', { cache: 'no-store' }).catch(() => null),
-        ]);
+        const telegraphRes = await fetch('/api/tray/telegraph', { cache: 'no-store' }).catch(() => null);
         if (telegraphRes && telegraphRes.ok) {
           const json = await telegraphRes.json() as RolofaxData & { error?: string };
           if (!cancelled) setData(json);
         }
-        if (lbRes && lbRes.ok) {
-          const lbJson = await lbRes.json() as LeaderboardData;
-          if (!cancelled) setLeaderboard(lbJson);
-        }
+        if (!cancelled) await loadLeaderboard(1);
       } catch (cause: unknown) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Could not load log');
       } finally {
@@ -129,7 +180,16 @@ export default function RolofaxClient() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [loadLeaderboard]);
+
+  async function refresh() {
+    setRefreshing(true);
+    await loadLeaderboard(1, { refresh: true });
+    setRefreshing(false);
+  }
+
+  const mintsTotal = leaderboard.mintsTotal ?? 0;
+  const totalPages = Math.max(1, Math.ceil(mintsTotal / MINTS_PAGE_SIZE));
 
   return (
     <main className="min-h-screen bg-[#c8c0ae] px-4 py-6 md:px-8 md:py-10">
@@ -212,9 +272,19 @@ export default function RolofaxClient() {
         )}
 
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
-            <span className="text-[#615c50]">{leaderboard.totalMints ?? 0} mints · {leaderboard.contractBalanceEth ?? '0'} ETH accumulated</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[#615c50]">{leaderboard.totalMints ?? 0} mints · {leaderboard.contractBalanceEth ?? '0'} ETH accumulated</span>
+              <button
+                onClick={() => void refresh()}
+                disabled={refreshing || mintsLoading}
+                className="key-shadow flex items-center gap-1 border border-[#77705f] bg-[#d8d0bf] px-2 py-1 text-[11px] font-bold uppercase disabled:opacity-50"
+                title="Refresh leaderboard"
+              >
+                <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
           </div>
           {leaderboard.leaderboard && leaderboard.leaderboard.length > 0 ? (
             <table className="w-full border-collapse text-left text-[12px]">
@@ -244,14 +314,24 @@ export default function RolofaxClient() {
 
         {/* Per-mint collection panel */}
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Minted fax collection</div>
-          {leaderboard.mints && leaderboard.mints.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
+            <span>Minted fax collection</span>
+            {mintsTotal > 0 && (
+              <span className="text-[11px] font-bold text-[#615c50]">Page {mintsPage} of {totalPages} · {mintsTotal} total</span>
+            )}
+          </div>
+          {mintsError && (
+            <div className="border-b border-[#8f8878] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">FAULT: {mintsError}</div>
+          )}
+          {mintsLoading ? (
+            <div className="grid min-h-[140px] place-items-center"><Loader2 className="animate-spin text-[#847d6e]" size={22} /></div>
+          ) : leaderboard.mints && leaderboard.mints.length > 0 ? (
             <div className="max-h-[280px] overflow-y-auto">
               <table className="w-full border-collapse text-left text-[12px]">
                 <thead className="sticky top-0 bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                   <tr>
-                    <th className="border-b border-[#8f8878] p-3 font-bold">Preview</th>
                     <th className="border-b border-[#8f8878] p-3 font-bold">Token ID</th>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">Preview</th>
                     <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
                     <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
                     <th className="border-b border-[#8f8878] p-3 font-bold">Minter</th>
@@ -260,7 +340,6 @@ export default function RolofaxClient() {
                 <tbody>
                   {leaderboard.mints.map((mint) => (
                     <tr key={mint.tokenId} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
-                      <td className="p-3"><MintPreview trayId={mint.trayId} /></td>
                       <td className="p-3">
                         <a
                           href={`https://opensea.io/assets/base/${'0xcc121bf9e3a13d03eacd55e15495e3e8de61fac5'}/${mint.tokenId}`}
@@ -271,6 +350,7 @@ export default function RolofaxClient() {
                           #{mint.tokenId} <ExternalLink size={10} />
                         </a>
                       </td>
+                      <td className="p-3"><MintPreview trayId={mint.trayId} /></td>
                       <td className="p-3 font-mono">{mint.trayId || '—'}</td>
                       <td className="p-3">{tierForDepth(mint.chainDepth ?? 1)}</td>
                       <td className="p-3">{minterLabel(mint)}</td>
@@ -281,6 +361,25 @@ export default function RolofaxClient() {
             </div>
           ) : (
             <div className="p-5 text-center text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet</div>
+          )}
+          {mintsTotal > MINTS_PAGE_SIZE && (
+            <div className="flex items-center justify-center gap-3 border-t border-[#8f8878] bg-[#b5ad9d] px-5 py-3">
+              <button
+                onClick={() => void loadLeaderboard(mintsPage - 1)}
+                disabled={mintsPage <= 1 || mintsLoading}
+                className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-1.5 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Prev
+              </button>
+              <span className="text-[11px] font-bold uppercase text-[#615c50]">Page {mintsPage} / {totalPages}</span>
+              <button
+                onClick={() => void loadLeaderboard(mintsPage + 1)}
+                disabled={mintsPage >= totalPages || mintsLoading}
+                className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-3 py-1.5 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next
+              </button>
+            </div>
           )}
 
           {/* View Fax form */}

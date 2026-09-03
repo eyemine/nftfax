@@ -2,6 +2,15 @@
 /// to build the per-collection leaderboard, then enriches each mint with the
 /// fax's real chain depth (tier) from the worker's tray KV — the contract
 /// event only carries the source NFT's tokenId, which is NOT the chain depth.
+///
+/// Log scanning is cached in-process across requests (this runs as a
+/// persistent Docker process on Hetzner, not serverless) — each request
+/// only fetches the block range since the last successful scan instead of
+/// re-scanning the entire history every time. This also fixes a bug where
+/// public-RPC rate limiting on a failed eth_getLogs chunk would silently
+/// drop that entire range of mints from the leaderboard with no error
+/// surfaced (see rpc()'s retry logic and fetchLogsInRange()'s bounded
+/// concurrency below).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
@@ -12,6 +21,8 @@ const CONTRACT = BASE_FAX_COLLECTIBLE;
 const FAX_MINTED_TOPIC = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506e5629bcb0e5c';
 const DEPLOY_BLOCK = 50375000;
 const CHUNK_SIZE = 10_000;
+const MAX_CONCURRENT_CHUNKS = 4;
+const RPC_RETRIES = 3;
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
 
@@ -26,7 +37,15 @@ const COMMUNITY_PREFIXES: Record<number, string> = {
 interface RpcLog { topics: string[]; data: string; blockNumber: string; transactionHash: string; }
 interface MintEntry { tokenId: number; minter: string; community: number; sourceTokenId: number; trayId: string; chainDepth?: number; rootTrayId?: string; }
 interface LeaderboardEntry { collection: string; mints: number; maxTokenId: number; communities: number; }
-interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; contractBalanceEth: string; mints: MintEntry[]; }
+interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; contractBalanceEth: string; mints: MintEntry[]; mintsTotal: number; page: number; pageSize: number; }
+
+/// In-process cache of decoded-ready raw logs, keyed by the highest block
+/// scanned so far. Persists across requests in this long-running server
+/// process. `cacheInFlight` de-dupes concurrent requests so a burst of
+/// simultaneous page loads triggers only one underlying scan.
+let cachedLogs: RpcLog[] = [];
+let cachedUpToBlock = DEPLOY_BLOCK - 1;
+let cacheInFlight: Promise<void> | null = null;
 
 async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string }> {
   try {
@@ -48,14 +67,25 @@ async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; roo
   }
 }
 
-async function rpc(method: string, params: unknown[]): Promise<unknown> {
-  const res = await fetch(RPC_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-  });
-  const json = (await res.json()) as { result?: unknown };
-  return json.result;
+/// Calls the RPC endpoint, retrying with backoff on network errors or RPC
+/// error responses. Throws after exhausting retries — callers must not
+/// treat a failure as "no logs" (that previously caused entire block
+/// ranges to silently vanish from the leaderboard).
+async function rpc(method: string, params: unknown[], attempt = 0): Promise<unknown> {
+  try {
+    const res = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    const json = (await res.json()) as { result?: unknown; error?: { message?: string } };
+    if (json.error) throw new Error(json.error.message || 'RPC error');
+    return json.result;
+  } catch (cause) {
+    if (attempt >= RPC_RETRIES) throw cause;
+    await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    return rpc(method, params, attempt + 1);
+  }
 }
 
 async function getTotalMinted(): Promise<number> {
@@ -74,25 +104,51 @@ async function getCurrentBlock(): Promise<number> {
   return 0;
 }
 
-async function fetchFaxMintedLogs(): Promise<RpcLog[]> {
-  const currentBlock = await getCurrentBlock();
-  if (currentBlock === 0) return [];
-  const allLogs: RpcLog[] = [];
-  const chunks: Promise<unknown>[] = [];
-  for (let from = DEPLOY_BLOCK; from <= currentBlock; from += CHUNK_SIZE) {
-    const to = Math.min(from + CHUNK_SIZE - 1, currentBlock);
-    chunks.push(rpc('eth_getLogs', [{
+/// Fetches FaxMinted logs across [fromBlock, toBlock] in fixed-size chunks,
+/// with bounded concurrency (public RPC endpoints rate-limit large bursts
+/// of parallel requests — sending all chunks via Promise.all risked some
+/// silently failing and dropping mints). Each chunk retries via rpc();
+/// if a chunk still fails after retries, the whole fetch throws rather
+/// than returning a partial, silently-incomplete result.
+async function fetchLogsInRange(fromBlock: number, toBlock: number): Promise<RpcLog[]> {
+  const ranges: Array<[number, number]> = [];
+  for (let from = fromBlock; from <= toBlock; from += CHUNK_SIZE) {
+    ranges.push([from, Math.min(from + CHUNK_SIZE - 1, toBlock)]);
+  }
+  const out: RpcLog[] = [];
+  for (let i = 0; i < ranges.length; i += MAX_CONCURRENT_CHUNKS) {
+    const batch = ranges.slice(i, i + MAX_CONCURRENT_CHUNKS);
+    const results = await Promise.all(batch.map(([from, to]) => rpc('eth_getLogs', [{
       address: CONTRACT,
       topics: [FAX_MINTED_TOPIC],
       fromBlock: '0x' + from.toString(16),
       toBlock: '0x' + to.toString(16),
-    }]));
+    }])));
+    for (const result of results) {
+      out.push(...(result as RpcLog[]));
+    }
   }
-  const results = await Promise.all(chunks);
-  for (const result of results) {
-    if (Array.isArray(result)) allLogs.push(...(result as RpcLog[]));
+  return out;
+}
+
+/// Ensures the in-process cache covers up to `currentBlock`, fetching only
+/// the incremental range since the last successful scan. If the fetch
+/// fails, the cache cursor is not advanced so the same range is retried on
+/// the next request instead of silently skipping it.
+async function ensureLogsCached(currentBlock: number): Promise<void> {
+  if (cachedUpToBlock >= currentBlock) return;
+  if (cacheInFlight) return cacheInFlight;
+  cacheInFlight = (async () => {
+    const from = cachedUpToBlock + 1;
+    const newLogs = await fetchLogsInRange(from, currentBlock);
+    cachedLogs = cachedLogs.concat(newLogs);
+    cachedUpToBlock = currentBlock;
+  })();
+  try {
+    await cacheInFlight;
+  } finally {
+    cacheInFlight = null;
   }
-  return allLogs;
 }
 
 // DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite
@@ -137,20 +193,31 @@ async function getContractBalanceEth(): Promise<string> {
   return '0';
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    const [totalMints, contractBalanceEth] = await Promise.all([getTotalMinted(), getContractBalanceEth()]);
-    if (totalMints === 0) {
-      return NextResponse.json({ leaderboard: [], totalMints: 0, contractBalanceEth, mints: [] } as LeaderboardData, { headers: NO_STORE });
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '20', 10) || 20));
+    // Manual cache-bust escape hatch: ?refresh=1 forces a full re-scan from
+    // DEPLOY_BLOCK, in case the cache ever needs to be reset.
+    if (searchParams.get('refresh') === '1') {
+      cachedLogs = [];
+      cachedUpToBlock = DEPLOY_BLOCK - 1;
     }
 
-    const logs = await fetchFaxMintedLogs();
-    const allMints: MintEntry[] = [];
+    const [totalMints, contractBalanceEth, currentBlock] = await Promise.all([
+      getTotalMinted(), getContractBalanceEth(), getCurrentBlock(),
+    ]);
+    if (totalMints === 0 || currentBlock === 0) {
+      return NextResponse.json({ leaderboard: [], totalMints: 0, contractBalanceEth, mints: [], mintsTotal: 0, page, pageSize } as LeaderboardData, { headers: NO_STORE });
+    }
+
+    await ensureLogsCached(currentBlock);
+
+    const allMints: MintEntry[] = cachedLogs.map(decodeLog);
     const byCollection = new Map<string, { mints: number; maxTokenId: number; communities: Set<number> }>();
 
-    for (const log of logs) {
-      const mint = decodeLog(log);
-      allMints.push(mint);
+    for (const mint of allMints) {
       const name = COMMUNITY_NAMES[mint.community] ?? 'unknown';
       const entry = byCollection.get(name) ?? { mints: 0, maxTokenId: 0, communities: new Set<number>() };
       entry.mints++;
@@ -163,16 +230,24 @@ export async function GET(_req: NextRequest) {
       .map(([collection, e]) => ({ collection, mints: e.mints, maxTokenId: e.maxTokenId, communities: e.communities.size }))
       .sort((a, b) => b.mints - a.mints);
 
-    const uniqueTrayIds = Array.from(new Set(allMints.map((m) => m.trayId).filter(Boolean)));
+    // Newest-first, paginated AFTER sorting so page 1 always shows the most
+    // recent mints. Tray metadata (chain depth/tier) is only fetched for the
+    // current page's mints — at 2200+ mints, fetching metadata for every
+    // single mint on every request would be very slow and mostly wasted.
+    const sortedMints = allMints.slice().sort((a, b) => b.tokenId - a.tokenId);
+    const start = (page - 1) * pageSize;
+    const pageMints = sortedMints.slice(start, start + pageSize);
+
+    const uniqueTrayIds = Array.from(new Set(pageMints.map((m) => m.trayId).filter(Boolean)));
     const metas = await Promise.all(uniqueTrayIds.map((id) => fetchTrayMeta(id)));
     const metaByTrayId = new Map(uniqueTrayIds.map((id, i) => [id, metas[i]]));
-    for (const mint of allMints) {
+    for (const mint of pageMints) {
       const meta = metaByTrayId.get(mint.trayId);
       mint.chainDepth = meta?.chainDepth;
       mint.rootTrayId = meta?.rootTrayId;
     }
 
-    return NextResponse.json({ leaderboard, totalMints, contractBalanceEth, mints: allMints } as LeaderboardData, { headers: NO_STORE });
+    return NextResponse.json({ leaderboard, totalMints, contractBalanceEth, mints: pageMints, mintsTotal: allMints.length, page, pageSize } as LeaderboardData, { headers: NO_STORE });
   } catch {
     return NextResponse.json({ error: 'Leaderboard lookup failed' }, { status: 502, headers: NO_STORE });
   }
