@@ -142,7 +142,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-2 sm:gap-3">
             <LayersArrowDown size={28} className="text-[#1a1a14]" />
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}<span style={{ color: collectionTheme.accent }}>™</span></h1>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-black">{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
               {(!showSplash || collection) && <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>}
             </div>
           </div>
@@ -216,13 +216,13 @@ export default function HomeClient() {
 
       {showSplash ? (
         <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="relative min-h-[420px] flex flex-col items-center justify-center p-8 md:p-12 text-center">
+          <div className="relative min-h-[420px] flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 text-center">
             <div className="paper-noise absolute inset-0 opacity-30" />
             <div className="relative z-10 flex flex-col items-center">
               <LayersArrowDown size={72} className="mb-4 text-[#1a1a14]" />
-              <h2 className="text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2">NFTFAX<span style={{ color: collectionTheme.accent }}>™</span></h2>
+              <h2 className="text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2"><span className="font-['Courier_New',_monospace] text-black">NFTFAX</span><span style={{ color: collectionTheme.accent }}>™</span></h2>
               <p className="text-[12px] sm:text-[12px] font-bold uppercase tracking-[.24em] text-[#625e52] mb-6">Internet bitmap transmission office</p>
-              <div className="border-t border-b border-[#8f8878] py-4 px-6 mb-6 max-w-xl">
+              <div className="border-t border-b border-[#8f8878] py-4 px-2 sm:px-6 mb-6 max-w-xl sm:max-w-2xl w-full">
                 <p className="text-sm font-bold mb-2">Chain-letter fax game on Base</p>
                 <p className="text-[11px] text-[#575244] leading-relaxed">Welcome Chonks, &lsquo;sup Deadfellaz, howdy-doo-dee Normies, g&rsquo;day POW NFTers</p>
                 <p className="text-[11px] text-[#575244] leading-relaxed">In the Rolofax, add your NFT to join the game and find a player to send an art fax to — start a Fax Chain. Check your fax-tray, got a fax? Select to forward then upload art and build the collage. Send to another @fax account to keep the chain alive! If you forward, you can mint your Hop for a chance to win a 0.404 ETH prize from the pool of 2,222 mints — 10 randomly selected winners.</p>
