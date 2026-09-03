@@ -13,11 +13,25 @@
 /// concurrency below).
 
 import { NextRequest, NextResponse } from 'next/server';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
-const RPC_URL = BASE_CHAIN.rpcUrl;
+// Alchemy has much higher rate limits / reliability than the free public Base
+// RPC for the ~40-chunk eth_getLogs scan this route does on a cold cache.
+// Falls back to the public endpoint if unset (same "never blank" pattern as
+// app/lib/tba.ts).
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || '';
+const RPC_URL = ALCHEMY_API_KEY ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : BASE_CHAIN.rpcUrl;
 const CONTRACT = BASE_FAX_COLLECTIBLE;
+// Persisted to disk (bind-mounted volume, see docker-compose.yml) so a
+// container restart/redeploy doesn't force re-scanning the entire mint
+// history from DEPLOY_BLOCK on the next request — that full rescan is what
+// intermittently timed out/rate-limited against the public RPC and surfaced
+// to users as "FAULT: Leaderboard request failed".
+const CACHE_DIR = process.env.LEADERBOARD_CACHE_DIR || join(process.cwd(), 'data');
+const CACHE_FILE = join(CACHE_DIR, 'leaderboard-log-cache.json');
 const FAX_MINTED_TOPIC = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506e5629bcb0e5c';
 const DEPLOY_BLOCK = 50375000;
 const CHUNK_SIZE = 10_000;
@@ -46,6 +60,27 @@ interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number;
 let cachedLogs: RpcLog[] = [];
 let cachedUpToBlock = DEPLOY_BLOCK - 1;
 let cacheInFlight: Promise<void> | null = null;
+
+try {
+  const raw = readFileSync(CACHE_FILE, 'utf8');
+  const parsed = JSON.parse(raw) as { logs: RpcLog[]; upToBlock: number };
+  if (Array.isArray(parsed.logs) && typeof parsed.upToBlock === 'number') {
+    cachedLogs = parsed.logs;
+    cachedUpToBlock = parsed.upToBlock;
+    console.log(`[leaderboard] restored ${cachedLogs.length} cached logs up to block ${cachedUpToBlock}`);
+  }
+} catch {
+  // No cache file yet (first boot) or unreadable — fine, will do a full scan.
+}
+
+function persistCache(): void {
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true });
+    writeFileSync(CACHE_FILE, JSON.stringify({ logs: cachedLogs, upToBlock: cachedUpToBlock }));
+  } catch (cause) {
+    console.error('[leaderboard] failed to persist log cache', cause);
+  }
+}
 
 async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string }> {
   try {
@@ -143,6 +178,7 @@ async function ensureLogsCached(currentBlock: number): Promise<void> {
     const newLogs = await fetchLogsInRange(from, currentBlock);
     cachedLogs = cachedLogs.concat(newLogs);
     cachedUpToBlock = currentBlock;
+    persistCache();
   })();
   try {
     await cacheInFlight;
@@ -248,7 +284,8 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ leaderboard, totalMints, contractBalanceEth, mints: pageMints, mintsTotal: allMints.length, page, pageSize } as LeaderboardData, { headers: NO_STORE });
-  } catch {
+  } catch (cause) {
+    console.error('[leaderboard] lookup failed', cause);
     return NextResponse.json({ error: 'Leaderboard lookup failed' }, { status: 502, headers: NO_STORE });
   }
 }

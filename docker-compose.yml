@@ -20,4 +20,6 @@ services:
       - ALCHEMY_API_KEY=${ALCHEMY_API_KEY:-}
     ports:
       - "3002:3000"
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
