@@ -18,12 +18,11 @@ import { join } from 'path';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
-// Alchemy has much higher rate limits / reliability than the free public Base
-// RPC for the ~40-chunk eth_getLogs scan this route does on a cold cache.
-// Falls back to the public endpoint if unset (same "never blank" pattern as
-// app/lib/tba.ts).
-const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || '';
-const RPC_URL = ALCHEMY_API_KEY ? `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : BASE_CHAIN.rpcUrl;
+// NOTE: Alchemy's free tier caps eth_getLogs at a 10-block range (vs. the
+// public Base RPC's 10,000), making it unusable for this route's bulk
+// history scan unless upgraded to a paid plan — deliberately NOT using
+// ALCHEMY_API_KEY here (unlike app/lib/tba.ts) for that reason.
+const RPC_URL = BASE_CHAIN.rpcUrl;
 const CONTRACT = BASE_FAX_COLLECTIBLE;
 // Persisted to disk (bind-mounted volume, see docker-compose.yml) so a
 // container restart/redeploy doesn't force re-scanning the entire mint
