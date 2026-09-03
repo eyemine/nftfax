@@ -142,7 +142,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-2 sm:gap-3">
             <LayersArrowDown size={28} className="text-[#1a1a14]" />
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-black">{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-black" style={{ fontWeight: 900, WebkitTextStroke: '0.6px black' }}>{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
               {(!showSplash || collection) && <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>}
             </div>
           </div>
@@ -220,7 +220,7 @@ export default function HomeClient() {
             <div className="paper-noise absolute inset-0 opacity-30" />
             <div className="relative z-10 flex flex-col items-center">
               <LayersArrowDown size={72} className="mb-4 text-[#1a1a14]" />
-              <h2 className="text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2"><span className="font-['Courier_New',_monospace] text-black">NFTFAX</span><span style={{ color: collectionTheme.accent }}>™</span></h2>
+              <h2 className="text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2"><span className="font-['Courier_New',_monospace] text-black" style={{ fontWeight: 900, WebkitTextStroke: '0.8px black' }}>NFTFAX</span><span style={{ color: collectionTheme.accent }}>™</span></h2>
               <p className="text-[12px] sm:text-[12px] font-bold uppercase tracking-[.24em] text-[#625e52] mb-6">Internet bitmap transmission office</p>
               <div className="border-t border-b border-[#8f8878] py-4 px-2 sm:px-6 mb-6 max-w-xl sm:max-w-2xl w-full">
                 <p className="text-sm font-bold mb-2">Chain-letter fax game on Base</p>
