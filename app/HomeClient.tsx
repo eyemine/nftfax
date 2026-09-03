@@ -142,7 +142,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-2 sm:gap-3">
             <LayersArrowDown size={28} className="text-[#1a1a14]" />
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-black" style={{ fontWeight: 900, WebkitTextStroke: '0.6px black' }}>{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-[#1a1a14] font-black sm:font-bold [-webkit-text-stroke:0.6px_#1a1a14] sm:[-webkit-text-stroke:0.2px_#1a1a14]">{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
               {(!showSplash || collection) && <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>}
             </div>
           </div>
@@ -162,38 +162,38 @@ export default function HomeClient() {
             href="/rolofax"
             className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
-            <Radar size={12} /> Rolofax
+            <Radar size={14} /> Rolofax
           </Link>
           <button
             onClick={() => { setShowSplash(false); setView('send'); }}
             className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'send' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
-            <Send size={12} /> Send
+            <Send size={14} /> Send
           </button>
           <button
             onClick={() => { setShowSplash(false); setView('tray'); }}
             className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
-            <Inbox size={12} /> <span className="hidden sm:inline">Fax-Tray</span>
+            <Inbox size={14} /> <span className="hidden sm:inline">Fax-Tray</span>
           </button>
           <Link
             href="/leaderboard"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
-            <Trophy size={12} /> <span className="hidden sm:inline">Leaderboard</span>
+            <Trophy size={14} /> <span className="hidden sm:inline">Leaderboard</span>
           </Link>
           <Link
             href="/draw"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
-            <Dices size={12} /> <span className="hidden sm:inline">Prize Draw</span>
+            <Dices size={14} /> <span className="hidden sm:inline">Prize Draw</span>
           </Link>
         </div>
         <Link
           href="/about"
           className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] sm:justify-self-center"
         >
-          <Info size={12} /> About
+          <Info size={14} /> About
         </Link>
         <div className="flex items-center gap-1.5 sm:gap-2 sm:justify-self-end">
           {(collection || FAX_THEME.key) === 'chonk' && (
@@ -202,14 +202,14 @@ export default function HomeClient() {
               className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'backpack' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
               title="View your Chonk backpacks (tokenbound.org replacement)"
             >
-              <BackpackIcon size={12} /> <span className="hidden sm:inline">Backpack</span>
+              <BackpackIcon size={14} /> <span className="hidden sm:inline">Backpack</span>
             </button>
           )}
           <button
             onClick={() => { setShowSplash(false); setView('delegate'); }}
             className={`hidden sm:flex items-center gap-1.5 sm:gap-2 key-shadow border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
-            <UserCheck size={12} /> Delegate
+            <UserCheck size={14} /> Delegate
           </button>
         </div>
       </div>
@@ -219,8 +219,8 @@ export default function HomeClient() {
           <div className="relative min-h-[420px] flex flex-col items-center justify-center p-4 sm:p-8 md:p-12 text-center">
             <div className="paper-noise absolute inset-0 opacity-30" />
             <div className="relative z-10 flex flex-col items-center">
-              <LayersArrowDown size={72} className="mb-4 text-[#1a1a14]" />
-              <h2 className="text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2"><span className="font-['Courier_New',_monospace] text-black" style={{ fontWeight: 900, WebkitTextStroke: '0.8px black' }}>NFTFAX</span><span style={{ color: collectionTheme.accent }}>™</span></h2>
+              <LayersArrowDown className="mb-[10px] sm:mb-4 text-[#1a1a14] w-[66px] h-[66px] sm:w-[72px] sm:h-[72px]" />
+              <h2 className="text-5xl font-black tracking-[-0.06em] leading-[0.9] mb-2"><span className="font-['Courier_New',_monospace] text-[#1a1a14] font-black sm:font-bold [-webkit-text-stroke:0.8px_#1a1a14] sm:[-webkit-text-stroke:0.3px_#1a1a14]">NFTFAX</span><span style={{ color: collectionTheme.accent }}>™</span></h2>
               <p className="text-[12px] sm:text-[12px] font-bold uppercase tracking-[.24em] text-[#625e52] mb-6">Internet bitmap transmission office</p>
               <div className="border-t border-b border-[#8f8878] py-4 px-2 sm:px-6 mb-6 max-w-xl sm:max-w-2xl w-full">
                 <p className="text-sm font-bold mb-2">Chain-letter fax game on Base</p>
@@ -234,7 +234,7 @@ export default function HomeClient() {
                 href="/rolofax"
                 className="key-shadow flex items-center gap-2 border border-[#9d3c20] bg-[#e65b2f] px-6 py-3 text-xs font-black uppercase tracking-[.14em] text-white hover:bg-[#c0392b] transition-colors"
               >
-                <Radar size={16} /> Join the Rolofax directory
+                <Radar size={19} /> Join the Rolofax directory
               </Link>
               <button
                 onClick={() => setShowSplash(false)}
@@ -313,7 +313,7 @@ export default function HomeClient() {
               className="paper-noise relative grid min-h-[310px] w-full place-items-center overflow-hidden border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center transition hover:bg-[#eee8dc]"
             >
               {preview ? <img src={preview} alt="Fax preview" className="max-h-[290px] max-w-full object-contain grayscale" /> : (
-                <div><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full border border-[#9a9282] bg-[#d5cebf]"><Upload size={26} /></div><p className="font-bold uppercase">Insert document</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">PNG · JPG · BMP / maximum intake 20MB</p></div>
+                <div><div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-full border border-[#9a9282] bg-[#d5cebf]"><Upload size={31} /></div><p className="font-bold uppercase">Insert document</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">PNG · JPG · BMP / maximum intake 20MB</p></div>
               )}
               {status === 'processing' && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/90"><Loader2 className="animate-spin" /><p className="mt-10 text-[12px] font-bold uppercase">Calibrating image…</p></div>}
             </button>
@@ -332,7 +332,7 @@ export default function HomeClient() {
             {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">FAULT: {error}</div>}
             {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
 
-            <button onClick={() => isConnected ? void transmit() : login()} disabled={status === 'sending' || (isConnected && !base64)} className={`key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white transition-opacity ${!isConnected ? 'opacity-40' : 'disabled:cursor-not-allowed disabled:opacity-45'}`}>{status === 'sending' ? <Loader2 className="animate-spin" size={17} /> : <Send size={17} />} Transmit NFTfax</button>
+            <button onClick={() => isConnected ? void transmit() : login()} disabled={status === 'sending' || (isConnected && !base64)} className={`key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white transition-opacity ${!isConnected ? 'opacity-40' : 'disabled:cursor-not-allowed disabled:opacity-45'}`}>{status === 'sending' ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />} Transmit NFTfax</button>
             <p className="mt-4 text-center text-[11px] uppercase tracking-[.16em] text-[#625d51]">Basic: earn send credits by forwarding · Pro: unlimited internal · Premium: external + colour</p>
           </div>
         </div>
