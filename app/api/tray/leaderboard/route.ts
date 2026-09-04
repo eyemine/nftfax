@@ -14,8 +14,17 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join } from 'path';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
+import {
+  FAX_MINTED_TOPIC,
+  DEPLOY_BLOCK,
+  COMMUNITY_NAMES,
+  CACHE_DIR,
+  CACHE_FILE,
+  decodeFaxMintedLog as decodeLog,
+  type RpcLog,
+  type MintEntry,
+} from '../../../lib/fax-stats';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 // NOTE: Alchemy's free tier caps eth_getLogs at a 10-block range (vs. the
@@ -29,26 +38,16 @@ const CONTRACT = BASE_FAX_COLLECTIBLE;
 // history from DEPLOY_BLOCK on the next request — that full rescan is what
 // intermittently timed out/rate-limited against the public RPC and surfaced
 // to users as "FAULT: Leaderboard request failed".
-const CACHE_DIR = process.env.LEADERBOARD_CACHE_DIR || join(process.cwd(), 'data');
-const CACHE_FILE = join(CACHE_DIR, 'leaderboard-log-cache.json');
-const FAX_MINTED_TOPIC = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506e5629bcb0e5c';
-const DEPLOY_BLOCK = 50375000;
 const CHUNK_SIZE = 10_000;
 const MAX_CONCURRENT_CHUNKS = 4;
 const RPC_RETRIES = 3;
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
 
-const COMMUNITY_NAMES: Record<number, string> = {
-  0: 'none', 1: 'chonk', 2: 'deadfellaz', 3: 'pow', 4: 'normie',
-};
-
 const COMMUNITY_PREFIXES: Record<number, string> = {
   1: 'chonk', 2: 'dfz', 3: 'atom', 4: 'normie',
 };
 
-interface RpcLog { topics: string[]; data: string; blockNumber: string; transactionHash: string; }
-interface MintEntry { tokenId: number; minter: string; community: number; sourceTokenId: number; trayId: string; chainDepth?: number; rootTrayId?: string; }
 interface LeaderboardEntry { collection: string; mints: number; maxTokenId: number; communities: number; }
 interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; contractBalanceEth: string; mints: MintEntry[]; mintsTotal: number; page: number; pageSize: number; }
 
@@ -184,36 +183,6 @@ async function ensureLogsCached(currentBlock: number): Promise<void> {
   } finally {
     cacheInFlight = null;
   }
-}
-
-// DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite
-// (realTokenId * 1_000_000 + chainSuffix) — see encodeCompositeSourceTokenId
-// in app/lib/fax-mint.ts — so the same real NFT can claim once per chain
-// instead of the contract's permanent once-ever claimed[] mapping. Chonk
-// mints always use the real ID (on-chain ownerOf() resolution requires it).
-// Real collection supplies are well under 1M, so any value >= 1_000_000
-// unambiguously indicates the new composite encoding.
-const CHAIN_SUFFIX_MOD = 1_000_000;
-
-function decodeSourceTokenId(raw: number, community: number): number {
-  if (community === 1) return raw; // Chonk: always the real ID
-  if (raw >= CHAIN_SUFFIX_MOD) return Math.floor(raw / CHAIN_SUFFIX_MOD);
-  return raw; // legacy pre-composite mint, already the real ID
-}
-
-function decodeLog(log: RpcLog): MintEntry {
-  const tokenId = parseInt(log.topics[1] ?? '0x0', 16);
-  const minter = '0x' + (log.topics[2] ?? '').slice(26).toLowerCase();
-  const data = log.data.slice(2);
-  const community = parseInt(data.slice(0, 64), 16);
-  const rawSourceTokenId = parseInt(data.slice(64, 128), 16);
-  const sourceTokenId = decodeSourceTokenId(rawSourceTokenId, community);
-  // trayId is a dynamic string: offset (word 3), length, then UTF-8 bytes
-  const stringOffset = parseInt(data.slice(128, 192), 16) * 2; // in hex chars
-  const stringLen = parseInt(data.slice(stringOffset, stringOffset + 64), 16);
-  const trayIdHex = data.slice(stringOffset + 64, stringOffset + 64 + stringLen * 2);
-  const trayId = Buffer.from(trayIdHex, 'hex').toString('utf8');
-  return { tokenId, minter, community, sourceTokenId, trayId };
 }
 
 async function getContractBalanceEth(): Promise<string> {
