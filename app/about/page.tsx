@@ -48,7 +48,7 @@ export default function AboutPage() {
                 <li><strong>Send</strong> a greyscale image to any <code>prefix.tokenId@fax</code> address.</li>
                 <li><strong>Forward</strong> public faxes you receive to keep the chain alive. <strong>Every forward spends 1 credit</strong>. Hops 1–5 also credit the recipient +1 (capped at 5). Hop 6+ forwards do not credit the recipient — the chain must be unlocked by a mint.</li>
                 <li><strong>Mint</strong> a fax to Base only after forwarding — the collectible costs 1 credit and credits the next recipient +1, giving them a fresh 72-hour timer.</li>
-                <li><strong>Save</strong> a fax to Gnosis for permanence — rescues it from the hop timer and 96-hour gallery decay.</li>
+                <li><strong>Save</strong> a fax to Gnosis for permanence — rescues it from the hop timer and 8-day gallery decay.</li>
                 <li><strong>No loops</strong> — each participant can only appear once in a chain. You cannot forward back to the sender or any previous hop.</li>
               </ul>
             </div>
@@ -112,7 +112,7 @@ export default function AboutPage() {
               <ul className="space-y-2 list-disc pl-4">
                 <li><strong>Hop 1:</strong> 72 hours. Hops 2–11 halve (or nearly halve) each time, down to 3 minutes at hop 11.</li>
                 <li><strong>After a mint:</strong> the next hop always starts fresh at 72 hours.</li>
-                <li><strong>After the timer expires:</strong> the line is <strong>JAMMED</strong>. The chain can no longer be forwarded from that hop, and the card is removed from the inbox after a total of 96 hours if not saved or minted.</li>
+                <li><strong>After the timer expires:</strong> the line is <strong>JAMMED</strong>. The chain can no longer be forwarded from that hop, and the card is removed from the inbox after a total of 8 days if not saved or minted.</li>
                 <li>The sender address stays visible after a jam so someone can start a fresh chain with that player.</li>
               </ul>
             </div>
@@ -122,7 +122,7 @@ export default function AboutPage() {
             <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Tray tabs</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
               <ul className="space-y-2 list-disc pl-4">
-                <li><strong>Fax-Tray</strong> — faxes you have received. Shows the thermal-fade countdown and chain link depth. Forward to unlock mint, save to rescue from decay.</li>
+                <li><strong>in-Tray</strong> — faxes you have received. Shows the thermal-fade countdown and chain link depth. Forward to unlock mint, save to rescue from decay.</li>
                 <li><strong>Sent</strong> — faxes you have sent to other players. Shows the recipient, chain position, and a relay countdown. If the recipient hasn't forwarded within 24 hours, a re-route button appears — you can send the fax to a new player to keep the chain alive. The original recipient can still forward, but their mint is disabled.</li>
                 <li><strong>Saved</strong> — faxes you have saved to Gnosis. These are permanent and no longer decay.</li>
                 <li><strong>Minted</strong> — faxes you have minted to Base as tradeable collectibles. Once the contract is deployed, these will link to OpenSea.</li>

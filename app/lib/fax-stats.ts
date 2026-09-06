@@ -15,7 +15,7 @@ export const FAX_MINTED_TOPIC =
 export const DEPLOY_BLOCK = 50375000;
 
 export const COMMUNITY_NAMES: Record<number, string> = {
-  0: 'none', 1: 'chonk', 2: 'deadfellaz', 3: 'pow', 4: 'normie',
+  0: 'none', 1: 'chonks', 2: 'deadfellaz', 3: 'POWNFT', 4: 'normie',
 };
 
 export interface RpcLog {

@@ -8,7 +8,7 @@
 ///      You may attach a new image to the forward; it becomes the next link.
 ///   3. MINT TO BASE (the tradeable collectible) — only after forwarding.
 ///   4. SAVE TO GNOSIS (permanence) — rescues the fax from the fade at any time.
-/// Unsaved / unminted faxes decay after 96 hours so the gallery stays uncluttered.
+/// Unsaved / unminted faxes decay after 8 days so the gallery stays uncluttered.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
@@ -33,7 +33,7 @@ const MINT_LIMIT_NOTICE: Record<string, string> = {
   normie: 'NORMIES PERMITS ONE NFTFAX CHAIN MINT PER CHAIN PER NORMIE.0000@FAX ACCOUNT.',
 };
 
-const DECAY_MS = 4 * 24 * 60 * 60 * 1000; // 96-hour decay
+const DECAY_MS = 8 * 24 * 60 * 60 * 1000; // 8-day decay
 
 interface InboxFax {
   id: string;
@@ -575,7 +575,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[#8f8878]">
-        {([['inbox', `Fax-Tray (${faxes.filter(f => !f.savedGnosis).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length + sentMintedIds.size})`]] as [TabKey, string][]).map(([key, label]) => (
+        {([['inbox', `in-Tray (${faxes.filter(f => !f.savedGnosis).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length + sentMintedIds.size})`]] as [TabKey, string][]).map(([key, label]) => (
           <button key={key} onClick={() => { setActiveTab(key); setNotice(''); }} className={`px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
             {label}
           </button>
@@ -587,7 +587,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       {!loading && displayedFaxes.length === 0 && (
         <div className="grid min-h-[180px] place-items-center border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center">
-          <div><Clock size={24} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">{activeTab === 'inbox' ? 'Tray empty' : activeTab === 'sent' ? 'Nothing sent' : activeTab === 'saved' ? 'Nothing saved' : 'Nothing minted'}</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">{activeTab === 'inbox' ? 'Received faxes appear here and fade after 96 hours unless saved.' : ''}</p></div>
+          <div><Clock size={24} className="mx-auto mb-3 text-[#847d6e]" /><p className="font-bold uppercase">{activeTab === 'inbox' ? 'Tray empty' : activeTab === 'sent' ? 'Nothing sent' : activeTab === 'saved' ? 'Nothing saved' : 'Nothing minted'}</p><p className="mt-2 text-[12px] uppercase tracking-wider text-[#696457]">{activeTab === 'inbox' ? 'Received faxes appear here and fade after 8 days unless saved.' : ''}</p></div>
         </div>
       )}
 

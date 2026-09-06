@@ -352,7 +352,7 @@ export default function RolofaxClient() {
                       </td>
                       <td className="p-3"><MintPreview trayId={mint.trayId} /></td>
                       <td className="p-3 font-mono">{mint.trayId || '—'}</td>
-                      <td className="p-3">{tierForDepth(mint.chainDepth ?? 1)}</td>
+                      <td className="p-3">{tierForDepth(Math.max(0, (mint.chainDepth ?? 1) - 1))}</td>
                       <td className="p-3">{minterLabel(mint)}</td>
                     </tr>
                   ))}
