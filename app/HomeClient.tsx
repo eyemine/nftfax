@@ -10,6 +10,7 @@ type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
 type View = 'send' | 'tray' | 'delegate' | 'backpack';
 
 import { prepareImage } from './lib/image';
+import { disconnectWallet } from './lib/disconnect';
 import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
 import { SkinPanel } from './components/SkinPanel';
 import { DelegatePanel } from './components/DelegatePanel';
@@ -82,8 +83,7 @@ export default function HomeClient() {
   );
 
   async function handleDisconnect() {
-    try { await activeWallet?.disconnect(); } catch { /* wallet may not support disconnect */ }
-    if (authenticated) await logout();
+    await disconnectWallet(activeWallet, { authenticated, logout });
   }
 
   async function selectFile(file: File) {

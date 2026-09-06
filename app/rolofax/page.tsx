@@ -5,6 +5,7 @@ import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-aut
 import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, ArrowLeft, X, Send } from 'lucide-react';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
+import { disconnectWallet } from '../lib/disconnect';
 import { SkinPanel } from '../components/SkinPanel';
 
 type RegisterStatus = 'idle' | 'registering' | 'registered' | 'error';
@@ -266,7 +267,7 @@ export default function PreRegisterPage() {
                 <span className="text-[11px] font-bold uppercase tracking-[.18em] block mb-1">Wallet</span>
                 {walletAddress && (
                   <button
-                    onClick={() => void (async () => { try { await activeWallet?.disconnect(); } catch { /* noop */ } if (authenticated) await logout(); })()}
+                    onClick={() => void disconnectWallet(activeWallet, { authenticated, logout })}
                     className="text-[11px] font-bold uppercase underline text-[#a94228]"
                   >
                     Sign out
