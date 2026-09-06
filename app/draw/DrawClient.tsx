@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
+import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
 import { Loader2, Dices, CheckCircle2, Clock, Trophy, ArrowLeft, ShieldAlert, Check } from 'lucide-react';
 import {
   FAX_CONTRACT,
@@ -52,7 +52,8 @@ interface Winner {
 }
 
 export default function DrawClient() {
-  const { ready, authenticated, login } = usePrivy();
+  const { ready } = usePrivy();
+  const { connectWallet } = useConnectWallet();
   const activeWallet = useActiveWallet().wallet;
   const walletAddress = activeWallet?.address?.toLowerCase() || '';
   const [round, setRound] = useState<number>(0);
@@ -135,8 +136,8 @@ export default function DrawClient() {
     setCapturing(true);
     setCaptureMsg('');
     try {
-      if (!authenticated || !walletAddress) {
-        login();
+      if (!walletAddress) {
+        connectWallet();
         return;
       }
       const result = await captureDrawSeedTx(walletAddress, round, getProvider());
@@ -154,7 +155,7 @@ export default function DrawClient() {
   }
 
   async function handleDistribute(winner: string, index: number) {
-    if (!authenticated || !walletAddress || !isOwner) return;
+    if (!walletAddress || !isOwner) return;
     setDistributing((d) => ({ ...d, [index]: true }));
     setDistributeMsg('');
     try {
@@ -173,7 +174,7 @@ export default function DrawClient() {
   }
 
   async function handleWithdraw() {
-    if (!authenticated || !walletAddress || !isOwner) return;
+    if (!walletAddress || !isOwner) return;
     setWithdrawing(true);
     setWithdrawMsg('');
     try {
@@ -297,7 +298,7 @@ export default function DrawClient() {
                         disabled={capturing || !ready}
                         className="key-shadow border border-[#77705f] bg-[#e65b2f] px-4 py-2 text-[12px] font-bold uppercase text-white disabled:opacity-50"
                       >
-                        {capturing ? 'Capturing…' : authenticated ? 'Capture draw seed' : 'Connect wallet to capture'}
+                        {capturing ? 'Capturing…' : walletAddress ? 'Capture draw seed' : 'Connect wallet to capture'}
                       </button>
                       {captureMsg && <p className="text-[12px] font-mono break-all">{captureMsg}</p>}
                     </div>

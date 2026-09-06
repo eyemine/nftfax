@@ -196,11 +196,17 @@ async function getOwnedChonks(walletAddress: `0x${string}`): Promise<number[]> {
   return candidateIds.filter((_, i) => (owners[i] as string | null)?.toLowerCase() === walletAddress.toLowerCase());
 }
 
-/// Build an executeCall() transaction for an ERC-6551 TBA to withdraw an
-/// ERC-721 NFT back to the Chonk owner's EOA. The TBA calls
+/// Build an execute() transaction for an ERC-6551 TBA to withdraw an ERC-721
+/// NFT back to the Chonk owner's EOA. The TBA calls
 /// `nftContract.safeTransferFrom(tba, recipient, tokenId)` through its own
-/// `executeCall(to, value, data)` function. Returns the raw tx fields needed
-/// by the connected wallet.
+/// `execute(to, value, data, operation)` function. Returns the raw tx fields
+/// needed by the connected wallet.
+///
+/// Verified on Chonk #585's backpack: calling `execute` from a non-owner
+/// reverts (the function is real and enforces auth), whereas `executeCall`
+/// succeeds from anyone because it does not exist — see the warning below.
+/// Note the account reports `supportsInterface(IERC6551Executable) == false`
+/// despite `execute` working, so never feature-detect withdrawal that way.
 export function buildTBAWithdrawTx(
   tbaAddress: `0x${string}`,
   nftContract: `0x${string}`,

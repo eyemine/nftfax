@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
+import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
 import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, ArrowLeft, X, Send } from 'lucide-react';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
@@ -19,7 +19,8 @@ interface RolofaxEntry {
 }
 
 export default function PreRegisterPage() {
-  const { ready, authenticated, login, logout } = usePrivy();
+  const { ready, authenticated, logout } = usePrivy();
+  const { connectWallet } = useConnectWallet();
   const activeWallet = useActiveWallet().wallet;
   const [collection, setCollection] = useState<CollectionKey>('deadfellaz');
   const theme = useMemo(() => getCollectionTheme(collection), [collection]);
@@ -265,7 +266,7 @@ export default function PreRegisterPage() {
                 <span className="text-[11px] font-bold uppercase tracking-[.18em] block mb-1">Wallet</span>
                 {walletAddress && (
                   <button
-                    onClick={() => void (async () => { await logout(); })()}
+                    onClick={() => void (async () => { try { await activeWallet?.disconnect(); } catch { /* noop */ } if (authenticated) await logout(); })()}
                     className="text-[11px] font-bold uppercase underline text-[#a94228]"
                   >
                     Sign out
@@ -291,7 +292,7 @@ export default function PreRegisterPage() {
 
             {!walletAddress ? (
               <button
-                onClick={() => login({ loginMethods: ['wallet'] })}
+                onClick={() => connectWallet()}
                 className="key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white"
               >
                 <Users size={17} /> Connect wallet to rolofax

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { usePrivy, useActiveWallet } from '@privy-io/react-auth';
+import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
 import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Trophy, Dices, Backpack as BackpackIcon } from 'lucide-react';
 import InTray from './components/InTray';
 
@@ -17,7 +17,8 @@ import { ChonkBackpack } from './components/ChonkBackpack';
 import Link from 'next/link';
 
 export default function HomeClient() {
-  const { ready, authenticated, login, logout } = usePrivy();
+  const { ready, authenticated, logout } = usePrivy();
+  const { connectWallet } = useConnectWallet();
   const activeWallet = useActiveWallet().wallet;
   const evmWallet = activeWallet && 'getEthereumProvider' in activeWallet ? activeWallet : undefined;
   const searchParams = useSearchParams();
@@ -81,7 +82,8 @@ export default function HomeClient() {
   );
 
   async function handleDisconnect() {
-    await logout();
+    try { await activeWallet?.disconnect(); } catch { /* wallet may not support disconnect */ }
+    if (authenticated) await logout();
   }
 
   async function selectFile(file: File) {
@@ -151,7 +153,7 @@ export default function HomeClient() {
           {isConnected && walletAddress ? (
             <button onClick={handleDisconnect} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap hover:bg-[#c0392b] hover:text-white hover:border-[#9d3c20] transition-colors">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} · Disconnect</button>
           ) : (
-            <button onClick={() => login()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-3 sm:px-4 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase text-white disabled:opacity-50">Connect</button>
+            <button onClick={() => connectWallet()} disabled={!ready} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-3 sm:px-4 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase text-white disabled:opacity-50">Connect</button>
           )}
         </div>
       </header>
@@ -332,7 +334,7 @@ export default function HomeClient() {
             {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">FAULT: {error}</div>}
             {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
 
-            <button onClick={() => isConnected ? void transmit() : login()} disabled={status === 'sending' || (isConnected && !base64)} className={`key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white transition-opacity ${!isConnected ? 'opacity-40' : 'disabled:cursor-not-allowed disabled:opacity-45'}`}>{status === 'sending' ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />} Transmit NFTfax</button>
+            <button onClick={() => isConnected ? void transmit() : connectWallet()} disabled={status === 'sending' || (isConnected && !base64)} className={`key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white transition-opacity ${!isConnected ? 'opacity-40' : 'disabled:cursor-not-allowed disabled:opacity-45'}`}>{status === 'sending' ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />} Transmit NFTfax</button>
             <p className="mt-4 text-center text-[11px] uppercase tracking-[.16em] text-[#625d51]">Basic: earn send credits by forwarding · Pro: unlimited internal · Premium: external + colour</p>
           </div>
         </div>
