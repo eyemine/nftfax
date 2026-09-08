@@ -47,7 +47,14 @@ export async function resolveEnsNames(addresses: string[]): Promise<Map<string, 
       batch.map(async (addr) => {
         try {
           const name = await client.getEnsName({ address: addr as `0x${string}` });
-          return [addr, name, true] as const;
+          if (!name) return [addr, null, true] as const;
+          // A reverse record is set by the ADDRESS owner and can point at any
+          // name, including one they don't own (e.g. someone else's .eth/.box
+          // domain) — it's not authoritative on its own. Only trust it once
+          // the name's forward record resolves back to this exact address.
+          const forward = await client.getEnsAddress({ name }).catch(() => null);
+          const verified = forward?.toLowerCase() === addr;
+          return [addr, verified ? name : null, true] as const;
         } catch {
           // RPC failure, not a confirmed "no ENS name" — don't cache, so the
           // next request retries instead of being stuck showing the raw
