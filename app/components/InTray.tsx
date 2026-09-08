@@ -327,16 +327,19 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       setSelected((prev) => prev ? { ...prev, forwarded: true } : prev);
       resetForward();
       await load();
-      // Best-effort IPFS+Arweave pin now that the fax is finalized. Pins the
-      // fax being forwarded (fax.id) — NOT data.id (the new tray created for
-      // the next recipient) — since fax.id is what mint later embeds as the
-      // on-chain tokenURI.
+      // Best-effort IPFS+Arweave pin now that the fax is finalized. Pins
+      // data.id (the NEW tray just created for the next recipient) — that's
+      // the player's own composited hop, i.e. the artwork the collectible
+      // should represent. fax.id (the received fax) is only used on-chain as
+      // the ownership/provenance trayId argument — see act()'s mint path.
       // Non-fatal: if pinning fails, mint will fall back to baseURI.
-      pinFaxMetadata(fax.id, cleanLocal).then((uri) => {
-        if (uri) {
-          setSelected((prev) => prev ? { ...prev, pinnedURI: uri } : prev);
-        }
-      }).catch(() => { /* non-fatal */ });
+      if (data.id) {
+        pinFaxMetadata(data.id, cleanLocal).then((uri) => {
+          if (uri) {
+            setSelected((prev) => prev ? { ...prev, pinnedURI: uri } : prev);
+          }
+        }).catch(() => { /* non-fatal */ });
+      }
     } catch (cause: unknown) {
       const msg = cause instanceof Error ? cause.message : 'Forward failed';
       setForwardError(msg);
@@ -433,9 +436,16 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       if (kind === 'mint' && provider && !placeholder) {
         // Use pre-pinned URI from forward time if available; otherwise pin now (best-effort).
+        // The ARTWORK/metadata must reflect the fax the caller forwarded onward
+        // (fax.forwardedTrayId — their own composited hop), not the received
+        // fax (targetId) — minting is only unlocked after forwarding, so the
+        // collectible should represent what the player actually contributed.
+        // targetId is still used below for the on-chain trayId argument since
+        // that's an ownership/ProvenanceId constraint (see comment below), not
+        // a display concern.
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
-          tokenURI = await pinFaxMetadata(targetId, cleanLocal).catch(() => null) || undefined;
+          tokenURI = await pinFaxMetadata(fax.forwardedTrayId || targetId, cleanLocal).catch(() => null) || undefined;
         }
         // The mint always identifies the token via the CALLER's own mailbox
         // identity (cleanLocal) — the fax being minted (targetId) is always
@@ -452,9 +462,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       if (kind === 'save') {
         // Gasless-first Save to Gnosis: server-side relayer pays the xDAI gas.
+        // Same artwork-identity rule as mint above — prefer the forwarded hop.
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
-          tokenURI = await pinFaxMetadata(targetId, cleanLocal).catch(() => null) || undefined;
+          tokenURI = await pinFaxMetadata(fax.forwardedTrayId || targetId, cleanLocal).catch(() => null) || undefined;
         }
         if (!tokenURI) throw new Error('Could not pin fax metadata for saving.');
 
