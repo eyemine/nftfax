@@ -35,6 +35,7 @@ export default function PreRegisterPage() {
   const [vaultWallet, setVaultWallet] = useState('');
   const [tokenId, setTokenId] = useState('');
   const [entries, setEntries] = useState<RolofaxEntry[]>([]);
+  const [ensNames, setEnsNames] = useState<Record<string, string>>({});
   const [ownedTokenIds, setOwnedTokenIds] = useState<number[]>([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
 
@@ -76,10 +77,25 @@ export default function PreRegisterPage() {
     try {
       const res = await fetch(`/api/telegraph/list?collection=${collection}`, { cache: 'no-store' });
       const json = (await res.json()) as { items?: RolofaxEntry[]; error?: string };
-      setEntries(json.items ?? []);
+      const items = json.items ?? [];
+      setEntries(items);
+      void resolveEns(items.map((e) => e.wallet));
     } catch {
       setEntries([]);
     }
+  }
+
+  async function resolveEns(addresses: string[]) {
+    if (addresses.length === 0) return;
+    try {
+      const res = await fetch('/api/ens', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addresses }),
+      });
+      const json = (await res.json()) as { names?: Record<string, string> };
+      if (json.names) setEnsNames((prev) => ({ ...prev, ...json.names }));
+    } catch { /* non-fatal — falls back to truncated address */ }
   }
 
   async function register() {
@@ -341,7 +357,7 @@ export default function PreRegisterPage() {
                   <div key={entry.handle} className={`flex items-center justify-between border border-[#847d6e] bg-[#eee8dc] px-3 py-2 ${isOwn ? '' : 'hover:border-[#e65b2f]'} transition-colors`}>
                     <div className="flex-1">
                       <p className="text-xs font-bold">{entry.handle}@fax</p>
-                      <p className="text-[11px] uppercase tracking-wider text-[#625e52]">{entry.wallet.slice(0, 6)}…{entry.wallet.slice(-4)}</p>
+                      <p className="text-[11px] uppercase tracking-wider text-[#625e52]">{ensNames[entry.wallet.toLowerCase()] ?? `${entry.wallet.slice(0, 6)}…${entry.wallet.slice(-4)}`}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       {entry.ready ? (

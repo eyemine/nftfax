@@ -33,6 +33,7 @@ export interface MintEntry {
   trayId: string;
   chainDepth?: number;
   rootTrayId?: string;
+  minterEns?: string;
 }
 
 /// DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite

@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
+import { resolveEnsNames } from '../../../lib/ens';
 import {
   FAX_MINTED_TOPIC,
   DEPLOY_BLOCK,
@@ -325,12 +326,17 @@ export async function GET(req: NextRequest) {
     const pageMints = sortedMints.slice(start, start + pageSize);
 
     const uniqueTrayIds = Array.from(new Set(pageMints.map((m) => m.trayId).filter(Boolean)));
-    const metas = await Promise.all(uniqueTrayIds.map((id) => fetchTrayMeta(id)));
+    const uniqueMinters = Array.from(new Set(pageMints.map((m) => m.minter)));
+    const [metas, ensByAddress] = await Promise.all([
+      Promise.all(uniqueTrayIds.map((id) => fetchTrayMeta(id))),
+      resolveEnsNames(uniqueMinters),
+    ]);
     const metaByTrayId = new Map(uniqueTrayIds.map((id, i) => [id, metas[i]]));
     for (const mint of pageMints) {
       const meta = metaByTrayId.get(mint.trayId);
       mint.chainDepth = meta?.chainDepth;
       mint.rootTrayId = meta?.rootTrayId;
+      mint.minterEns = ensByAddress.get(mint.minter);
     }
 
     return NextResponse.json({ leaderboard, totalMints, contractBalanceEth, mints: pageMints, mintsTotal: allMints.length, page, pageSize } as LeaderboardData, { headers: NO_STORE });

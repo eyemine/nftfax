@@ -36,6 +36,7 @@ interface MintEntry {
   trayId: string;
   chainDepth?: number;
   rootTrayId?: string;
+  minterEns?: string;
 }
 
 // Only fetches the tray image once the row scrolls into view — at 2200+
@@ -127,6 +128,7 @@ const COMMUNITY_PREFIXES: Record<number, string> = {
 };
 
 function minterLabel(mint: MintEntry): string {
+  if (mint.minterEns) return mint.minterEns;
   const prefix = COMMUNITY_PREFIXES[mint.community] ?? 'unknown';
   return mint.sourceTokenId > 0 ? `${prefix}.${mint.sourceTokenId}@fax` : `${prefix}@fax`;
 }
