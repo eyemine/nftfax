@@ -9,7 +9,7 @@
 import { createPublicClient, http, isAddress } from 'viem';
 import { mainnet } from 'viem/chains';
 
-const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://eth.llamarpc.com';
+const ETH_RPC_URL = process.env.ETH_RPC_URL || 'https://ethereum-rpc.publicnode.com';
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h
 const MAX_BATCH = 50; // cap per call — public RPCs dislike huge bursts
 
@@ -47,13 +47,17 @@ export async function resolveEnsNames(addresses: string[]): Promise<Map<string, 
       batch.map(async (addr) => {
         try {
           const name = await client.getEnsName({ address: addr as `0x${string}` });
-          return [addr, name] as const;
+          return [addr, name, true] as const;
         } catch {
-          return [addr, null] as const;
+          // RPC failure, not a confirmed "no ENS name" — don't cache, so the
+          // next request retries instead of being stuck showing the raw
+          // address for a full TTL because of a transient RPC outage.
+          return [addr, null, false] as const;
         }
       }),
     );
-    for (const [addr, name] of results) {
+    for (const [addr, name, ok] of results) {
+      if (!ok) continue;
       cache.set(addr, { name, at: now });
       if (name) out.set(addr, name);
     }
