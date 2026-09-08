@@ -22,6 +22,7 @@ import {
   CACHE_DIR,
   CACHE_FILE,
   decodeFaxMintedLog as decodeLog,
+  decodeSourceTokenId,
   type RpcLog,
   type MintEntry,
 } from '../../../lib/fax-stats';
@@ -43,6 +44,13 @@ const MAX_CONCURRENT_CHUNKS = 4;
 const RPC_RETRIES = 3;
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
+// Envio HyperIndex GraphQL endpoint (hosted at envio.dev, repo:
+// eyemine/nftfax-indexer). When set, mint history comes from the indexer
+// instead of chunked eth_getLogs — faster and immune to public-RPC rate
+// limits. If unset OR the query fails, the route falls back to the RPC
+// scan + disk cache below, so an Envio outage/plan-limit deletion never
+// takes the leaderboard down.
+const ENVIO_GRAPHQL_URL = process.env.ENVIO_GRAPHQL_URL || '';
 
 const COMMUNITY_PREFIXES: Record<number, string> = {
   1: 'chonk', 2: 'dfz', 3: 'atom', 4: 'normie',
@@ -185,6 +193,70 @@ async function ensureLogsCached(currentBlock: number): Promise<void> {
   }
 }
 
+// ── Envio indexer path ───────────────────────────────────────────────────
+
+interface EnvioFaxMintedRow {
+  mintedTokenId: string | number;
+  to: string;
+  community: string | number;
+  sourceTokenId: string | number;
+  trayId: string;
+}
+
+const ENVIO_PAGE = 1000;
+
+/// Fetches the full FaxMinted history from the Envio-hosted GraphQL
+/// endpoint, paginating in 1000-row batches. Returns null on ANY failure
+/// (network, GraphQL error, malformed row) so the caller can fall back to
+/// the RPC scan — Envio's free tier can delete deployments when indexing
+/// hours are exhausted, and that must never break this route.
+async function fetchMintsFromEnvio(): Promise<MintEntry[] | null> {
+  if (!ENVIO_GRAPHQL_URL) return null;
+  try {
+    const out: MintEntry[] = [];
+    for (let offset = 0; ; offset += ENVIO_PAGE) {
+      const res = await fetch(ENVIO_GRAPHQL_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `query FaxMinted($limit: Int!, $offset: Int!) {
+            NFTFaxCollectibleV2_FaxMinted(
+              order_by: { blockNumber: asc }
+              limit: $limit
+              offset: $offset
+            ) { mintedTokenId to community sourceTokenId trayId }
+          }`,
+          variables: { limit: ENVIO_PAGE, offset },
+        }),
+      });
+      if (!res.ok) return null;
+      const json = (await res.json()) as {
+        data?: { NFTFaxCollectibleV2_FaxMinted?: EnvioFaxMintedRow[] };
+        errors?: unknown[];
+      };
+      const rows = json.data?.NFTFaxCollectibleV2_FaxMinted;
+      if (json.errors || !Array.isArray(rows)) return null;
+      for (const row of rows) {
+        const tokenId = Number(row.mintedTokenId);
+        const community = Number(row.community);
+        const rawSource = Number(row.sourceTokenId);
+        if (!Number.isFinite(tokenId) || !Number.isFinite(community) || !Number.isFinite(rawSource)) return null;
+        out.push({
+          tokenId,
+          minter: String(row.to).toLowerCase(),
+          community,
+          sourceTokenId: decodeSourceTokenId(rawSource, community),
+          trayId: String(row.trayId ?? ''),
+        });
+      }
+      if (rows.length < ENVIO_PAGE) return out;
+    }
+  } catch (cause) {
+    console.error('[leaderboard] envio fetch failed, falling back to RPC scan', cause);
+    return null;
+  }
+}
+
 async function getContractBalanceEth(): Promise<string> {
   try {
     const result = await rpc('eth_getBalance', [CONTRACT, 'latest']);
@@ -209,6 +281,10 @@ export async function GET(req: NextRequest) {
       cachedUpToBlock = DEPLOY_BLOCK - 1;
     }
 
+    // Prefer the Envio indexer when configured; fall back to the RPC scan
+    // on any failure so an indexer outage never breaks the leaderboard.
+    const envioMints = await fetchMintsFromEnvio();
+
     const [totalMints, contractBalanceEth, currentBlock] = await Promise.all([
       getTotalMinted(), getContractBalanceEth(), getCurrentBlock(),
     ]);
@@ -216,9 +292,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ leaderboard: [], totalMints: 0, contractBalanceEth, mints: [], mintsTotal: 0, page, pageSize } as LeaderboardData, { headers: NO_STORE });
     }
 
-    await ensureLogsCached(currentBlock);
-
-    const allMints: MintEntry[] = cachedLogs.map(decodeLog);
+    let allMints: MintEntry[];
+    // An empty Envio result while the contract reports mints means the
+    // indexer is still backfilling (or was deleted) — fall back to RPC.
+    if (envioMints !== null && envioMints.length > 0) {
+      allMints = envioMints;
+    } else {
+      await ensureLogsCached(currentBlock);
+      allMints = cachedLogs.map(decodeLog);
+    }
     const byCollection = new Map<string, { mints: number; maxTokenId: number; communities: Set<number> }>();
 
     for (const mint of allMints) {

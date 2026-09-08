@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
-import { compositeChain, CHAIN_OPS, type ChainOp } from '../lib/image';
+import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
 import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
@@ -190,6 +190,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [showReroute, setShowReroute] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [forwardError, setForwardError] = useState('');
+  const [replyFor, setReplyFor] = useState('');
+  const [replyTo, setReplyTo] = useState('');
+  const [replyFileName, setReplyFileName] = useState('');
+  const [replyBase64, setReplyBase64] = useState('');
+  const [replyPreview, setReplyPreview] = useState('');
+  const [replyError, setReplyError] = useState('');
+  const [replyBusy, setReplyBusy] = useState(false);
+  const replyFileInputRef = useRef<HTMLInputElement>(null);
   const cleanLocal = useMemo(() => local.trim().toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, ''), [local]);
   const effectiveDomain = useMemo(() => domain.trim().toLowerCase() || 'nftmail.box', [domain]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -319,10 +327,12 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       setSelected((prev) => prev ? { ...prev, forwarded: true } : prev);
       resetForward();
       await load();
-      // Best-effort IPFS+Arweave pin now that the fax is finalized.
+      // Best-effort IPFS+Arweave pin now that the fax is finalized. Pins the
+      // fax being forwarded (fax.id) — NOT data.id (the new tray created for
+      // the next recipient) — since fax.id is what mint later embeds as the
+      // on-chain tokenURI.
       // Non-fatal: if pinning fails, mint will fall back to baseURI.
-      const pinnedId = data.id || fax.id;
-      pinFaxMetadata(pinnedId, cleanLocal).then((uri) => {
+      pinFaxMetadata(fax.id, cleanLocal).then((uri) => {
         if (uri) {
           setSelected((prev) => prev ? { ...prev, pinnedURI: uri } : prev);
         }
@@ -333,6 +343,66 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       setNotice(msg);
     } finally {
       setBusyId('');
+    }
+  }
+
+  function resetReply() {
+    setReplyFor('');
+    setReplyTo('');
+    setReplyFileName('');
+    setReplyBase64('');
+    setReplyPreview('');
+    setReplyError('');
+    setReplyBusy(false);
+  }
+
+  function selectReplyFile(file: File) {
+    setReplyError('');
+    (async () => {
+      try {
+        const prepared = await prepareImage(file);
+        setReplyBase64(prepared.base64);
+        setReplyPreview(prepared.preview);
+        setReplyFileName(file.name);
+      } catch (cause: unknown) {
+        setReplyError(cause instanceof Error ? cause.message : 'Image processing failed.');
+      }
+    })();
+  }
+
+  // Reply starts a brand-new chain addressed back to the original sender —
+  // it is the same plain "send" used to originate a fax, so it never touches
+  // the source fax's chainTrayId, hop credits, or decay timer.
+  async function sendReply(fax: InboxFax) {
+    if (!replyTo.includes('@')) { setReplyError('Enter a valid recipient address.'); return; }
+    if (!replyBase64) { setReplyError('Add an image to send.'); return; }
+    setReplyBusy(true);
+    setReplyError('');
+    setNotice('');
+    try {
+      const res = await fetch('/api/tray/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromLabel: cleanLocal,
+          fromDomain: effectiveDomain,
+          ownerWallet: wallet,
+          to: replyTo.trim(),
+          format: 'jpg',
+          dataBase64: replyBase64,
+          colorMode: 'greyscale',
+        }),
+      });
+      const data = await res.json() as { error?: string; id?: string };
+      if (!res.ok) throw new Error(data.error || 'Reply failed');
+      setNotice('Reply sent as a new chain.');
+      resetReply();
+      await load();
+    } catch (cause: unknown) {
+      const msg = cause instanceof Error ? cause.message : 'Reply failed';
+      setReplyError(msg);
+    } finally {
+      setReplyBusy(false);
     }
   }
 
@@ -457,6 +527,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   function openDetail(fax: InboxFax) {
     setSelected(fax);
     resetForward();
+    resetReply();
     setForwardedTrayId('');
     setShowReroute(false);
     setRelaySuggestions([]);
@@ -660,14 +731,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-4" onClick={() => { resetForward(); setSelected(null); setNotice(''); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-4" onClick={() => { resetForward(); resetReply(); setSelected(null); setNotice(''); }}>
           <div className="machine-shadow flex h-[75vh] w-[75vw] flex-col overflow-hidden border border-[#8f8878] bg-[#c8c0ae]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[.24em] text-[#615c50]">Transmission detail</p>
                 <h3 className="text-lg font-black uppercase">T/#{selected.id.toUpperCase()}</h3>
               </div>
-              <button onClick={() => { resetForward(); setSelected(null); setNotice(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] p-2"><X size={16} /></button>
+              <button onClick={() => { resetForward(); resetReply(); setSelected(null); setNotice(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] p-2"><X size={16} /></button>
             </div>
 
             <div className="grid min-h-0 flex-1 lg:grid-cols-[1.2fr_1fr]">
@@ -811,9 +882,21 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 )}
 
                 {activeTab === 'inbox' && (
-                <div className="mb-5 grid grid-cols-3 gap-2">
-                  <button onClick={() => setForwardFor(forwardFor === selected.id ? '' : selected.id)} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase)))} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
+                <div className="mb-5 grid grid-cols-4 gap-2">
+                  <button onClick={() => { if (forwardFor === selected.id) { resetForward(); return; } resetReply(); setForwardFor(selected.id); }} disabled={busyId === selected.id || selected.forwarded || selected.encrypted || (!selected.savedGnosis && !selected.mintedBase && (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase)))} className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${forwardFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}>
                     <Send size={12} /> Forward
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (replyFor === selected.id) { resetReply(); return; }
+                      resetForward();
+                      setReplyFor(selected.id);
+                      setReplyTo(selected.from);
+                    }}
+                    disabled={busyId === selected.id || selected.encrypted}
+                    className={`key-shadow flex items-center justify-center gap-1 border px-2 py-3 text-[11px] font-bold uppercase disabled:cursor-not-allowed disabled:opacity-40 ${replyFor === selected.id ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+                  >
+                    <Send size={12} className="-scale-x-100" /> Reply
                   </button>
                   <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || !!selected.sourceMintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
                     <Coins size={12} /> {MINT_PAUSED ? 'Paused' : 'Mint'}
@@ -822,6 +905,47 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                     <Archive size={12} /> Save
                   </button>
                 </div>
+                )}
+
+                {activeTab === 'inbox' && replyFor === selected.id && (
+                  <div className="mb-5 border-t-2 border-dashed border-[#8f8878] pt-5">
+                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[.18em]">Reply — starts a new chain</p>
+                    <p className="mb-3 text-[11px] text-[#6e685a]">Off-the-record: this does not touch the original chain, its credits, or its decay timer.</p>
+
+                    {replyError && (
+                      <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">{replyError}</div>
+                    )}
+
+                    <input
+                      value={replyTo}
+                      onChange={(e) => setReplyTo(e.target.value)}
+                      placeholder="collection.1234@fax"
+                      className="mb-3 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                    />
+
+                    <button
+                      onClick={() => replyFileInputRef.current?.click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => { e.preventDefault(); const file = e.dataTransfer.files?.[0]; if (file) selectReplyFile(file); }}
+                      className="paper-noise relative mb-3 grid w-full min-h-[110px] place-items-center overflow-hidden border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-4 text-center transition hover:bg-[#eee8dc]"
+                    >
+                      {replyPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={replyPreview} alt="Your image" className="max-h-[90px] max-w-full object-contain grayscale" />
+                      ) : (
+                        <div><div className="mx-auto mb-2 grid h-10 w-10 place-items-center rounded-full border border-[#9a9282] bg-[#d5cebf]"><Upload size={18} /></div><p className="text-[12px] font-bold uppercase">Add an image to reply with</p><p className="text-[11px] uppercase text-[#696457]">PNG · JPG · BMP</p></div>
+                      )}
+                    </button>
+                    <input ref={replyFileInputRef} type="file" accept=".png,.jpg,.jpeg,.bmp,image/png,image/jpeg,image/bmp" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) selectReplyFile(file); }} />
+                    {replyFileName && <p className="mb-3 text-[11px] font-bold uppercase text-[#615c50]">{replyFileName}</p>}
+
+                    <div className="flex gap-2">
+                      <button onClick={() => void sendReply(selected)} disabled={replyBusy} className="key-shadow flex flex-1 items-center justify-center gap-1 border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
+                        {replyBusy ? <Loader2 className="animate-spin" size={13} /> : <Send size={13} />} Send reply
+                      </button>
+                      <button onClick={() => { const to = replyTo; resetReply(); setReplyFor(selected.id); setReplyTo(to); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-3 text-[12px] font-bold uppercase">Clear</button>
+                    </div>
+                  </div>
                 )}
                 {activeTab === 'sent' && !selected.mintedBase && !selected.sourceMintedBase && !selected.savedGnosis && !MINT_PAUSED && !selected.encrypted && (selected.sourceTrayId || selected.chainTrayId || selected.recipientForwarded || selected.forwarded) && (
                 <div className="mb-5 grid grid-cols-2 gap-2">

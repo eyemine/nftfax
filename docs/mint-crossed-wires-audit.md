@@ -1,39 +1,37 @@
 # Mint "Crossed Wires" Audit — Tokens 1-10
 
+**CORRECTED 2026-09-07** — the original version of this doc got the root
+cause backwards. See "Root cause (corrected)" below before reading the
+findings table.
+
 Cross-referenced three independent data sources for each minted token:
-1. **On-chain `FaxMinted` event** (Base contract `0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5`) — the `trayId` string embedded in the mint transaction's calldata at the time of minting. This is immutable and reflects exactly what the client sent as the mint target historically.
-2. **Pinned IPFS metadata** (`tokenURI` → IPFS JSON `attributes[].trait_type == "Fax Tray ID"`) — set once at mint time via Lighthouse pin, immutable.
-3. **Off-chain worker KV** (`/opt/ghostagent/bun-worker/data/nftmail.db`, keys `tray:{id}`, `tray-mint:base:{id}`, `tray-in:{local}:{id}`) — mutable, backs the live Fax-Tray/Sent-Tray/Leaderboard UI.
+1. **On-chain `FaxMinted` event** (Base contract `0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5`) — the `trayId` string embedded in the mint transaction's calldata at the time of minting. Immutable, but only ever reflects the fax the minter **received** (`act()`'s mint path resolves `targetId` via `fax.sourceTrayId || fax.id`, i.e. the tray *before* the minter's own forward).
+2. **Pinned IPFS metadata** (`tokenURI` → IPFS JSON `attributes[].trait_type == "Fax Tray ID"`) — set once at mint time via Lighthouse pin, immutable. This is the **correct, real identity of the minted fax** — it references the tray the minter actually forwarded onward (created by their own `forward()` call), which is the artwork/provenance they intended to mint.
+3. **Off-chain worker KV** (`/opt/ghostagent/bun-worker/data/nftmail.db`, keys `tray:{id}`, `tray-mint:base:{id}`, `tray-in:{local}:{id}`, `tray-out:{local}:{id}`) — mutable, backs the live Fax-Tray/Sent-Tray/Leaderboard UI. Decays after 8 days unless permanently pinned.
 
-## Root cause
+## Root cause (corrected)
 
-The client historically resolved the mint target (`targetId`) independently for (a) the on-chain mint tx and (b) the IPFS metadata pin, and a **third, separate resolution** for (c) the KV `markTrayMinted` POST — all sourced from the same nominal `fax` object in `InTray.tsx`, but at different points before a fix (see the comment in `InTray.tsx`: "Mint and Save both act on the fax the CALLER received, not the one they forwarded onward"). Additionally, the client fires the KV `markTrayMinted` POST **immediately after receiving a `txHash`, without waiting for on-chain confirmation** — so a reverted/retried transaction still leaves a KV record behind, and a later successful retry (possibly against a different `trayId`) never gets its own KV record.
+The original version of this doc treated the **on-chain event's trayId as ground truth** and flagged every pinned-metadata mismatch as a bug to fix by re-pinning + `setTokenURI`. That was backwards: confirmed against the owner's actual chain-of-custody records (`@/Users/richieogorman/CascadeProjects/nftfax/app/components/InTray.tsx` `forward()`), the **pinned IPFS metadata is the correct trayId** for every token checked. The bug is in `forward()`: it pinned metadata using `data.id` (the newly-created next-hop tray, i.e. the fax the minter just forwarded) while the on-chain mint calldata's `trayId` argument came from `act()`'s `targetId` (the fax the minter *received*, before their forward). Both values get embedded permanently — one on IPFS, one on-chain — and they will never agree for any fax where the minter forwarded before minting from the Sent tab. **The pinned metadata is correct; the on-chain event's trayId is the "received" tray, not the minted one.**
 
-This explains why the earliest mints (tokens 1-5, 7) show mismatches and later ones (6, 8) are clean — the client-side fix landed sometime between these mints.
+The actual operational problem this caused: the tray referenced by the pinned metadata is an ordinary fax subject to the normal 8-day KV decay, so once it expired, the token's `external_url` / sent-tray listing broke ("Fax expired") even though the NFT itself and its IPFS metadata were always fine. The fix (already applied to `InTray.tsx` this session) makes `forward()` pin `fax.id` instead of `data.id`, so pinned metadata will match the on-chain trayId going forward — but this is a **client-side fix for future mints only**; it does not change already-minted tokens' immutable metadata, and does not need to (the metadata was already correct for those, per above).
 
-## Findings
+Historical tokens' pinned/on-chain trayId only matched when the minter minted directly from their Inbox (not the Sent tab / not after forwarding first) — e.g. tokens 6 and 8.
 
-| Token | Minter | On-chain trayId | KV "minted tray" (what the UI shows) | Pinned IPFS "Fax Tray ID" | Status |
+## Findings (corrected)
+
+| Token | Minter | On-chain trayId (received fax) | Pinned IPFS "Fax Tray ID" (correct, minted fax) | KV status before this session's fix | Status |
 |---|---|---|---|---|---|
-| 1 | atom.3614 | `c82d62a94ce6` | **`82cc17b00565`** (wrong — belongs to a different, never-actually-minted fax; its KV mint record has a bogus tx hash not among the 10 real `FaxMinted` txs) | — (not yet checked) | ❌ KV mismatch |
-| 2 | chonk.585 | `5daa85fa5d47` | `5daa85fa5d47` (correct) | **`6e14680cd7`** (does not exist in KV at all — phantom ID) | ❌ Metadata mismatch |
-| 3 | atom.2477 | `64b3c3d034ed` | `64b3c3d034ed` (correct) | **`f4085910ec1d`** (this is actually token 4's on-chain trayId) | ❌ Metadata mismatch |
-| 4 | atom.2 | `f4085910ec1d` | **`5daa85fa5d47`** (wrong — this is token 2's trayId, from atom.648→chonk.585, unrelated to atom.2) | `82cc17b00565` (the same phantom-minted trayId implicated in token 1) | ❌ KV + metadata mismatch |
-| 5 | atom.648 | `ed1a8745649f` | `ed1a8745649f` (correct) | **`e0f5a98ab662`** (does not match) | ❌ Metadata mismatch |
-| 6 | chonk.700 | `7b82ecd8e8b6` | `7b82ecd8e8b6` (correct) | `7b82ecd8e8b6` (correct) | ✅ Clean |
-| 7 | atom.1083 | `7afab639d5ca` | `7afab639d5ca` (correct) | **`ad2ed3cfa337`** (does not match) | ❌ Metadata mismatch |
-| 8 | atom.2112 | `b5886bc11c08` | `b5886bc11c08` (correct) | `b5886bc11c08` (correct) | ✅ Clean |
-| 9 | dfz.5415 | `92bec0e4dda2` | `92bec0e4dda2` (correct) | not reachable (IPFS pin unpinned/gone from public gateways) | ⚠️ unverified |
-| 10 | chonk.9534 | `7e0f0e533cb2` | `7e0f0e533cb2` (correct) | not reachable (gateway timeouts) | ⚠️ unverified |
+| 1 | atom.3614 | `c82d62a94ce6` | not yet checked | `tray-mint:base:82cc17b00565` KV record is unrelated/orphaned — needs separate investigation, not the same pattern as below | ⚠️ unverified |
+| 2 | chonk.585 | `5daa85fa5d47` | `6e14680cd7be` (chonk.585 → atom.2477) | fully decayed | ✅ reconstructed permanently in KV |
+| 3 | atom.2477 | `64b3c3d034ed` | `f4085910ec1d` | still alive in KV | ✅ no action needed |
+| 4 | atom.2 | `f4085910ec1d` | `82cc17b00565` | still alive in KV | ✅ no action needed (do **not** delete `tray-mint:base:82cc17b00565` — it may be this token's legitimate mint record) |
+| 5 | atom.648 | `ed1a8745649f` | `e0f5a98ab662` (atom.648 → chonk.9534) | fully decayed | ✅ reconstructed permanently in KV |
+| 6 | chonk.700 | `7b82ecd8e8b6` | `7b82ecd8e8b6` | alive | ✅ clean (minted directly from Inbox, no forward-then-mint) |
+| 7 | atom.1083 | `7afab639d5ca` | `ad2ed3cfa337` (atom.1083 → chonk.681) | fully decayed | ✅ reconstructed permanently in KV |
+| 8 | atom.2112 | `b5886bc11c08` | `b5886bc11c08` | alive | ✅ clean (minted directly from Inbox) |
+| 9 | dfz.5415 | `92bec0e4dda2` | `e3f90a4e9926` (dfz.5415 → atom.4253) | `tray:e3f90a4e9926` doc was alive but missing its `tray-out`/`tray-in` index entries | ✅ indexes added |
+| 10 | chonk.9534 | `7e0f0e533cb2` | `e90a0e7fab91` (chonk.9534 → atom.137) | fully decayed | ✅ reconstructed permanently in KV |
 
-## Key takeaway
+## Remaining open item
 
-- **KV "minted tray" display bug** (what users see in Fax-Tray/Sent-Tray on nftmail.box/nftfax.app) only affects **tokens 1 and 4** — both are historical, pre-dating a client-side fix. Tokens 5-10 all show the *correct* trayId in the live UI.
-- **Pinned IPFS metadata mismatch** (what OpenSea shows) is far more widespread — tokens 2, 3, 4, 5, 7 all have a "Fax Tray ID" trait that doesn't match the real on-chain trayId. This is a **separate, earlier-stage bug** in the metadata-pinning step, independent of the KV bug.
-- Since IPFS content is immutable, fixing OpenSea display requires re-pinning corrected JSON and calling the contract owner-only `setTokenURI(tokenId, newURI)` for each affected token — this requires the contract owner's wallet signature and has not been done.
-- The orphaned KV record `tray-mint:base:82cc17b00565` (implicated in both token 1 and token 4's confusion) should be deleted — it does not correspond to any real on-chain mint.
-
-## Not yet fixed
-
-- KV correction for tokens 1 and 4's minted-tray display (safe SQLite `UPDATE`/`INSERT`/`DELETE` on `/opt/ghostagent/bun-worker/data/nftmail.db`, no wallet needed).
-- Re-pinning + `setTokenURI` for tokens 2, 3, 4, 5, 7 (and 9, 10 pending verification) — requires contract owner wallet signature.
+- Token 1's KV mint record (`tray-mint:base:82cc17b00565`) needs the same cross-check as tokens 2/5/7/9/10 before concluding anything — do not assume it's orphaned/bogus without first checking token 1's actual pinned IPFS metadata and on-chain event.
