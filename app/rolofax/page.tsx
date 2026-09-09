@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
 import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, ArrowLeft, X, Send } from 'lucide-react';
 import Link from 'next/link';
@@ -17,6 +17,71 @@ interface RolofaxEntry {
   ready: boolean;
   readyUntil?: number;
   createdAt: number;
+}
+
+const COLLECTION_KEYS = ['chonk', 'deadfellaz', 'normie', 'pow'] as const;
+
+// Only fetches the NFT's image once the row scrolls into view — avoids
+// firing an RPC + IPFS-gateway lookup for every registered entry on mount.
+// Once resolved, the <img> loads directly from IPFS/HTTP in the browser —
+// our server only ever resolves+caches the URL, never proxies the bytes.
+function NftThumbnail({ handle, collection }: { handle: string; collection: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const elRef = useRef<HTMLDivElement>(null);
+
+  const tokenId = useMemo(() => {
+    const match = handle.match(/\.(\d+)$/);
+    return match ? Number(match[1]) : null;
+  }, [handle]);
+
+  useEffect(() => {
+    if (visible) return;
+    const el = elRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setVisible(true);
+    }, { rootMargin: '200px' });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || tokenId === null) return;
+    if (!COLLECTION_KEYS.includes(collection as typeof COLLECTION_KEYS[number])) { setFailed(true); return; }
+    const theme = getCollectionTheme(collection as CollectionKey);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const params = new URLSearchParams({
+          contract: theme.contract,
+          chainId: String(theme.chainId),
+          tokenId: String(tokenId),
+          rpc: theme.rpc,
+        });
+        const res = await fetch(`/api/nft-image?${params}`, { cache: 'no-store' });
+        const json = await res.json() as { image?: string | null };
+        if (cancelled) return;
+        if (json.image) setSrc(json.image); else setFailed(true);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visible, tokenId, collection]);
+
+  return (
+    <div ref={elRef} className="grid h-10 w-10 flex-shrink-0 place-items-center overflow-hidden border border-[#847d6e] bg-[#d5cebf]">
+      {tokenId === null || failed ? (
+        <span className="text-[9px] text-[#847d6e]">N/A</span>
+      ) : src ? (
+        <img src={src} alt={`${handle}@fax`} className="h-10 w-10 object-cover" loading="lazy" />
+      ) : (
+        <Loader2 size={12} className="animate-spin text-[#847d6e]" />
+      )}
+    </div>
+  );
 }
 
 export default function PreRegisterPage() {
@@ -354,10 +419,13 @@ export default function PreRegisterPage() {
                 {entries.map((entry) => {
                   const isOwn = walletAddress && entry.wallet.toLowerCase() === walletAddress.toLowerCase();
                   return (
-                  <div key={entry.handle} className={`flex items-center justify-between border border-[#847d6e] bg-[#eee8dc] px-3 py-2 ${isOwn ? '' : 'hover:border-[#e65b2f]'} transition-colors`}>
-                    <div className="flex-1">
-                      <p className="text-xs font-bold">{entry.handle}@fax</p>
-                      <p className="text-[11px] uppercase tracking-wider text-[#625e52]">{ensNames[entry.wallet.toLowerCase()] ?? `${entry.wallet.slice(0, 6)}…${entry.wallet.slice(-4)}`}</p>
+                  <div key={entry.handle} className={`flex items-center justify-between gap-3 border border-[#847d6e] bg-[#eee8dc] px-3 py-2 ${isOwn ? '' : 'hover:border-[#e65b2f]'} transition-colors`}>
+                    <div className="flex flex-1 items-center gap-3">
+                      <NftThumbnail handle={entry.handle} collection={entry.collection} />
+                      <div>
+                        <p className="text-xs font-bold">{entry.handle}@fax</p>
+                        <p className="text-[11px] uppercase tracking-wider text-[#625e52]">{ensNames[entry.wallet.toLowerCase()] ?? `${entry.wallet.slice(0, 6)}…${entry.wallet.slice(-4)}`}</p>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {entry.ready ? (
