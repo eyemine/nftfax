@@ -52,7 +52,9 @@ export async function resolveEnsNames(addresses: string[]): Promise<Map<string, 
           // name, including one they don't own (e.g. someone else's .eth/.box
           // domain) — it's not authoritative on its own. Only trust it once
           // the name's forward record resolves back to this exact address.
-          const forward = await client.getEnsAddress({ name }).catch(() => null);
+          // Let a thrown error here fall through to the outer catch (below)
+          // so a transient RPC failure isn't cached as "verification failed".
+          const forward = await client.getEnsAddress({ name });
           const verified = forward?.toLowerCase() === addr;
           return [addr, verified ? name : null, true] as const;
         } catch {
