@@ -58,7 +58,17 @@ const COMMUNITY_PREFIXES: Record<number, string> = {
 };
 
 interface LeaderboardEntry { collection: string; mints: number; maxTokenId: number; communities: number; }
-interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; contractBalanceEth: string; mints: MintEntry[]; mintsTotal: number; page: number; pageSize: number; }
+interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; uniqueMintersTotal: number; contractBalanceEth: string; mints: MintEntry[]; mintsTotal: number; page: number; pageSize: number; }
+
+/// Manual post-mint corrections, keyed by on-chain tokenId. The on-chain
+/// FaxMinted event's trayId is immutable once minted, but a bad pin (see
+/// docs on the InTray.tsx mint fix) can mean the wrong tray got embedded at
+/// mint time even though setTokenURI was later corrected. Overriding here
+/// keeps the leaderboard's preview/trayId/tier consistent with the actual
+/// corrected tokenURI instead of the stale on-chain event value.
+const TOKEN_TRAY_ID_OVERRIDES: Record<number, string> = {
+  11: '6be9f54538b5', // corrected via setTokenURI — see tx 0xf74179fc21c1a0618c3641531159b18a177a06794e7fe6e9d954d184e3bb9f0c
+};
 
 /// In-process cache of decoded-ready raw logs, keyed by the highest block
 /// scanned so far. Persists across requests in this long-running server
@@ -290,7 +300,7 @@ export async function GET(req: NextRequest) {
       getTotalMinted(), getContractBalanceEth(), getCurrentBlock(),
     ]);
     if (totalMints === 0 || currentBlock === 0) {
-      return NextResponse.json({ leaderboard: [], totalMints: 0, contractBalanceEth, mints: [], mintsTotal: 0, page, pageSize } as LeaderboardData, { headers: NO_STORE });
+      return NextResponse.json({ leaderboard: [], totalMints: 0, uniqueMintersTotal: 0, contractBalanceEth, mints: [], mintsTotal: 0, page, pageSize } as LeaderboardData, { headers: NO_STORE });
     }
 
     let allMints: MintEntry[];
@@ -324,7 +334,12 @@ export async function GET(req: NextRequest) {
     const sortedMints = allMints.slice().sort((a, b) => b.tokenId - a.tokenId);
     const start = (page - 1) * pageSize;
     const pageMints = sortedMints.slice(start, start + pageSize);
+    for (const mint of pageMints) {
+      const override = TOKEN_TRAY_ID_OVERRIDES[mint.tokenId];
+      if (override) mint.trayId = override;
+    }
 
+    const uniqueMintersTotal = new Set(allMints.map((m) => m.minter)).size;
     const uniqueTrayIds = Array.from(new Set(pageMints.map((m) => m.trayId).filter(Boolean)));
     const uniqueMinters = Array.from(new Set(pageMints.map((m) => m.minter)));
     const [metas, ensByAddress] = await Promise.all([
@@ -339,7 +354,7 @@ export async function GET(req: NextRequest) {
       mint.minterEns = ensByAddress.get(mint.minter);
     }
 
-    return NextResponse.json({ leaderboard, totalMints, contractBalanceEth, mints: pageMints, mintsTotal: allMints.length, page, pageSize } as LeaderboardData, { headers: NO_STORE });
+    return NextResponse.json({ leaderboard, totalMints, uniqueMintersTotal, contractBalanceEth, mints: pageMints, mintsTotal: allMints.length, page, pageSize } as LeaderboardData, { headers: NO_STORE });
   } catch (cause) {
     console.error('[leaderboard] lookup failed', cause);
     return NextResponse.json({ error: 'Leaderboard lookup failed' }, { status: 502, headers: NO_STORE });

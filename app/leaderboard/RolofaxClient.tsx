@@ -100,6 +100,7 @@ function MintPreview({ trayId }: { trayId: string }) {
 interface LeaderboardData {
   leaderboard?: LeaderboardEntry[];
   totalMints?: number;
+  uniqueMintersTotal?: number;
   contractBalanceEth?: string;
   mints?: MintEntry[];
   mintsTotal?: number;
@@ -107,6 +108,8 @@ interface LeaderboardData {
   pageSize?: number;
   error?: string;
 }
+
+const FAX_COLLECTIBLE_CONTRACT = '0xcc121bf9e3a13d03eacd55e15495e3e8de61fac5';
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
@@ -127,8 +130,16 @@ const COMMUNITY_PREFIXES: Record<number, string> = {
   1: 'chonk', 2: 'dfz', 3: 'atom', 4: 'normie',
 };
 
-function minterLabel(mint: MintEntry): string {
-  if (mint.minterEns) return mint.minterEns;
+function truncateAddress(addr: string): string {
+  if (!addr || addr.length < 10) return addr;
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+
+function minterEoaLabel(mint: MintEntry): string {
+  return mint.minterEns || truncateAddress(mint.minter);
+}
+
+function faxIdentity(mint: MintEntry): string {
   const prefix = COMMUNITY_PREFIXES[mint.community] ?? 'unknown';
   return mint.sourceTokenId > 0 ? `${prefix}.${mint.sourceTokenId}@fax` : `${prefix}@fax`;
 }
@@ -137,7 +148,7 @@ const MINTS_PAGE_SIZE = 20;
 
 export default function RolofaxClient() {
   const [data, setData] = useState<RolofaxData | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardData>({ leaderboard: [], totalMints: 0, contractBalanceEth: '0', mints: [], mintsTotal: 0, page: 1, pageSize: MINTS_PAGE_SIZE });
+  const [leaderboard, setLeaderboard] = useState<LeaderboardData>({ leaderboard: [], totalMints: 0, uniqueMintersTotal: 0, contractBalanceEth: '0', mints: [], mintsTotal: 0, page: 1, pageSize: MINTS_PAGE_SIZE });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [mintsLoading, setMintsLoading] = useState(false);
@@ -225,7 +236,7 @@ export default function RolofaxClient() {
                 ['Public faxes', data.totalPublic ?? 0],
                 ['Senders', data.uniqueSenders ?? 0],
                 ['Recipients', data.uniqueRecipients ?? 0],
-                ['Communities', data.domainDiversity ?? 0],
+                ['Wallets', leaderboard.uniqueMintersTotal ?? 0],
                 ['24h velocity', data.velocity24h ?? 0],
               ].map(([label, value]) => (
                 <div key={String(label)} className="bg-[#c8c0ae] p-4 text-center">
@@ -277,7 +288,17 @@ export default function RolofaxClient() {
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
             <div className="flex items-center gap-3">
-              <span className="text-[#615c50]">{leaderboard.totalMints ?? 0} mints · {leaderboard.contractBalanceEth ?? '0'} ETH accumulated</span>
+              <span className="text-[#615c50]">
+                {leaderboard.totalMints ?? 0} mints ·{' '}
+                <a
+                  href={`https://basescan.org/address/${FAX_COLLECTIBLE_CONTRACT}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-[#e65b2f]"
+                >
+                  {leaderboard.contractBalanceEth ?? '0'} ETH accumulated
+                </a>
+              </span>
               <button
                 onClick={() => void refresh()}
                 disabled={refreshing || mintsLoading}
@@ -336,7 +357,8 @@ export default function RolofaxClient() {
                     <th className="border-b border-[#8f8878] p-3 font-bold">Preview</th>
                     <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
                     <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
-                    <th className="border-b border-[#8f8878] p-3 font-bold">Minter</th>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">Minter EOA</th>
+                    <th className="border-b border-[#8f8878] p-3 font-bold">@</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -355,7 +377,8 @@ export default function RolofaxClient() {
                       <td className="p-3"><MintPreview trayId={mint.trayId} /></td>
                       <td className="p-3 font-mono">{mint.trayId || '—'}</td>
                       <td className="p-3">{tierForDepth(Math.max(0, (mint.chainDepth ?? 1) - 1))}</td>
-                      <td className="p-3">{minterLabel(mint)}</td>
+                      <td className="p-3 font-mono">{minterEoaLabel(mint)}</td>
+                      <td className="p-3">{faxIdentity(mint)}</td>
                     </tr>
                   ))}
                 </tbody>
