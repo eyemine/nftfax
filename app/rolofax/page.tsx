@@ -21,6 +21,13 @@ interface RolofaxEntry {
 
 const COLLECTION_KEYS = ['chonk', 'deadfellaz', 'normie', 'pow'] as const;
 
+const MARKETPLACE_URLS: Record<string, (tokenId: number) => string> = {
+  chonk: (id) => `https://www.chonks.xyz/market/chonks/${id}`,
+  deadfellaz: (id) => `https://opensea.io/item/ethereum/0x2acab3dea77832c09420663b0e1cb386031ba17b/${id}`,
+  normie: (id) => `https://opensea.io/item/ethereum/0x9eb6e2025b64f340691e424b7fe7022ffde12438/${id}`,
+  pow: (id) => `https://opensea.io/item/ethereum/0x9abb7bddc43fa67c76a62d8c016513827f59be1b/${id}`,
+};
+
 // Only fetches the NFT's image once the row scrolls into view — avoids
 // firing an RPC + IPFS-gateway lookup for every registered entry on mount.
 // Once resolved, the <img> loads directly from IPFS/HTTP in the browser —
@@ -29,7 +36,7 @@ function NftThumbnail({ handle, collection }: { handle: string; collection: stri
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [visible, setVisible] = useState(false);
-  const elRef = useRef<HTMLDivElement>(null);
+  const elRef = useRef<HTMLAnchorElement>(null);
 
   const tokenId = useMemo(() => {
     const match = handle.match(/\.(\d+)$/);
@@ -71,8 +78,17 @@ function NftThumbnail({ handle, collection }: { handle: string; collection: stri
     return () => { cancelled = true; };
   }, [visible, tokenId, collection]);
 
+  const marketplaceUrl = tokenId !== null ? MARKETPLACE_URLS[collection]?.(tokenId) ?? null : null;
+
   return (
-    <div ref={elRef} className="grid h-10 w-10 flex-shrink-0 place-items-center overflow-hidden border border-[#847d6e] bg-[#d5cebf]">
+    <a
+      ref={elRef}
+      href={marketplaceUrl ?? undefined}
+      target={marketplaceUrl ? '_blank' : undefined}
+      rel={marketplaceUrl ? 'noopener noreferrer' : undefined}
+      className="grid h-10 w-10 flex-shrink-0 place-items-center overflow-hidden border border-[#847d6e] bg-[#d5cebf] transition-colors hover:border-[#e65b2f]"
+      title={marketplaceUrl ? `View on ${collection === 'chonk' ? 'Chonks' : 'OpenSea'}` : undefined}
+    >
       {tokenId === null || failed ? (
         <span className="text-[9px] text-[#847d6e]">N/A</span>
       ) : src ? (
@@ -80,7 +96,7 @@ function NftThumbnail({ handle, collection }: { handle: string; collection: stri
       ) : (
         <Loader2 size={12} className="animate-spin text-[#847d6e]" />
       )}
-    </div>
+    </a>
   );
 }
 
