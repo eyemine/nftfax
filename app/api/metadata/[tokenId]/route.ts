@@ -183,17 +183,17 @@ async function findFaxMinted(tokenId: number): Promise<{
 
 /// Fetches the tray document to get the fax image (as base64 data URI) and
 /// chain depth (for tier classification used in the prize draw).
-async function getFaxData(trayId: string): Promise<{ image: string | null; chainDepth: number | null }> {
+async function getFaxData(trayId: string): Promise<{ image: string | null; chainDepth: number | null; forwardedTrayId?: string }> {
   if (!trayId) return { image: null, chainDepth: null };
   try {
     const res = await fetch(`https://nftmail.box/api/tray/${trayId}`, { cache: 'no-store' });
     if (!res.ok) return { image: null, chainDepth: null };
-    const doc = await res.json() as { dataBase64?: string; format?: string; chainDepth?: number };
+    const doc = await res.json() as { dataBase64?: string; format?: string; chainDepth?: number; forwardedTrayId?: string };
     const image = doc.dataBase64
       ? `data:${doc.format === 'png' ? 'image/png' : 'image/jpeg'};base64,${doc.dataBase64}`
       : null;
     const chainDepth = typeof doc.chainDepth === 'number' ? doc.chainDepth : null;
-    return { image, chainDepth };
+    return { image, chainDepth, forwardedTrayId: doc.forwardedTrayId };
   } catch {
     return { image: null, chainDepth: null };
   }
@@ -217,14 +217,25 @@ export async function GET(
 
   const mintInfo = await findFaxMinted(tokenId);
 
+  const { image: rawFaxImage, chainDepth, forwardedTrayId } = await getFaxData(mintInfo?.trayId ?? '');
+
+  // The on-chain trayId is the RECEIVED fax (ownership/provenance), but the
+  // artwork the collectible should represent is the FORWARDED fax (the
+  // player's own composited hop). If the tray document has a
+  // forwardedTrayId, fetch that tray's image and use it for display.
+  const displayTrayId = forwardedTrayId || mintInfo?.trayId || '';
+  let image = rawFaxImage ?? COLLECTION_IMAGE;
+  if (forwardedTrayId) {
+    const fwdData = await getFaxData(forwardedTrayId);
+    if (fwdData.image) image = fwdData.image;
+  }
+
   const communityName = mintInfo ? COMMUNITY_NAMES[mintInfo.community] ?? 'UNKNOWN' : 'FAX';
   const name = `FAX CHAIN #${tokenId}`;
   const description = mintInfo
-    ? `NFTFax Collectible #${tokenId} — minted from ${communityName}${mintInfo.sourceTokenId ? ` #${mintInfo.sourceTokenId}` : ''}${mintInfo.trayId ? ` (fax ${mintInfo.trayId})` : ''}. A chain-letter fax machine collectible on Base.`
+    ? `NFTFax Collectible #${tokenId} — minted from ${communityName}${mintInfo.sourceTokenId ? ` #${mintInfo.sourceTokenId}` : ''}${displayTrayId ? ` (fax ${displayTrayId})` : ''}. A chain-letter fax machine collectible on Base.`
     : `NFTFax Collectible #${tokenId} — a chain-letter fax machine collectible on Base.`;
 
-  const { image: faxImage, chainDepth } = await getFaxData(mintInfo?.trayId ?? '');
-  const image = faxImage ?? COLLECTION_IMAGE;
   // Worker counts the initial send as depth 1, but the first send is not a hop.
   // First forward = hop 1 (Dial Tone). Subtract 1 to get actual hop count.
   const hopCount = chainDepth != null ? Math.max(0, chainDepth - 1) : null;
@@ -234,11 +245,11 @@ export async function GET(
     name,
     description,
     image,
-    external_url: `https://nftmail.box/tray/${mintInfo?.trayId ?? ''}`,
+    external_url: `https://nftmail.box/tray/${displayTrayId}`,
     attributes: [
       { trait_type: 'Tier', value: tier },
       ...(hopCount != null ? [{ trait_type: 'Chain Depth', value: hopCount }] : []),
-      ...(mintInfo && mintInfo.trayId ? [{ trait_type: 'Fax Tray ID', value: mintInfo.trayId }] : []),
+      ...(displayTrayId ? [{ trait_type: 'Fax Tray ID', value: displayTrayId }] : []),
       { trait_type: 'Minting Collection', value: communityName },
       ...(mintInfo && mintInfo.sourceTokenId ? [{ trait_type: 'Minting Token ID', value: `${COMMUNITY_PREFIXES[mintInfo.community] ?? 'unknown'}.${mintInfo.sourceTokenId}` }] : []),
       { trait_type: 'Token ID', value: tokenId },

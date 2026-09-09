@@ -324,7 +324,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       if (!res.ok) throw new Error(data.error || 'Forward failed');
       if (data.id) setForwardedTrayId(data.id);
       setNotice(compositeBase64 ? 'Chain extended — your link was composited and forwarded.' : 'Chain forwarded — Base mint unlocked.');
-      setSelected((prev) => prev ? { ...prev, forwarded: true } : prev);
+      setSelected((prev) => prev ? { ...prev, forwarded: true, forwardedTrayId: data.id } : prev);
       resetForward();
       await load();
       // Best-effort IPFS+Arweave pin now that the fax is finalized. Pins

@@ -68,6 +68,7 @@ interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number;
 /// corrected tokenURI instead of the stale on-chain event value.
 const TOKEN_TRAY_ID_OVERRIDES: Record<number, string> = {
   11: '6be9f54538b5', // corrected via setTokenURI — see tx 0xf74179fc21c1a0618c3641531159b18a177a06794e7fe6e9d954d184e3bb9f0c
+  12: '9650d1a15f94', // on-chain trayId is the received fax; metadata should show the forwarded fax
 };
 
 /// In-process cache of decoded-ready raw logs, keyed by the highest block
