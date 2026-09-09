@@ -29,19 +29,26 @@ const ERC721_METADATA_ABI = [
   },
 ] as const;
 
-const IPFS_GATEWAY = 'https://ipfs.io/ipfs/';
+const IPFS_GATEWAYS = [
+  'https://ipfs.io/ipfs/',
+  'https://dweb.link/ipfs/',
+  'https://nftstorage.link/ipfs/',
+  'https://gateway.pinata.cloud/ipfs/',
+  'https://cloudflare-ipfs.com/ipfs/',
+  'https://infura-ipfs.io/ipfs/',
+];
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h — images don't change post-mint
-const FETCH_TIMEOUT_MS = 8000;
+const FETCH_TIMEOUT_MS = 12000;
 
 interface CacheEntry { image: string | null; at: number }
 const cache = new Map<string, CacheEntry>();
 
 /// Rewrites ipfs://<cid>/<path> (and the bare ipfs:/<cid> variant some
-/// minters use) to an HTTP gateway URL. Passes through http(s) and data:
-/// URIs unchanged.
+/// minters use) to an HTTP gateway URL using the first gateway in the list.
+/// Passes through http(s) and data: URIs unchanged.
 function resolveUri(uri: string): string {
   if (uri.startsWith('ipfs://')) {
-    return IPFS_GATEWAY + uri.slice('ipfs://'.length).replace(/^ipfs\//, '');
+    return IPFS_GATEWAYS[0] + uri.slice('ipfs://'.length).replace(/^ipfs\//, '');
   }
   return uri;
 }
@@ -50,13 +57,34 @@ async function fetchWithTimeout(url: string): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    return await fetch(url, { signal: controller.signal });
+    return await fetch(url, { signal: controller.signal, redirect: 'follow' });
   } finally {
     clearTimeout(timer);
   }
 }
 
 interface NftMetadata { image?: string; poster?: string }
+
+/// Tries to fetch metadata from an IPFS URI across multiple gateways,
+/// returning the first successful JSON response. For non-IPFS URIs, falls
+/// back to a single fetchWithTimeout call.
+async function fetchMetadataFromUri(tokenUri: string): Promise<NftMetadata | null> {
+  if (!tokenUri.startsWith('ipfs://')) {
+    const res = await fetchWithTimeout(resolveUri(tokenUri));
+    if (!res.ok) return null;
+    return (await res.json()) as NftMetadata;
+  }
+  const path = tokenUri.slice('ipfs://'.length).replace(/^ipfs\//, '');
+  for (const gateway of IPFS_GATEWAYS) {
+    try {
+      const res = await fetchWithTimeout(gateway + path);
+      if (res.ok) return (await res.json()) as NftMetadata;
+    } catch {
+      // gateway down or timed out — try next
+    }
+  }
+  return null;
+}
 
 async function fetchMetadata(tokenUri: string): Promise<NftMetadata | null> {
   // Fully on-chain metadata: data:application/json;base64,<...> or
@@ -71,9 +99,7 @@ async function fetchMetadata(tokenUri: string): Promise<NftMetadata | null> {
       : decodeURIComponent(payload);
     return JSON.parse(json) as NftMetadata;
   }
-  const res = await fetchWithTimeout(resolveUri(tokenUri));
-  if (!res.ok) return null;
-  return (await res.json()) as NftMetadata;
+  return fetchMetadataFromUri(tokenUri);
 }
 
 /// Some collections (e.g. POW NFT) put an animated/live-model render under
