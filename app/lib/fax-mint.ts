@@ -14,7 +14,7 @@
 /// "atom.3614", "chonk.585") — see app/lib/theme.ts mailboxPlaceholder for
 /// the canonical prefixes per collection.
 
-import { BASE_FAX_COLLECTIBLE } from './contracts';
+import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from './contracts';
 import { resolveMintRecipient } from './mint-recipient';
 import type { CollectionKey } from './theme';
 
@@ -190,6 +190,7 @@ export interface BuildMintTxResult {
   to: string;
   data: string;
   value: string; // hex-encoded wei, for eth_sendTransaction
+  chainId?: string; // hex chain id for wallet_sendCalls (Base 0x2105)
   error?: string;
 }
 
@@ -219,7 +220,7 @@ export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, 
     const data = tokenURI
       ? MINT_FAX_ON_CHAIN_WITH_URI_SELECTOR + encodeUint256(identity.tokenId) + encodeTrailingStrings(1, [trayId, tokenURI])
       : MINT_FAX_ON_CHAIN_SELECTOR + encodeUint256(identity.tokenId) + encodeTrailingString(2, trayId);
-    return { to: BASE_FAX_COLLECTIBLE, data, value };
+    return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId };
   }
 
   const resolved = await resolveMintRecipient({
@@ -244,7 +245,7 @@ export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, 
       encodeUint256(community) +
       encodeUint256(onChainSourceTokenId) +
       encodeTrailingString(4, trayId);
-  return { to: BASE_FAX_COLLECTIBLE, data, value };
+  return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId };
 }
 
 /// Pins the fax's image + metadata JSON to IPFS via the `/api/tray/[id]/pin`
@@ -281,8 +282,45 @@ interface EthereumProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
 }
 
-/// Sends the mint transaction via the connected EIP-1193 wallet. Returns the
-/// pending tx hash immediately (does not wait for confirmation).
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface CallsStatusResponse {
+  status?: number;
+  atomic?: boolean;
+  receipts?: { transactionHash?: string }[];
+}
+
+async function getCallsTransactionHash(provider: EthereumProvider, callId: string, timeoutMs = 25000, intervalMs = 2000): Promise<string | undefined> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await sleep(intervalMs);
+    const raw = await provider.request({ method: 'wallet_getCallsStatus', params: [callId] });
+    const status = raw as CallsStatusResponse | undefined;
+    if (!status) continue;
+    if (typeof status.status === 'number') {
+      if (status.status >= 400) throw new Error(`Call bundle failed with status ${status.status}`);
+      if (status.status === 200) {
+        const txHash = status.receipts?.[0]?.transactionHash;
+        if (txHash) return txHash;
+        throw new Error('Call bundle confirmed but no transaction hash was returned.');
+      }
+    }
+  }
+  throw new Error('Call bundle confirmation timed out.');
+}
+
+function isSendCallsUnsupported(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  const lower = message.toLowerCase();
+  return lower.includes('method not found') || lower.includes('not supported') || lower.includes('unsupported') || lower.includes('invalid method') || message.includes('-32601');
+}
+
+/// Sends the mint transaction via the connected EIP-1193 wallet. For value-
+/// bearing mints it tries EIP-5792 wallet_sendCalls first so smart accounts
+/// correctly forward the call value. Falls back to eth_sendTransaction for
+/// EOAs or wallets that do not support wallet_sendCalls.
 export async function sendMintTx(
   provider: EthereumProvider,
   fromAccount: string,
@@ -290,6 +328,32 @@ export async function sendMintTx(
 ): Promise<{ txHash?: string; error?: string }> {
   if (tx.error || !tx.data) {
     return { error: tx.error || 'Mint transaction could not be built.' };
+  }
+  const hasValue = (() => {
+    try { return BigInt(tx.value || '0x0') > BigInt(0); } catch { return false; }
+  })();
+  if (hasValue && tx.chainId) {
+    try {
+      const bundle = await provider.request({
+        method: 'wallet_sendCalls',
+        params: [{
+          version: '1.0',
+          from: fromAccount,
+          chainId: tx.chainId,
+          atomicRequired: true,
+          calls: [{ to: tx.to, data: tx.data, value: tx.value }],
+        }],
+      });
+      const callId = (bundle as { id?: string }).id;
+      if (!callId) throw new Error('wallet_sendCalls did not return a call bundle id.');
+      const txHash = await getCallsTransactionHash(provider, callId);
+      return { txHash };
+    } catch (err: unknown) {
+      if (!isSendCallsUnsupported(err)) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
+      // Unsupported wallet: fall through to eth_sendTransaction.
+    }
   }
   try {
     const txHash = await provider.request({
