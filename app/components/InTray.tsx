@@ -27,10 +27,10 @@ const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, ill
 /// sourceTokenId is app-encoded per chain (see encodeCompositeSourceTokenId
 /// in fax-mint.ts) — one mint per chain.
 const MINT_LIMIT_NOTICE: Record<string, string> = {
-  chonk: 'CHONKS BACKPACKS CAN MINT ONLY ONE FAX CHAIN NFT PER CHONK.0000@FAX ACCOUNT.',
-  pow: 'POW NFT CAN MINT ONE FAX CHAIN NFT PER CHAIN PER ATOM.0000@FAX ACCOUNT.',
-  deadfellaz: 'DEADFELLAZ CAN MINT ONE FAX CHAIN NFT PER CHAIN PER DFZ.0000@FAX ACCOUNT.',
-  normie: 'NORMIES PERMITS ONE NFTFAX CHAIN MINT PER CHAIN PER NORMIE.0000@FAX ACCOUNT.',
+  chonk: 'EACH CHONK @FAX ACCOUNT CAN MINT ONLY ONE FAX CHAIN NFT.',
+  pow: 'A POW NFT @FAX ACCOUNT CAN ONLY MINT ONE FAX CHAIN NFT PER CHAIN.',
+  deadfellaz: 'A DEADFELLAZ @FAX ACCOUNT CAN ONLY MINT ONE FAX CHAIN NFT PER CHAIN.',
+  normie: 'A NORMIE @FAX ACCOUNT CAN ONLY MINT ONE FAX CHAIN NFT PER CHAIN.',
 };
 
 const DECAY_MS = 8 * 24 * 60 * 60 * 1000; // 8-day decay
@@ -628,10 +628,12 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     }
   }
 
-  const mintLimitNotice = useMemo(() => {
+  const mintLimitAlert = useMemo(() => {
     const identity = parseFaxIdentity(cleanLocal);
-    return identity ? MINT_LIMIT_NOTICE[identity.collection] : null;
-  }, [cleanLocal]);
+    const notice = identity ? MINT_LIMIT_NOTICE[identity.collection] : null;
+    const hasMinted = faxes.some((f) => f.mintedBase);
+    return notice ? { notice, hasMinted } : null;
+  }, [cleanLocal, faxes]);
 
   const sentMintedIds = useMemo(() => new Set(
     sentFaxes.filter((f) => f.mintedBase || f.sourceMintedBase).map((f) => f.id),
@@ -674,8 +676,8 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         </div>
       </div>
 
-      {mintLimitNotice && (
-        <div className="mb-4 border-l-4 border-[#26417d] bg-[#d3ddf2] p-3 text-[12px] font-bold uppercase text-[#26417d]">{mintLimitNotice}</div>
+      {mintLimitAlert && (
+        <div className={`mb-4 border-l-4 p-3 text-[12px] font-bold uppercase ${mintLimitAlert.hasMinted ? 'border-[#a94228] bg-[#e2c9bc] text-[#a94228]' : 'border-[#26417d] bg-[#d3ddf2] text-[#26417d]'}`}>{mintLimitAlert.notice}</div>
       )}
 
       {/* Tabs */}
