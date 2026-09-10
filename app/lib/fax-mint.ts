@@ -350,12 +350,20 @@ function isSendCallsUnsupported(err: unknown): boolean {
   return lower.includes('method not found') || lower.includes('not supported') || lower.includes('unsupported') || lower.includes('invalid method') || message.includes('-32601');
 }
 
-/// Sends the mint transaction via the connected EIP-1193 wallet. For value-
-/// bearing mints it tries EIP-5792 wallet_sendCalls first so smart accounts
-/// correctly forward the call value. Falls back to eth_sendTransaction for
-/// EOAs or wallets that do not support wallet_sendCalls. The returned hash is
-/// only returned after the transaction is confirmed on-chain, so failed mints
-/// are never recorded as minted.
+/// Sends the mint transaction via the connected EIP-1193 wallet.
+///
+/// For value-bearing mints (0.002 ETH), it tries eth_sendTransaction FIRST.
+/// This is critical for MetaMask Delegated Smart Accounts (EIP-7702 DeleGators):
+/// wallet_sendCalls routes through redeemDelegations, which is not payable and
+/// causes an arithmetic underflow (Panic 0x11) in caveat enforcer hooks when
+/// the Execution.value cannot be funded from msg.value. eth_sendTransaction
+/// may send a direct call to the contract, correctly forwarding msg.value.
+///
+/// If eth_sendTransaction fails (e.g. wallet doesn't support direct sends for
+/// smart accounts), it falls back to EIP-5792 wallet_sendCalls.
+///
+/// The returned hash is only returned after the transaction is confirmed
+/// on-chain, so failed mints are never recorded as minted.
 export async function sendMintTx(
   provider: EthereumProvider,
   fromAccount: string,
@@ -364,6 +372,38 @@ export async function sendMintTx(
   if (tx.error || !tx.data) {
     return { error: tx.error || 'Mint transaction could not be built.' };
   }
+
+  // ── Path 1: eth_sendTransaction (direct, forwards msg.value) ──────────────
+  // For EIP-7702 accounts, this sends a standard type-2 transaction directly
+  // to the target contract. The EOA's delegated code does NOT intercept when
+  // the EOA is the sender (only when it's the recipient), so msg.value is
+  // forwarded correctly. This avoids the redeemDelegations wrapper entirely.
+  try {
+    const txHash = await provider.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: fromAccount, to: tx.to, data: tx.data, value: tx.value }],
+    });
+    if (typeof txHash !== 'string') throw new Error('Wallet did not return a transaction hash.');
+    if (tx.rpcUrl) await waitForRpcReceipt(tx.rpcUrl, txHash);
+    return { txHash };
+  } catch (err: unknown) {
+    // If eth_sendTransaction works but the tx reverts on-chain, return the
+    // error — don't silently retry with wallet_sendCalls (which would also
+    // fail and could confuse the user with a second MetaMask popup).
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const isRevert = errMsg.includes('revert') || errMsg.includes('Panic') || errMsg.includes('execution')
+      || errMsg.includes('0x') && errMsg.length > 10;
+    if (isRevert) return { error: errMsg };
+
+    // If eth_sendTransaction is not supported (method not found, etc.),
+    // fall through to wallet_sendCalls.
+  }
+
+  // ── Path 2: wallet_sendCalls (EIP-5792 fallback) ──────────────────────────
+  // Used when eth_sendTransaction is not supported (e.g. some smart account
+  // wallets that only expose wallet_sendCalls). Note: for MetaMask DeleGators,
+  // this path routes through redeemDelegations and may fail for value-bearing
+  // transactions due to a known Delegation Toolkit bug (smart-accounts-kit #28).
   const hasValue = (() => {
     try { return BigInt(tx.value || '0x0') > BigInt(0); } catch { return false; }
   })();
@@ -372,7 +412,7 @@ export async function sendMintTx(
       const bundle = await provider.request({
         method: 'wallet_sendCalls',
         params: [{
-          version: '1.0',
+          version: '2.0.0',
           from: fromAccount,
           chainId: tx.chainId,
           atomicRequired: true,
@@ -385,22 +425,9 @@ export async function sendMintTx(
       if (tx.rpcUrl) await waitForRpcReceipt(tx.rpcUrl, txHash);
       return { txHash };
     } catch (err: unknown) {
-      if (!isSendCallsUnsupported(err)) {
-        return { error: err instanceof Error ? err.message : String(err) };
-      }
-      // Unsupported wallet: fall through to eth_sendTransaction.
+      return { error: err instanceof Error ? err.message : String(err) };
     }
   }
-  try {
-    const txHash = await provider.request({
-      method: 'eth_sendTransaction',
-      params: [{ from: fromAccount, to: tx.to, data: tx.data, value: tx.value }],
-    });
-    if (typeof txHash !== 'string') throw new Error('Wallet did not return a transaction hash.');
-    if (tx.rpcUrl) await waitForRpcReceipt(tx.rpcUrl, txHash);
-    return { txHash };
-  } catch (err: unknown) {
-    const error = err instanceof Error ? err.message : String(err);
-    return { error };
-  }
+
+  return { error: 'No supported transaction method available for this wallet.' };
 }
