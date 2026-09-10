@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
 import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlacement } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
-import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity } from '../lib/fax-mint';
+import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity, checkSmartWalletMintEligibility } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
@@ -455,6 +455,15 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       }
 
       if (kind === 'mint' && provider && !placeholder) {
+        // Pre-mint check: detect EIP-7702 smart accounts (MetaMask DeleGators)
+        // and verify they have enough ETH to cover the mint fee + gas. This
+        // catches the problem BEFORE MetaMask shows a popup, so the user sees
+        // a clear message instead of a cryptic Panic(0x11) after confirming.
+        // Smart accounts route value-bearing txs through redeemDelegations,
+        // which fails with Panic(0x11) due to a NativeBalanceChangeEnforcer
+        // gas-reserve underflow bug in MetaMask's delegation framework.
+        const smartWalletError = await checkSmartWalletMintEligibility(provider, wallet, MINT_CONFIG.chain.rpcUrl);
+        if (smartWalletError) throw new Error(smartWalletError);
         // Use pre-pinned URI from forward time if available; otherwise pin now (best-effort).
         // The ARTWORK/metadata must reflect the fax the caller forwarded onward
         // (fax.forwardedTrayId — their own composited hop), not the received

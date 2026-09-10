@@ -193,6 +193,7 @@ export interface BuildMintTxResult {
   chainId?: string; // hex chain id for wallet_sendCalls (Base 0x2105)
   rpcUrl?: string; // RPC to poll for the on-chain receipt
   error?: string;
+  warning?: string; // non-fatal, e.g. "minting to on-chain owner, not connected wallet"
 }
 
 /// Builds the calldata + value for the on-chain mint transaction. Returns
@@ -246,7 +247,7 @@ export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, 
       encodeUint256(community) +
       encodeUint256(onChainSourceTokenId) +
       encodeTrailingString(4, trayId);
-  return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId, rpcUrl: BASE_CHAIN.rpcUrl };
+  return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId, rpcUrl: BASE_CHAIN.rpcUrl, warning: resolved.warning };
 }
 
 /// Pins the fax's image + metadata JSON to IPFS via the `/api/tray/[id]/pin`
@@ -281,6 +282,80 @@ export function encodeSaveFax(to: string, trayId: string, tokenURI: string): str
 
 interface EthereumProvider {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+}
+
+/// Detects whether a connected wallet is an EIP-7702 delegated smart account
+/// (e.g. a MetaMask DeleGator). These accounts have code deployed at their
+/// address (the EIP-7702 authorization pointer), so `eth_getCode` returns
+/// non-empty bytes. Value-bearing transactions from these accounts are routed
+/// through `redeemDelegations`, which currently fails with `Panic(0x11)` due
+/// to a `NativeBalanceChangeEnforcer` gas-reserve underflow bug in MetaMask's
+/// delegation framework.
+export async function isEip7702Account(provider: EthereumProvider, address: string): Promise<boolean> {
+  try {
+    const code = await provider.request({ method: 'eth_getCode', params: [address, 'latest'] });
+    return typeof code === 'string' && code.length > 4; // "0x" is empty, anything longer is code
+  } catch {
+    return false;
+  }
+}
+
+/// Reads the ETH balance of an address via RPC. Used to pre-check whether a
+/// smart wallet has enough ETH to cover the mint fee + gas before prompting
+/// MetaMask, so the user sees a clear message instead of a cryptic Panic(0x11).
+export async function getEthBalance(rpcUrl: string, address: string): Promise<bigint> {
+  try {
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getBalance', params: [address, 'latest'] }),
+    });
+    const json = (await res.json()) as { result?: string };
+    return json.result ? BigInt(json.result) : BigInt(0);
+  } catch {
+    return BigInt(0);
+  }
+}
+
+/// Formats wei into a human-readable ETH string with up to 6 decimal places.
+export function formatEth(wei: bigint): string {
+  const eth = Number(wei) / 1e18;
+  return eth.toFixed(6).replace(/\.?0+$/, '') || '0';
+}
+
+/// Pre-mint check for EIP-7702 smart accounts. Returns a user-facing error
+/// message if the smart wallet cannot complete the mint, or null if OK.
+/// The mint price is read from the contract (fetchMintPrice); gas is estimated
+/// at a conservative 0.001 ETH overhead on Base.
+export async function checkSmartWalletMintEligibility(
+  provider: EthereumProvider,
+  address: string,
+  rpcUrl: string,
+): Promise<string | null> {
+  const isSmart = await isEip7702Account(provider, address);
+  if (!isSmart) return null;
+
+  const balance = await getEthBalance(rpcUrl, address);
+  const mintPrice = await fetchMintPrice(rpcUrl);
+  const estimatedGas = BigInt('1000000000000000'); // 0.001 ETH gas estimate on Base
+  const required = mintPrice + estimatedGas;
+
+  if (balance < required) {
+    return (
+      `Smart Wallet Needs ETH\n\n` +
+      `Your MetaMask smart wallet is a separate account from your regular wallet. ` +
+      `It needs its own ETH to make transactions.\n\n` +
+      `Smart wallet address: ${address}\n` +
+      `Current balance: ${formatEth(balance)} ETH\n` +
+      `Needed: ~${formatEth(required)} ETH (0.002 mint fee + gas)\n\n` +
+      `To fix:\n` +
+      `1. Send ~0.005 ETH to your smart wallet address (${address})\n` +
+      `2. Try minting again\n\n` +
+      `Or: Switch to your standard wallet account in MetaMask → Settings → Accounts.`
+    );
+  }
+
+  return null;
 }
 
 function sleep(ms: number): Promise<void> {

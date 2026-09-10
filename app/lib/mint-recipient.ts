@@ -62,6 +62,23 @@ export async function resolveMintRecipient({
   });
 
   if (!verify.verified) {
+    // Fallback: the connected wallet is not the owner/delegate, but we can
+    // still mint to the on-chain NFT owner. This is essential for EIP-7702
+    // smart accounts (MetaMask DeleGators) where the user must switch to a
+    // raw EOA to send value-bearing transactions — the EOA pays the mint
+    // price and the NFT is minted directly to the smart account that owns
+    // the source NFT. Security: mintFaxDirect doesn't verify ownership
+    // on-chain anyway, the NFT goes to the verified owner (not the caller),
+    // and the claimed[] mapping prevents double-mints.
+    if (verify.actualOwner) {
+      return {
+        to: verify.actualOwner,
+        strategy: 'direct',
+        actualOwner: verify.actualOwner,
+        isDelegate: false,
+        warning: 'Connected wallet is not the NFT owner — the collectible will be minted to the on-chain owner address.',
+      };
+    }
     return {
       to: '',
       strategy: 'direct',
