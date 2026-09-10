@@ -202,6 +202,7 @@ export async function POST(req: NextRequest) {
       dataBase64: rawDataBase64,
       chainDepth: nextHop,
       chainTimerDuration,
+      ownerWallet: (body.ownerWallet || '').toLowerCase().trim(),
     };
     if (chainTrayId) {
       trayPayload.chainTrayId = chainTrayId;

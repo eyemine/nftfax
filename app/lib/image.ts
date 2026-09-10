@@ -15,6 +15,23 @@ export const CHAIN_OPS: { id: ChainOp; label: string; raw: string; hint: string 
   { id: 'stamp', label: 'Stamp', raw: 'Copy', hint: 'Assert your ink over the chain (darken).' },
 ];
 
+export interface OverlayPlacement {
+  /** Horizontal anchor (0..1) of the overlay's center on the base. */
+  x: number;
+  /** Vertical anchor (0..1) of the overlay's center on the base. */
+  y: number;
+  /** Scale multiplier relative to the contain fit of the cropped overlay. */
+  scale: number;
+  /** Left of the crop on the overlay (0..1). */
+  cropX: number;
+  /** Top of the crop on the overlay (0..1). */
+  cropY: number;
+  /** Width of the crop on the overlay (0..1). */
+  cropW: number;
+  /** Height of the crop on the overlay (0..1). */
+  cropH: number;
+}
+
 function stripDataUri(value: string): string {
   const comma = value.indexOf(',');
   return comma >= 0 ? value.slice(comma + 1) : value;
@@ -37,7 +54,7 @@ function yieldToBrowser(): Promise<void> {
 /// Composite an overlay image onto a base fax bitmap using a chain operation.
 /// Both are reduced to greyscale, scaled to the base dimensions, then combined
 /// pixel-by-pixel. Returns a fax-sized JPEG (base64 + preview data URI).
-export async function compositeChain(baseSrc: string, overlaySrc: string, op: ChainOp, negative = false): Promise<{ base64: string; preview: string; sizeKb: number; format: 'png' | 'jpg' }> {
+export async function compositeChain(baseSrc: string, overlaySrc: string, op: ChainOp, negative = false, placement?: OverlayPlacement): Promise<{ base64: string; preview: string; sizeKb: number; format: 'png' | 'jpg' }> {
   const [base, overlay] = await Promise.all([loadImage(baseSrc), loadImage(overlaySrc)]);
   let width = Math.max(1, base.naturalWidth || base.width);
   let height = Math.max(1, base.naturalHeight || base.height);
@@ -60,17 +77,30 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   ctx.drawImage(base, 0, 0, width, height);
   const baseData = ctx.getImageData(0, 0, width, height);
 
-  // Draw the overlay WITHOUT stretching: preserve its aspect ratio and scale so
-  // it fits entirely within the underlying fax (contain), centered. Areas not
-  // covered stay white (paper) so they are neutral for every operation.
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, width, height);
+  // Build the overlay layer on a transparent canvas so PNG alpha is preserved.
+  // Any pixel not covered by the overlay (alpha < threshold) is treated as
+  // "no ink" and falls back to the base, making placement and transparent
+  // backgrounds behave like real transparency for every operation.
+  ctx.clearRect(0, 0, width, height);
   const ow = Math.max(1, overlay.naturalWidth || overlay.width);
   const oh = Math.max(1, overlay.naturalHeight || overlay.height);
-  const containScale = Math.min(width / ow, height / oh);
-  const dw = ow * containScale;
-  const dh = oh * containScale;
-  ctx.drawImage(overlay, (width - dw) / 2, (height - dh) / 2, dw, dh);
+
+  const p = placement || { x: 0.5, y: 0.5, scale: 1, cropX: 0, cropY: 0, cropW: 1, cropH: 1 };
+  const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+  const cropX = clamp01(p.cropX);
+  const cropY = clamp01(p.cropY);
+  const cropW = clamp01(Math.max(0.001, p.cropW));
+  const cropH = clamp01(Math.max(0.001, p.cropH));
+  const srcX = Math.min(ow - 1, Math.floor(ow * cropX));
+  const srcY = Math.min(oh - 1, Math.floor(oh * cropY));
+  const srcW = Math.max(1, Math.min(Math.floor(ow * cropW), ow - srcX));
+  const srcH = Math.max(1, Math.min(Math.floor(oh * cropH), oh - srcY));
+  const containScale = Math.min(width / srcW, height / srcH);
+  const dstW = Math.max(1, Math.round(srcW * containScale * p.scale));
+  const dstH = Math.max(1, Math.round(srcH * containScale * p.scale));
+  const dstX = Math.round(width * clamp01(p.x) - dstW / 2);
+  const dstY = Math.round(height * clamp01(p.y) - dstH / 2);
+  ctx.drawImage(overlay, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
   const overData = ctx.getImageData(0, 0, width, height);
 
   if (negative) {
@@ -95,8 +125,15 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   // a multi-level reveal. 32 is aggressive enough to absorb JPEG artifacts
   // across multiple chain links.
   const QUANT = 32;
+  const ALPHA_THRESHOLD = 25;
   for (let i = 0; i < b.length; i += 4) {
     const bg = Math.round(b[i] * 0.299 + b[i + 1] * 0.587 + b[i + 2] * 0.114);
+    const a = o[i + 3];
+    if (a < ALPHA_THRESHOLD) {
+      r[i] = r[i + 1] = r[i + 2] = bg;
+      r[i + 3] = 255;
+      continue;
+    }
     const og = Math.round(o[i] * 0.299 + o[i + 1] * 0.587 + o[i + 2] * 0.114);
     let v: number;
     if (op === 'stamp') v = Math.min(bg, og);

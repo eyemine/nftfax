@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
-import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp } from '../lib/image';
+import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlacement } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
 import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
@@ -34,6 +34,8 @@ const MINT_LIMIT_NOTICE: Record<string, string> = {
 };
 
 const DECAY_MS = 8 * 24 * 60 * 60 * 1000; // 8-day decay
+
+const DEFAULT_PLACEMENT: OverlayPlacement = { x: 0.5, y: 0.5, scale: 1, cropX: 0, cropY: 0, cropW: 1, cropH: 1 };
 
 interface InboxFax {
   id: string;
@@ -183,6 +185,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [compositeFormat, setCompositeFormat] = useState<'png' | 'jpg'>('jpg');
   const [compositing, setCompositing] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(1);
+  const [overlayPlacement, setOverlayPlacement] = useState<OverlayPlacement>(DEFAULT_PLACEMENT);
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState<InboxFax | null>(null);
   const [relaySuggestions, setRelaySuggestions] = useState<RelaySuggestion[]>([]);
@@ -246,6 +249,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setOverlaySrc('');
     setChainOp('ghost');
     setNegative(false);
+    setOverlayPlacement(DEFAULT_PLACEMENT);
     setCompositeBase64('');
     setCompositePreview('');
     setCompositeFormat('jpg');
@@ -268,14 +272,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     return () => { cancelled = true; };
   }, [selected]);
 
-  // Recompute the composite whenever the overlay, operation, negative toggle, or base changes.
+  // Recompute the composite whenever the overlay, operation, placement, negative toggle, or base changes.
   useEffect(() => {
     if (!overlaySrc || !baseSrc) { setCompositeBase64(''); setCompositePreview(''); return; }
     let cancelled = false;
     setCompositing(true);
     (async () => {
       try {
-        const result = await compositeChain(baseSrc, overlaySrc, chainOp, negative);
+        const result = await compositeChain(baseSrc, overlaySrc, chainOp, negative, overlayPlacement);
         if (!cancelled) { setCompositeBase64(result.base64); setCompositePreview(result.preview); setCompositeFormat(result.format); }
       } catch (cause: unknown) {
         if (!cancelled) setNotice(cause instanceof Error ? cause.message : 'Compositing failed.');
@@ -284,10 +288,11 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       }
     })();
     return () => { cancelled = true; };
-  }, [overlaySrc, baseSrc, chainOp, negative]);
+  }, [overlaySrc, baseSrc, chainOp, negative, overlayPlacement]);
 
   function selectForwardFile(file: File) {
     setNotice('');
+    setOverlayPlacement(DEFAULT_PLACEMENT);
     const reader = new FileReader();
     reader.onload = () => { setOverlaySrc(String(reader.result || '')); setForwardFileName(file.name); };
     reader.onerror = () => setNotice('Could not read the selected image.');
@@ -1058,6 +1063,28 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                           })}
                         </div>
                         <p className="mt-2 text-[11px] text-[#4a4638]">{CHAIN_OPS.find((o) => o.id === chainOp)?.hint}</p>
+
+                        <div className="mt-4 space-y-2 border-t border-[#8f8878] pt-3">
+                          <div className="mb-2 flex items-center justify-between">
+                            <p className="text-[11px] font-bold uppercase tracking-[.18em] text-[#615c50]">Placement & crop</p>
+                            <button
+                              type="button"
+                              onClick={() => setOverlayPlacement(DEFAULT_PLACEMENT)}
+                              className="text-[10px] font-bold uppercase text-[#4a4638] underline"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px] font-bold uppercase text-[#4a4638]">
+                            <label className="space-y-0.5">X <input type="range" min="0" max="1" step="0.01" value={overlayPlacement.x} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, x: parseFloat(e.target.value) }))} className="w-full" /></label>
+                            <label className="space-y-0.5">Y <input type="range" min="0" max="1" step="0.01" value={overlayPlacement.y} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, y: parseFloat(e.target.value) }))} className="w-full" /></label>
+                            <label className="col-span-2 space-y-0.5">Scale <input type="range" min="0.1" max="3" step="0.05" value={overlayPlacement.scale} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, scale: parseFloat(e.target.value) }))} className="w-full" /></label>
+                            <label className="space-y-0.5">Crop X <input type="range" min="0" max="1" step="0.01" value={overlayPlacement.cropX} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, cropX: parseFloat(e.target.value) }))} className="w-full" /></label>
+                            <label className="space-y-0.5">Crop Y <input type="range" min="0" max="1" step="0.01" value={overlayPlacement.cropY} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, cropY: parseFloat(e.target.value) }))} className="w-full" /></label>
+                            <label className="space-y-0.5">Crop W <input type="range" min="0.01" max="1" step="0.01" value={overlayPlacement.cropW} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, cropW: parseFloat(e.target.value) }))} className="w-full" /></label>
+                            <label className="space-y-0.5">Crop H <input type="range" min="0.01" max="1" step="0.01" value={overlayPlacement.cropH} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, cropH: parseFloat(e.target.value) }))} className="w-full" /></label>
+                          </div>
+                        </div>
                       </div>
                     )}
                     {!overlaySrc && <p className="mb-4 text-[11px] text-[#6e685a]">No image? The existing fax is forwarded unchanged.</p>}
