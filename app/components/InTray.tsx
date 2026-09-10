@@ -497,7 +497,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           if (!provider || placeholder) throw new Error(gaslessErr.error || 'Gasless save unavailable and wallet not connected.');
           await switchToChain(provider, cfg.chain);
           const saveData = encodeSaveFax(wallet, targetId, tokenURI);
-          const sent = await sendMintTx(provider, wallet, { to: cfg.contract, data: saveData, value: '0x0' });
+          const sent = await sendMintTx(provider, wallet, { to: cfg.contract, data: saveData, value: '0x0', chainId: cfg.chain.hexId, rpcUrl: cfg.chain.rpcUrl });
           if (sent.error) throw new Error(sent.error);
           if (!sent.txHash) throw new Error('Wallet did not return a transaction hash.');
           txHash = sent.txHash;

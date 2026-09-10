@@ -191,6 +191,7 @@ export interface BuildMintTxResult {
   data: string;
   value: string; // hex-encoded wei, for eth_sendTransaction
   chainId?: string; // hex chain id for wallet_sendCalls (Base 0x2105)
+  rpcUrl?: string; // RPC to poll for the on-chain receipt
   error?: string;
 }
 
@@ -220,7 +221,7 @@ export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, 
     const data = tokenURI
       ? MINT_FAX_ON_CHAIN_WITH_URI_SELECTOR + encodeUint256(identity.tokenId) + encodeTrailingStrings(1, [trayId, tokenURI])
       : MINT_FAX_ON_CHAIN_SELECTOR + encodeUint256(identity.tokenId) + encodeTrailingString(2, trayId);
-    return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId };
+    return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId, rpcUrl: BASE_CHAIN.rpcUrl };
   }
 
   const resolved = await resolveMintRecipient({
@@ -245,7 +246,7 @@ export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, 
       encodeUint256(community) +
       encodeUint256(onChainSourceTokenId) +
       encodeTrailingString(4, trayId);
-  return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId };
+  return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId, rpcUrl: BASE_CHAIN.rpcUrl };
 }
 
 /// Pins the fax's image + metadata JSON to IPFS via the `/api/tray/[id]/pin`
@@ -286,13 +287,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+interface TransactionReceipt {
+  transactionHash?: string;
+  status?: string; // '0x1' success, '0x0' failure
+}
+
 interface CallsStatusResponse {
   status?: number;
   atomic?: boolean;
-  receipts?: { transactionHash?: string }[];
+  receipts?: TransactionReceipt[];
 }
 
-async function getCallsTransactionHash(provider: EthereumProvider, callId: string, timeoutMs = 25000, intervalMs = 2000): Promise<string | undefined> {
+interface RpcReceiptResponse {
+  result?: { status?: string } | null;
+  error?: { message?: string };
+}
+
+async function getCallsTransactionHash(provider: EthereumProvider, callId: string, timeoutMs = 25000, intervalMs = 2000): Promise<string> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     await sleep(intervalMs);
@@ -302,13 +313,35 @@ async function getCallsTransactionHash(provider: EthereumProvider, callId: strin
     if (typeof status.status === 'number') {
       if (status.status >= 400) throw new Error(`Call bundle failed with status ${status.status}`);
       if (status.status === 200) {
-        const txHash = status.receipts?.[0]?.transactionHash;
-        if (txHash) return txHash;
-        throw new Error('Call bundle confirmed but no transaction hash was returned.');
+        const receipt = status.receipts?.[0];
+        if (!receipt) throw new Error('Call bundle confirmed but no receipt was returned.');
+        if (receipt.status === '0x0') throw new Error('Mint transaction reverted on-chain.');
+        if (!receipt.transactionHash) throw new Error('Call bundle confirmed but no transaction hash was returned.');
+        return receipt.transactionHash;
       }
     }
   }
   throw new Error('Call bundle confirmation timed out.');
+}
+
+async function waitForRpcReceipt(rpcUrl: string, txHash: string, timeoutMs = 25000, intervalMs = 2000): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    await sleep(intervalMs);
+    const res = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [txHash] }),
+    });
+    const json = (await res.json()) as RpcReceiptResponse | undefined;
+    if (json?.error) throw new Error(json.error.message || 'Receipt fetch failed.');
+    if (json?.result) {
+      if (json.result.status === '0x1') return;
+      if (json.result.status === '0x0') throw new Error('Transaction reverted on-chain.');
+      throw new Error('Transaction receipt status unknown.');
+    }
+  }
+  throw new Error('Transaction confirmation timed out.');
 }
 
 function isSendCallsUnsupported(err: unknown): boolean {
@@ -320,7 +353,9 @@ function isSendCallsUnsupported(err: unknown): boolean {
 /// Sends the mint transaction via the connected EIP-1193 wallet. For value-
 /// bearing mints it tries EIP-5792 wallet_sendCalls first so smart accounts
 /// correctly forward the call value. Falls back to eth_sendTransaction for
-/// EOAs or wallets that do not support wallet_sendCalls.
+/// EOAs or wallets that do not support wallet_sendCalls. The returned hash is
+/// only returned after the transaction is confirmed on-chain, so failed mints
+/// are never recorded as minted.
 export async function sendMintTx(
   provider: EthereumProvider,
   fromAccount: string,
@@ -347,6 +382,7 @@ export async function sendMintTx(
       const callId = (bundle as { id?: string }).id;
       if (!callId) throw new Error('wallet_sendCalls did not return a call bundle id.');
       const txHash = await getCallsTransactionHash(provider, callId);
+      if (tx.rpcUrl) await waitForRpcReceipt(tx.rpcUrl, txHash);
       return { txHash };
     } catch (err: unknown) {
       if (!isSendCallsUnsupported(err)) {
@@ -360,7 +396,9 @@ export async function sendMintTx(
       method: 'eth_sendTransaction',
       params: [{ from: fromAccount, to: tx.to, data: tx.data, value: tx.value }],
     });
-    return { txHash: typeof txHash === 'string' ? txHash : undefined };
+    if (typeof txHash !== 'string') throw new Error('Wallet did not return a transaction hash.');
+    if (tx.rpcUrl) await waitForRpcReceipt(tx.rpcUrl, txHash);
+    return { txHash };
   } catch (err: unknown) {
     const error = err instanceof Error ? err.message : String(err);
     return { error };
