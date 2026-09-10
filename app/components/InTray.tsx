@@ -204,6 +204,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const cleanLocal = useMemo(() => local.trim().toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, ''), [local]);
   const effectiveDomain = useMemo(() => domain.trim().toLowerCase() || 'nftmail.box', [domain]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingActions = useRef(new Map<string, { promise: Promise<void>; resolve: () => void }>());
 
   const load = useCallback(async () => {
     if (!cleanLocal || !wallet) return;
@@ -425,6 +426,20 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       setNotice('No send credits. Minting a fax costs 1 credit.');
       return;
     }
+    const pendingKey = `${kind}:${targetId}`;
+    const existing = pendingActions.current.get(pendingKey);
+    if (existing) {
+      setBusyId(fax.id);
+      try {
+        await existing.promise;
+      } finally {
+        setBusyId('');
+      }
+      return;
+    }
+    let resolve!: () => void;
+    const pending = new Promise<void>((res) => { resolve = res; });
+    pendingActions.current.set(pendingKey, { promise: pending, resolve });
     setBusyId(fax.id);
     setNotice('');
     try {
@@ -537,11 +552,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       setNotice(cause instanceof Error ? cause.message : `${kind} failed`);
     } finally {
       setBusyId('');
+      pendingActions.current.delete(pendingKey);
+      resolve();
     }
   }
 
   function openDetail(fax: InboxFax) {
     setSelected(fax);
+    setBusyId('');
     resetForward();
     resetReply();
     setForwardedTrayId('');
