@@ -270,7 +270,9 @@ export default function RolofaxClient() {
                       }, new Map<string, ChainEntry>()).values() ?? []
                     ).map((entry) => (
                       <tr key={entry.id} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
-                        <td className="p-3 font-mono text-[11px]">T/#{entry.id.toUpperCase()}</td>
+                        <td className="p-3 font-mono text-[11px]">
+                          <a href={`https://nftmail.box/tray/${entry.id}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">T/#{entry.id}</a>
+                        </td>
                         <td className="p-3">{entry.from}</td>
                         <td className="p-3">{entry.to}</td>
                         <td className="p-3">{entry.chainDepth}</td>
@@ -375,7 +377,11 @@ export default function RolofaxClient() {
                         </a>
                       </td>
                       <td className="p-3"><MintPreview trayId={mint.trayId} /></td>
-                      <td className="p-3 font-mono">{mint.trayId || '—'}</td>
+                      <td className="p-3 font-mono">
+                        {mint.trayId ? (
+                          <a href={`https://nftmail.box/tray/${mint.trayId}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">{mint.trayId}</a>
+                        ) : '—'}
+                      </td>
                       <td className="p-3">{tierForDepth(Math.max(0, (mint.chainDepth ?? 1) - 1))}</td>
                       <td className="p-3 font-mono">{minterEoaLabel(mint)}</td>
                       <td className="p-3">{faxIdentity(mint)}</td>

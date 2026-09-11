@@ -469,19 +469,20 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         // (fax.forwardedTrayId — their own composited hop), not the received
         // fax (targetId) — minting is only unlocked after forwarding, so the
         // collectible should represent what the player actually contributed.
-        // targetId is still used below for the on-chain trayId argument since
-        // that's an ownership/ProvenanceId constraint (see comment below), not
-        // a display concern.
+        // The on-chain trayId argument ALSO uses the forwarded fax ID, since
+        // it's the player's own contribution that's being immortalized, not
+        // the received fax they were merely a relay for.
+        const mintTrayId = fax.forwardedTrayId || targetId;
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
-          tokenURI = await pinFaxMetadata(fax.forwardedTrayId || targetId, cleanLocal).catch(() => null) || undefined;
+          tokenURI = await pinFaxMetadata(mintTrayId, cleanLocal).catch(() => null) || undefined;
         }
         // The mint always identifies the token via the CALLER's own mailbox
-        // identity (cleanLocal) — the fax being minted (targetId) is always
-        // one the caller received. On the Sent tab, fax.to is the downstream
+        // identity (cleanLocal) — the fax being minted is always one the caller
+        // received and forwarded. On the Sent tab, fax.to is the downstream
         // recipient the caller forwarded to, not the caller themselves, so it
         // must not be used here.
-        const tx = await buildMintTx({ local: cleanLocal, connectedWallet: wallet, trayId: targetId, rootTrayId: fax.rootTrayId, tokenURI });
+        const tx = await buildMintTx({ local: cleanLocal, connectedWallet: wallet, trayId: mintTrayId, rootTrayId: fax.rootTrayId, tokenURI });
         if (tx.error) throw new Error(tx.error);
         const sent = await sendMintTx(provider, wallet, tx);
         if (sent.error) throw new Error(sent.error);
