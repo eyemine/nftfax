@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
       collection?: string;
       sourceChainDepth?: number;
       sourceMintedBase?: boolean;
+      coverNote?: string;
     };
 
     let { fromLabel, ownerWallet, to, format, dataBase64, chainTrayId } = body;
@@ -204,6 +205,10 @@ export async function POST(req: NextRequest) {
       chainTimerDuration,
       ownerWallet: (body.ownerWallet || '').toLowerCase().trim(),
     };
+    // Pass through cover note (sanitized + capped in the worker).
+    if (body.coverNote) {
+      trayPayload.coverNote = body.coverNote.trim().slice(0, 140);
+    }
     if (chainTrayId) {
       trayPayload.chainTrayId = chainTrayId;
     }

@@ -18,6 +18,7 @@ interface TrayDocument {
   createdAt: number;
   chainDepth?: number;
   chainTimerDuration?: number;
+  coverNote?: string;
 }
 
 const DEFAULT_JAM_MS = 72 * 60 * 60 * 1000;
@@ -71,7 +72,14 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
           </div>
 
           <div className="grid gap-6 p-5 md:p-8 lg:grid-cols-[1fr_340px]">
-            <div className="flex min-h-[360px] items-center justify-center overflow-hidden border border-[#918978] bg-[#e7e0d1] p-4">
+            <div>
+              {doc.coverNote && (
+                <div className="mb-4 border-l-4 border-[#8f8878] bg-[#e7e0d1] p-3">
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-[.16em] text-[#6e685a]">Cover note</p>
+                  <p className="text-[13px] text-[#3a362c]">{doc.coverNote}</p>
+                </div>
+              )}
+              <div className="flex min-h-[360px] items-center justify-center overflow-hidden border border-[#918978] bg-[#e7e0d1] p-4">
               {doc.encrypted || doc.channel === 'private' ? (
                 <div className="grid place-items-center text-center text-[#8a836f]">
                   <Lock size={32} className="mb-2" />
@@ -88,6 +96,7 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
               ) : (
                 <Loader2 className="animate-spin text-[#847d6e]" />
               )}
+              </div>
             </div>
 
             <div className="space-y-4 text-[12px] font-bold uppercase text-[#4a4638]">

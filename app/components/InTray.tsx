@@ -59,6 +59,7 @@ interface InboxFax {
   sourceMintedBase?: boolean;
   reroutedAt?: number | null;
   pinnedURI?: string | null;
+  coverNote?: string;
 }
 
 interface RelaySuggestion {
@@ -176,6 +177,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [forwardTo, setForwardTo] = useState('');
   const [forwardedTrayId, setForwardedTrayId] = useState('');
   const [forwardFileName, setForwardFileName] = useState('');
+  const [forwardCoverNote, setForwardCoverNote] = useState('');
   const [baseSrc, setBaseSrc] = useState('');
   const [overlaySrc, setOverlaySrc] = useState('');
   const [chainOp, setChainOp] = useState<ChainOp>('ghost');
@@ -200,6 +202,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [replyPreview, setReplyPreview] = useState('');
   const [replyError, setReplyError] = useState('');
   const [replyBusy, setReplyBusy] = useState(false);
+  const [replyCoverNote, setReplyCoverNote] = useState('');
   const replyFileInputRef = useRef<HTMLInputElement>(null);
   const cleanLocal = useMemo(() => local.trim().toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, ''), [local]);
   const effectiveDomain = useMemo(() => domain.trim().toLowerCase() || 'nftmail.box', [domain]);
@@ -257,6 +260,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setCompositing(false);
     setPreviewZoom(1);
     setForwardError('');
+    setForwardCoverNote('');
   }
 
   // Load the selected fax bitmap so it can be used as the compositing base.
@@ -321,6 +325,9 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         payload.format = compositeFormat;
         payload.dataBase64 = compositeBase64;
       }
+      if (forwardCoverNote.trim()) {
+        payload.coverNote = forwardCoverNote.trim().slice(0, 140);
+      }
       const res = await fetch('/api/tray/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -363,6 +370,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setReplyPreview('');
     setReplyError('');
     setReplyBusy(false);
+    setReplyCoverNote('');
   }
 
   function selectReplyFile(file: File) {
@@ -400,6 +408,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           format: 'jpg',
           dataBase64: replyBase64,
           colorMode: 'greyscale',
+          ...(replyCoverNote.trim() ? { coverNote: replyCoverNote.trim().slice(0, 140) } : {}),
         }),
       });
       const data = await res.json() as { error?: string; id?: string };
@@ -854,6 +863,13 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   </div>
                 </div>
 
+                {selected.coverNote && (
+                  <div className="mb-5 border-l-4 border-[#8f8878] bg-[#e7e0d1] p-3">
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-[.16em] text-[#6e685a]">Cover note</p>
+                    <p className="text-[12px] font-normal normal-case text-[#3a362c]">{selected.coverNote}</p>
+                  </div>
+                )}
+
                 {/* Re-route panel for sent faxes (relay window) */}
                 {activeTab === 'sent' && !selected.recipientForwarded && !selected.reroutedAt && !selected.encrypted && (() => {
                   const sentElapsed = now - selected.createdAt;
@@ -969,6 +985,17 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                       className="mb-3 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
                     />
 
+                    <div className="mb-3">
+                      <textarea
+                        value={replyCoverNote}
+                        onChange={(e) => setReplyCoverNote(e.target.value.slice(0, 140))}
+                        placeholder="Add cover note (optional, 140 chars max)…"
+                        rows={2}
+                        className="w-full resize-none border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-sm outline-none focus:border-[#e65b2f]"
+                      />
+                      <p className="mt-1 text-right text-[10px] font-bold uppercase text-[#6e685a]">{replyCoverNote.length}/140</p>
+                    </div>
+
                     <button
                       onClick={() => replyFileInputRef.current?.click()}
                       onDragOver={(e) => e.preventDefault()}
@@ -1052,6 +1079,17 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                       placeholder="collection.1234@fax"
                       className="mb-3 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
                     />
+
+                    <div className="mb-3">
+                      <textarea
+                        value={forwardCoverNote}
+                        onChange={(e) => setForwardCoverNote(e.target.value.slice(0, 140))}
+                        placeholder="Add cover note (optional, 140 chars max)…"
+                        rows={2}
+                        className="w-full resize-none border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-sm outline-none focus:border-[#e65b2f]"
+                      />
+                      <p className="mt-1 text-right text-[10px] font-bold uppercase text-[#6e685a]">{forwardCoverNote.length}/140</p>
+                    </div>
 
                     <button
                       onClick={() => fileInputRef.current?.click()}
