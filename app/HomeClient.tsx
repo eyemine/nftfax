@@ -30,6 +30,7 @@ export default function HomeClient() {
   const [base64, setBase64] = useState('');
   const [preview, setPreview] = useState('');
   const [sizeKb, setSizeKb] = useState(0);
+  const [coverNote, setCoverNote] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [trayUrl, setTrayUrl] = useState('');
@@ -125,6 +126,7 @@ export default function HomeClient() {
           format: 'jpg',
           dataBase64: base64,
           colorMode: 'greyscale',
+          ...(coverNote.trim() ? { coverNote: coverNote.trim().slice(0, 140) } : {}),
         }),
       });
       const result = await response.json() as { trayUrl?: string; error?: string };
@@ -330,6 +332,18 @@ export default function HomeClient() {
 
             <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">From fax handle</span>{rolofaxEntries.length > 0 && (<select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select a Rolofax handle…</option>{rolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<div className="flex"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></label>
             <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Destination address</span>{otherRolofaxEntries.length > 0 && (<select value={recipient.includes('@fax') ? recipient.replace(/@fax$/, '') : ''} onChange={(event) => { const h = event.target.value; setRecipient(h ? `${h}@fax` : ''); }} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select from Rolofax directory…</option>{otherRolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></label>
+
+            <div className="mb-5">
+              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Cover note (optional)</span>
+              <textarea
+                value={coverNote}
+                onChange={(e) => setCoverNote(e.target.value.slice(0, 140))}
+                placeholder="Add a cover note (140 chars max)…"
+                rows={2}
+                className="w-full resize-none border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-sm outline-none focus:border-[#e65b2f]"
+              />
+              <p className="mt-1 text-right text-[10px] font-bold uppercase text-[#6e685a]">{coverNote.length}/140</p>
+            </div>
 
             {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">FAULT: {error}</div>}
             {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
