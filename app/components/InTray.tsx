@@ -427,9 +427,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   async function act(fax: InboxFax, kind: 'mint' | 'save') {
     // Mint and Save both act on the fax the CALLER received, not the one they
     // forwarded onward — the ownership check (/api/tray/inbox) only recognizes
-    // items in the caller's own inbox. On the Sent tab, that's fax.sourceTrayId
-    // (the link they received and are re-broadcasting), not fax.id (the outgoing
-    // copy addressed to someone else's inbox).
+    // The tray ID used for API calls (ownership verification). On the Sent
+    // tab, the mint/save API searches the caller's inbox for this ID, so it
+    // must be the RECEIVED fax (fax.sourceTrayId), not the sent fax.
+    // On the Inbox/Saved tab, fax.id is the received fax in the inbox.
     const targetId = activeTab === 'sent' ? (fax.sourceTrayId || fax.id) : fax.id;
     if (kind === 'mint' && (credits ?? 0) <= 0) {
       setNotice('No send credits. Minting a fax costs 1 credit.');
@@ -473,15 +474,13 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         // gas-reserve underflow bug in MetaMask's delegation framework.
         const smartWalletError = await checkSmartWalletMintEligibility(provider, wallet, MINT_CONFIG.chain.rpcUrl);
         if (smartWalletError) throw new Error(smartWalletError);
-        // Use pre-pinned URI from forward time if available; otherwise pin now (best-effort).
         // The ARTWORK/metadata must reflect the fax the caller forwarded onward
-        // (fax.forwardedTrayId — their own composited hop), not the received
-        // fax (targetId) — minting is only unlocked after forwarding, so the
-        // collectible should represent what the player actually contributed.
-        // The on-chain trayId argument ALSO uses the forwarded fax ID, since
-        // it's the player's own contribution that's being immortalized, not
-        // the received fax they were merely a relay for.
-        const mintTrayId = fax.forwardedTrayId || targetId;
+        // (their own composited hop), not the received fax — minting is only
+        // unlocked after forwarding, so the collectible should represent what
+        // the player actually contributed.
+        // On the Sent tab, fax.id IS the forwarded hop (the sent fax itself).
+        // On the Inbox/Saved tab, fax.forwardedTrayId is the forwarded hop.
+        const mintTrayId = activeTab === 'sent' ? fax.id : (fax.forwardedTrayId || fax.id);
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
           tokenURI = await pinFaxMetadata(mintTrayId, cleanLocal).catch(() => null) || undefined;
@@ -502,9 +501,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       if (kind === 'save') {
         // Gasless-first Save to Gnosis: server-side relayer pays the xDAI gas.
         // Same artwork-identity rule as mint above — prefer the forwarded hop.
+        const saveTrayId = activeTab === 'sent' ? fax.id : (fax.forwardedTrayId || fax.id);
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
-          tokenURI = await pinFaxMetadata(fax.forwardedTrayId || targetId, cleanLocal).catch(() => null) || undefined;
+          tokenURI = await pinFaxMetadata(saveTrayId, cleanLocal).catch(() => null) || undefined;
         }
         if (!tokenURI) throw new Error('Could not pin fax metadata for saving.');
 
