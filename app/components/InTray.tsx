@@ -650,12 +650,13 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const mintLimitAlert = useMemo(() => {
     const identity = parseFaxIdentity(cleanLocal);
     const notice = identity ? MINT_LIMIT_NOTICE[identity.collection] : null;
-    const hasMinted = faxes.some((f) => f.mintedBase);
+    // Only count this user's own mints, not upstream source mints.
+    const hasMinted = faxes.some((f) => f.mintedBase) || sentFaxes.some((f) => f.mintedBase);
     return notice ? { notice, hasMinted } : null;
-  }, [cleanLocal, faxes]);
+  }, [cleanLocal, faxes, sentFaxes]);
 
   const sentMintedIds = useMemo(() => new Set(
-    sentFaxes.filter((f) => f.mintedBase || f.sourceMintedBase).map((f) => f.id),
+    sentFaxes.filter((f) => f.mintedBase).map((f) => f.id),
   ), [sentFaxes]);
 
   const displayedFaxes: InboxFax[] = useMemo(() => {
@@ -664,7 +665,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     if (activeTab === 'minted') {
       const inboxMinted = faxes.filter((f) => f.mintedBase);
       const inboxMintedIds = new Set(inboxMinted.map((f) => f.id));
-      const sentMinted = sentFaxes.filter((f) => (f.mintedBase || f.sourceMintedBase) && !inboxMintedIds.has(f.id));
+      const sentMinted = sentFaxes.filter((f) => f.mintedBase && !inboxMintedIds.has(f.id));
       return [...inboxMinted, ...sentMinted];
     }
     // Fax-Tray: show all received faxes (forwarded/minted retained with status badges)
@@ -778,7 +779,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                     {busyId === fax.id ? 'Deleting…' : 'Delete'}
                   </button>
                 )}
-                {activeTab === 'sent' && fax.forwarded && !fax.mintedBase && !fax.sourceMintedBase && <p className="text-[11px] uppercase tracking-wide text-[#26417d]">Mint available — click to mint</p>}
+                {activeTab === 'sent' && fax.forwarded && !fax.mintedBase && <p className="text-[11px] uppercase tracking-wide text-[#26417d]">Mint available — click to mint</p>}
               </div>
             </div>
           );
@@ -923,7 +924,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   );
                 })()}
 
-                {selected.forwarded && !selected.mintedBase && !selected.sourceMintedBase && (
+                {selected.forwarded && !selected.mintedBase && (
                   <div className="mb-5 border-2 border-[#3d6fd6] bg-[#d3ddf2] p-4">
                     <p className="mb-2 text-[12px] font-black uppercase tracking-[.14em] text-[#26417d]">✓ Forwarded — Mint unlocked</p>
                     <p className="mb-3 text-[12px] text-[#26417d]">You've passed the chain on. Mint this fax to Base as a permanent collectible.</p>
@@ -960,7 +961,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   >
                     <Send size={12} className="-scale-x-100" /> Reply
                   </button>
-                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || !!selected.sourceMintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
+                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
                     <Coins size={12} /> {MINT_PAUSED ? 'Paused' : 'Mint'}
                   </button>
                   <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis || !selected.forwarded} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[11px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
@@ -1020,7 +1021,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                     </div>
                   </div>
                 )}
-                {activeTab === 'sent' && !selected.mintedBase && !selected.sourceMintedBase && !selected.savedGnosis && !MINT_PAUSED && !selected.encrypted && (selected.sourceTrayId || selected.chainTrayId || selected.recipientForwarded || selected.forwarded) && (
+                {activeTab === 'sent' && !selected.mintedBase && !selected.savedGnosis && !MINT_PAUSED && !selected.encrypted && (selected.sourceTrayId || selected.chainTrayId || selected.recipientForwarded || selected.forwarded) && (
                 <div className="mb-5 grid grid-cols-2 gap-2">
                   <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
