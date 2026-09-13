@@ -42,6 +42,29 @@ function parseHandle(raw: string): ParsedHandle | null {
   return { collection, tokenId };
 }
 
+/// Public IPFS gateways to fall back through, in order.
+///
+/// Some collections (Deadfellaz) publish an absolute gateway URL in their
+/// metadata rather than an ipfs:// URI, and that gateway rate-limits — a
+/// direct load returns 429 and the thumbnail would show N/A. The CID is the
+/// stable part, so on failure we retry the same content elsewhere.
+const IPFS_FALLBACK_GATEWAYS = [
+  'https://ipfs.io/ipfs/',
+  'https://dweb.link/ipfs/',
+  'https://nftstorage.link/ipfs/',
+  'https://cloudflare-ipfs.com/ipfs/',
+];
+
+/// Extracts the `<cid>/<path>` portion of any `/ipfs/...` URL, or null when the
+/// URL is not IPFS-backed (on-chain data: URIs, plain HTTPS art).
+function ipfsPathOf(url: string): string | null {
+  const marker = '/ipfs/';
+  const at = url.indexOf(marker);
+  if (at < 0) return null;
+  const path = url.slice(at + marker.length);
+  return path || null;
+}
+
 interface FaxHandleThumbProps {
   /** The handle to preview, e.g. "chonk.681" or "chonk.681@fax". */
   handle: string;
@@ -55,12 +78,27 @@ export function FaxHandleThumb({ handle, size = 46, style, label }: FaxHandleThu
   const parsed = parseHandle(handle);
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  /// How many IPFS gateways we've already tried for the current image.
+  const [gatewayAttempt, setGatewayAttempt] = useState(0);
+
+  /// Advances to the next gateway when an IPFS-backed image fails to load,
+  /// and only gives up once the alternatives are exhausted.
+  const handleImageError = () => {
+    const path = src ? ipfsPathOf(src) : null;
+    if (path && gatewayAttempt < IPFS_FALLBACK_GATEWAYS.length) {
+      setSrc(IPFS_FALLBACK_GATEWAYS[gatewayAttempt] + path);
+      setGatewayAttempt(gatewayAttempt + 1);
+      return;
+    }
+    setFailed(true);
+  };
 
   useEffect(() => {
     if (!parsed) { setSrc(null); setFailed(false); return; }
     let cancelled = false;
     setSrc(null);
     setFailed(false);
+    setGatewayAttempt(0);
     const theme = getCollectionTheme(parsed.collection);
     void (async () => {
       try {
@@ -105,7 +143,7 @@ export function FaxHandleThumb({ handle, size = 46, style, label }: FaxHandleThu
           alt={title ?? `${parsed.collection} #${parsed.tokenId}`}
           className="h-full w-full object-cover"
           style={{ imageRendering: 'pixelated' }}
-          onError={() => setFailed(true)}
+          onError={handleImageError}
         />
       ) : (
         <span className="h-3 w-3 animate-pulse rounded-full bg-[#a99f8b]" />
