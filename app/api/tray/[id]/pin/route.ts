@@ -22,6 +22,10 @@ import { uploadImageToArweave, uploadJSONToArweave, arweaveTxIdToURI } from '../
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 
+const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
+const WORKER_SECRET = process.env.WORKER_SECRET || '';
+const WEBHOOK_SECRET = process.env.NFTMAIL_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || '';
+
 const BASE_RPC = 'https://mainnet.base.org';
 const BASE_FAX_COLLECTIBLE = '0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5';
 const TOTAL_MINTED_SELECTOR = '0xa2309ff8'; // totalMinted()
@@ -84,6 +88,73 @@ function collectionNameFromLocal(local: string): string {
   return PREFIX_TO_COLLECTION_NAME[prefix] ?? 'Unknown';
 }
 
+/// Mirrors a fax's image + metadata to Arweave and records the resulting
+/// `ar://` pointers on the worker, keyed by tray id.
+///
+/// Runs detached from the pin response (see the call site) because funding Irys
+/// and uploading a ~900KB bitmap takes ~25s and must not delay a mint.
+///
+/// The Arweave copy is deliberately SELF-CONTAINED: the image is uploaded first
+/// and referenced as `ar://` in an Arweave-only metadata variant. Uploading both
+/// in parallel and discarding the image txId (the earlier behaviour) left the
+/// mirror's `image` pointing at ipfs://, so if IPFS was what failed, the ar://
+/// metadata resolved with a dead image. The IPFS copy is untouched.
+async function mirrorToArweave(args: {
+  id: string;
+  local: string;
+  format: 'png' | 'jpeg';
+  dataBase64: string;
+  metadata: Record<string, unknown>;
+  nextTokenId: number | null;
+}): Promise<void> {
+  const { id, local, format, dataBase64, metadata, nextTokenId } = args;
+  try {
+    const tags = [
+      { name: 'Tray-Id', value: id },
+      ...(local ? [{ name: 'Fax-Mailbox', value: local }] : []),
+      ...(nextTokenId ? [{ name: 'Expected-Token-Id', value: String(nextTokenId) }] : []),
+    ];
+
+    const arweaveImage = await uploadImageToArweave(
+      Buffer.from(dataBase64, 'base64'),
+      format === 'png' ? 'image/png' : 'image/jpeg',
+      [...tags, { name: 'Fax-Asset', value: 'image' }],
+    );
+    const arweaveImageURI = arweaveImage ? arweaveTxIdToURI(arweaveImage.id) : null;
+
+    const arweaveMeta = await uploadJSONToArweave(
+      arweaveImageURI ? { ...metadata, image: arweaveImageURI } : metadata,
+      [...tags, { name: 'Fax-Asset', value: 'metadata' }],
+    );
+    if (!arweaveMeta) return;
+
+    const arweaveURI = arweaveTxIdToURI(arweaveMeta.id);
+    console.log(
+      `[pin] Arweave mirror stored for ${id}: ${arweaveURI}` +
+      (arweaveImageURI ? ` (self-contained, image ${arweaveImageURI})` : ' (WARNING: image upload failed, image still points at IPFS)'),
+    );
+
+    // Record the pointers so recovery does not depend on querying Irys by tag.
+    await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(WORKER_SECRET ? { 'X-Worker-Secret': WORKER_SECRET } : {}),
+      },
+      body: JSON.stringify({
+        action: 'setTrayArweave',
+        secret: WEBHOOK_SECRET,
+        trayId: id,
+        arweaveUri: arweaveURI,
+        arweaveImageUri: arweaveImageURI,
+      }),
+    }).catch(() => { /* tags remain as the fallback recovery path */ });
+  } catch (cause) {
+    // Best-effort by design: a mirror failure must never affect a mint.
+    console.error(`[pin] Arweave mirror failed for ${id}:`, cause);
+  }
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json().catch(() => ({})) as { local?: string };
@@ -138,55 +209,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ tokenURI: null, reason: 'metadata_pin_failed' }, { status: 200, headers: NO_STORE });
     }
 
-    // Belt-and-suspenders: also store permanently on Arweave (non-fatal).
-    // IPFS stays the primary tokenURI; Arweave is the backup you switch to via
-    // setTokenURI(tokenId, ar://<txId>) if Pinata ever goes down.
+    // Belt-and-suspenders: also mirror to Arweave — but NOT on this request's
+    // critical path.
     //
-    // For that switch to actually work the Arweave copy must be SELF-CONTAINED.
-    // Previously both uploads ran in parallel and the image's txId was thrown
-    // away, so the Arweave metadata still pointed `image` at ipfs:// — if IPFS
-    // was the thing that failed, the ar:// metadata resolved with a dead image.
-    // So: upload the image first, then reference it as ar:// in an Arweave-only
-    // metadata variant. The IPFS copy above is untouched and still points at
-    // ipfs://, so nothing about the primary path changes.
-    //
-    // Both uploads are tagged with the tray id so a txId can be recovered later
-    // (tokenId -> mint record -> trayId -> Irys GraphQL by Tray-Id tag).
-    let arweaveURI: string | null = null;
-    let arweaveImageURI: string | null = null;
-    try {
-      const imageBuffer = Buffer.from(doc.dataBase64, 'base64');
-      const tags = [
-        { name: 'Tray-Id', value: id },
-        ...(local ? [{ name: 'Fax-Mailbox', value: local }] : []),
-        ...(nextTokenId ? [{ name: 'Expected-Token-Id', value: String(nextTokenId) }] : []),
-      ];
-
-      const arweaveImage = await uploadImageToArweave(
-        imageBuffer,
-        format === 'png' ? 'image/png' : 'image/jpeg',
-        [...tags, { name: 'Fax-Asset', value: 'image' }],
-      );
-      if (arweaveImage) arweaveImageURI = arweaveTxIdToURI(arweaveImage.id);
-
-      const arweaveMetadata = arweaveImageURI ? { ...metadata, image: arweaveImageURI } : metadata;
-      const arweaveMeta = await uploadJSONToArweave(
-        arweaveMetadata,
-        [...tags, { name: 'Fax-Asset', value: 'metadata' }],
-      );
-      if (arweaveMeta) {
-        arweaveURI = arweaveTxIdToURI(arweaveMeta.id);
-        console.log(
-          `[pin] Arweave backup stored: ${arweaveURI}` +
-          (arweaveImageURI ? ` (self-contained, image ${arweaveImageURI})` : ' (WARNING: image upload failed, image still points at IPFS)'),
-        );
-      }
-    } catch {
-      // Arweave is best-effort; never block the response on it.
-    }
+    // This route is awaited by the mint flow before the wallet is even asked to
+    // sign. Funding the Irys node and pushing a ~900KB bitmap takes ~25s, which
+    // made clicking "Mint" look like nothing was happening at all. Arweave is a
+    // backup, so it must never delay a mint. Fire it off and return immediately;
+    // this runs as a persistent Node process (not serverless), so the task
+    // survives the response. The txId is recorded to the worker from inside the
+    // task, keyed by tray id, so nothing is lost by not returning it here.
+    void mirrorToArweave({ id, local, format, dataBase64: doc.dataBase64, metadata, nextTokenId });
 
     return NextResponse.json(
-      { tokenURI: metadataUri, imageUri, arweaveURI, arweaveImageURI },
+      { tokenURI: metadataUri, imageUri, arweaveQueued: true },
       { status: 200, headers: NO_STORE },
     );
   } catch {

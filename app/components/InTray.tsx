@@ -455,6 +455,12 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     pendingActions.current.set(pendingKey, { promise: pending, resolve });
     setBusyId(fax.id);
     setNotice('');
+    // Stage tracing. A mint crosses wallet discovery, a chain switch, IPFS
+    // pinning, eligibility and finally the wallet prompt — when one of those
+    // stalls, the UI just sits there and the failure looks silent. Logging each
+    // step makes the stall point visible in the console.
+    const stage = (label: string) => console.log(`[fax][${kind}] ${label}`);
+    stage(`start target=${targetId} tab=${activeTab}`);
     try {
       const cfg = kind === 'mint' ? MINT_CONFIG : SAVE_CONFIG;
       const placeholder = isPlaceholderAddress(cfg.contract);
@@ -482,8 +488,11 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         provider = (window as { ethereum?: Eip1193Provider }).ethereum ?? undefined;
         if (provider) console.warn('[fax] Privy provider unavailable — using window.ethereum');
       }
+      stage(`provider ${provider ? 'resolved' : 'MISSING'}`);
       if (provider && !placeholder) {
+        setNotice('Switching to Base…');
         await switchToChain(provider, cfg.chain);
+        stage('chain switched');
       }
 
       if (kind === 'mint' && provider && !placeholder) {
@@ -494,8 +503,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         // Smart accounts route value-bearing txs through redeemDelegations,
         // which fails with Panic(0x11) due to a NativeBalanceChangeEnforcer
         // gas-reserve underflow bug in MetaMask's delegation framework.
+        setNotice('Checking wallet balance…');
         const fundsError = await checkMintFundsEligibility(provider, wallet, MINT_CONFIG.chain.rpcUrl);
         if (fundsError) throw new Error(fundsError);
+        stage('funds ok');
         // The ARTWORK/metadata must reflect the fax the caller forwarded onward
         // (their own composited hop), not the received fax — minting is only
         // unlocked after forwarding, so the collectible should represent what
@@ -508,20 +519,27 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           // Capture the Arweave backup pointer too, so it can be recorded
           // against the mint below — otherwise the ar:// txId is created and
           // then discarded, leaving the backup unreachable.
+          setNotice('Pinning fax metadata to IPFS…');
+          stage(`pinning ${mintTrayId}`);
           const pinned = await pinFaxMetadataFull(mintTrayId, cleanLocal).catch(() => null);
           tokenURI = pinned?.tokenURI || undefined;
           arweaveUri = pinned?.arweaveURI || undefined;
+          stage(`pinned tokenURI=${tokenURI ?? 'none'}`);
         }
         // The mint always identifies the token via the CALLER's own mailbox
         // identity (cleanLocal) — the fax being minted is always one the caller
         // received and forwarded. On the Sent tab, fax.to is the downstream
         // recipient the caller forwarded to, not the caller themselves, so it
         // must not be used here.
+        setNotice('Preparing transaction…');
         const tx = await buildMintTx({ local: cleanLocal, connectedWallet: wallet, trayId: mintTrayId, rootTrayId: fax.rootTrayId, tokenURI });
         if (tx.error) throw new Error(tx.error);
+        stage(`tx built to=${tx.to} value=${tx.value} data=${tx.data.slice(0, 10)}…`);
+        setNotice('Confirm in your wallet…');
         const sent = await sendMintTx(provider, wallet, tx);
         if (sent.error) throw new Error(sent.error);
         if (!sent.txHash) throw new Error('Wallet did not return a transaction hash.');
+        stage(`tx sent ${sent.txHash}`);
         txHash = sent.txHash;
       } else if (kind === 'mint' && !provider && !placeholder) {
         throw new Error('No wallet available. Connect an EVM wallet (MetaMask) to mint to Base.');
@@ -597,7 +615,13 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       }
       await load();
     } catch (cause: unknown) {
-      setNotice(cause instanceof Error ? cause.message : `${kind} failed`);
+      // Always log the raw cause: setNotice only shows `message`, so anything
+      // without one (or a non-Error throw) previously vanished without trace.
+      console.error(`[fax][${kind}] FAILED`, cause);
+      const message = cause instanceof Error && cause.message
+        ? cause.message
+        : `${kind} failed — see the browser console for details.`;
+      setNotice(message);
     } finally {
       setBusyId('');
       pendingActions.current.delete(pendingKey);
