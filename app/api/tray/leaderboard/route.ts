@@ -30,7 +30,7 @@ import {
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 // NOTE: Alchemy's free tier caps eth_getLogs at a 10-block range (vs. the
-// public Base RPC's 10,000), making it unusable for this route's bulk
+// public Base RPC's 2,000), making it unusable for this route's bulk
 // history scan unless upgraded to a paid plan — deliberately NOT using
 // ALCHEMY_API_KEY here (unlike app/lib/tba.ts) for that reason.
 const RPC_URL = BASE_CHAIN.rpcUrl;
@@ -40,7 +40,10 @@ const CONTRACT = BASE_FAX_COLLECTIBLE;
 // history from DEPLOY_BLOCK on the next request — that full rescan is what
 // intermittently timed out/rate-limited against the public RPC and surfaced
 // to users as "FAULT: Leaderboard request failed".
-const CHUNK_SIZE = 10_000;
+// Base's public RPC caps eth_getLogs at a 2,000-block range. This was 10,000,
+// which meant every chunk failed with `-32614 eth_getLogs is limited to a
+// 2,000 range` and the scan could never advance past the cached block.
+const CHUNK_SIZE = 2_000;
 const MAX_CONCURRENT_CHUNKS = 4;
 const RPC_RETRIES = 3;
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';

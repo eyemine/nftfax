@@ -10,10 +10,22 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { BASE_FAX_COLLECTIBLE } from '../../../lib/contracts';
+import { decodeFaxMintedLog, decodeSourceTokenId, readLogCache } from '../../../lib/fax-stats';
 
 const RPC_URL = 'https://mainnet.base.org';
 const FAX_MINTED_TOPIC = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506e5629bcb0e5c';
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+/// Envio HyperIndex GraphQL endpoint — same indexer the leaderboard uses.
+/// Primary source for mint lookups: a single indexed query instead of
+/// scanning the whole chain history on every marketplace metadata fetch.
+const ENVIO_GRAPHQL_URL = process.env.ENVIO_GRAPHQL_URL || '';
+/// Base's public RPC caps eth_getLogs at a 2,000-block range. This was
+/// previously set to 10,000, so EVERY chunk request failed with
+/// `-32614 eth_getLogs is limited to a 2,000 range`, the catch swallowed it,
+/// and findFaxMinted always returned null — which made the on-chain baseURI
+/// fallback serve generic collection art with no provenance for every token.
+const LOG_CHUNK_SIZE = 2_000;
+const MAX_CONCURRENT_CHUNKS = 4;
 
 const COLLECTION_IMAGE = 'https://costumes.mypinata.cloud/ipfs/bafkreihl3q3aqf7njgqdv4swkglcuc633krvpxottun455ttll2zsqn42a';
 
@@ -83,16 +95,83 @@ async function getTotalMinted(): Promise<number> {
   return 0;
 }
 
-/// Fetches the FaxMinted event for a specific tokenId by scanning Transfer
-/// logs (which include tokenId as topic[3]) then matching the FaxMinted log
-/// in the same transaction. We search in 10k-block chunks from the deploy
-/// block to current.
-async function findFaxMinted(tokenId: number): Promise<{
+interface MintInfo {
   community: number;
   sourceTokenId: number;
   trayId: string;
   toAddress: string;
-} | null> {
+}
+
+/// Memo of resolved mints. This route runs as a long-lived Docker process,
+/// and marketplaces refetch metadata often — a mint is immutable once
+/// indexed, so there is no reason to look it up twice.
+const mintInfoMemo = new Map<number, MintInfo>();
+
+/// Primary lookup: the Envio HyperIndex indexer. One indexed query, no
+/// chain scan, and unaffected by the public RPC's block-range cap.
+async function findFaxMintedViaEnvio(tokenId: number): Promise<MintInfo | null> {
+  if (!ENVIO_GRAPHQL_URL) return null;
+  try {
+    const res = await fetch(ENVIO_GRAPHQL_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `query FaxMintedByToken($tokenId: numeric!) {
+          NFTFaxCollectibleV2_FaxMinted(where: { mintedTokenId: { _eq: $tokenId } } limit: 1) {
+            mintedTokenId to community sourceTokenId trayId
+          }
+        }`,
+        variables: { tokenId },
+      }),
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const json = await res.json() as {
+      data?: { NFTFaxCollectibleV2_FaxMinted?: { to: string; community: string | number; sourceTokenId: string | number; trayId: string }[] };
+      errors?: unknown[];
+    };
+    const row = json.data?.NFTFaxCollectibleV2_FaxMinted?.[0];
+    if (json.errors || !row) return null;
+    const community = Number(row.community);
+    return {
+      community,
+      // On-chain sourceTokenId is a composite (realId * 1e6 + chainSuffix)
+      // for the Ethereum-native collections — decode back to the real ID.
+      sourceTokenId: decodeSourceTokenId(Number(row.sourceTokenId), community),
+      trayId: row.trayId,
+      toAddress: row.to,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/// Secondary lookup: the FaxMinted log cache the leaderboard route persists
+/// to disk. Free (no network) and already mounted into this container.
+function findFaxMintedViaLogCache(tokenId: number): MintInfo | null {
+  const cache = readLogCache();
+  if (!cache) return null;
+  for (const log of cache.logs) {
+    if (parseInt(log.topics[1] ?? '0x0', 16) !== tokenId) continue;
+    try {
+      const entry = decodeFaxMintedLog(log);
+      return {
+        community: entry.community,
+        sourceTokenId: entry.sourceTokenId,
+        trayId: entry.trayId,
+        toAddress: entry.minter,
+      };
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/// Last-resort lookup: scan Transfer logs (tokenId is topic[3]) then match
+/// the FaxMinted log in the same transaction. Only runs if both the indexer
+/// and the disk cache miss.
+async function findFaxMintedViaRpc(tokenId: number): Promise<MintInfo | null> {
   const deployBlock = 50250138; // 0x2fec19a
   const tokenIdHex = '0x' + tokenId.toString(16).padStart(64, '0');
 
@@ -111,14 +190,16 @@ async function findFaxMinted(tokenId: number): Promise<{
   }
 
   // Search for Transfer logs with this tokenId. mainnet.base.org caps
-  // eth_getLogs at a 10,000-block range per call, so we chunk accordingly.
-  // Chunks are queried in parallel to minimize latency.
+  // eth_getLogs at a 2,000-block range per call, so we chunk accordingly.
+  // Newest chunks first: a token being fetched is usually a recent mint, and
+  // we stop as soon as a chunk hits.
   const chunks: { start: number; end: number }[] = [];
-  for (let start = deployBlock; start <= currentBlock; start += 10000) {
-    chunks.push({ start, end: Math.min(start + 9999, currentBlock) });
+  for (let start = deployBlock; start <= currentBlock; start += LOG_CHUNK_SIZE) {
+    chunks.push({ start, end: Math.min(start + LOG_CHUNK_SIZE - 1, currentBlock) });
   }
+  chunks.reverse();
 
-  const chunkResults = await Promise.all(chunks.map(async ({ start, end }) => {
+  const fetchChunk = async ({ start, end }: { start: number; end: number }) => {
     try {
       const res = await fetch(RPC_URL, {
         method: 'POST',
@@ -139,9 +220,15 @@ async function findFaxMinted(tokenId: number): Promise<{
     } catch {
       return null;
     }
-  }));
+  };
 
-  const transferLog = chunkResults.find((l): l is RpcLog => l !== null);
+  // Bounded concurrency: the public RPC rate-limits large parallel bursts,
+  // and firing every chunk at once is what made this scan unreliable.
+  let transferLog: RpcLog | null = null;
+  for (let i = 0; i < chunks.length && !transferLog; i += MAX_CONCURRENT_CHUNKS) {
+    const batch = await Promise.all(chunks.slice(i, i + MAX_CONCURRENT_CHUNKS).map(fetchChunk));
+    transferLog = batch.find((l): l is RpcLog => l !== null) ?? null;
+  }
   if (!transferLog) return null;
 
   const txHash = transferLog.transactionHash;
@@ -163,22 +250,38 @@ async function findFaxMinted(tokenId: number): Promise<{
              l.topics[1]?.toLowerCase() === tokenIdHex
     );
     if (faxMintedLog) {
-      // Decode data: community (uint8), sourceTokenId (uint256), trayId (string)
-      const data = faxMintedLog.data.slice(2);
-      const community = parseInt(data.slice(0, 64), 16);
-      const sourceTokenId = parseInt(data.slice(64, 128), 16);
-      // trayId is a dynamic string at offset
-      const strOffset = parseInt(data.slice(128, 192), 16) * 2; // offset in bytes from data start
-      const strLen = parseInt(data.slice(strOffset, strOffset + 64), 16);
-      const strHex = data.slice(strOffset + 64, strOffset + 64 + strLen * 2);
-      const trayId = Buffer.from(strHex, 'hex').toString('utf8');
-      return { community, sourceTokenId, trayId, toAddress };
+      const entry = decodeFaxMintedLog(faxMintedLog);
+      return {
+        community: entry.community,
+        sourceTokenId: entry.sourceTokenId,
+        trayId: entry.trayId,
+        toAddress,
+      };
     }
   } catch {
     // fall through to basic info below
   }
   // Transfer found but no FaxMinted — still return basic info
   return { community: 0, sourceTokenId: 0, trayId: '', toAddress };
+}
+
+/// Resolves a token's mint record, cheapest source first:
+/// Envio indexer → leaderboard disk log cache → chunked RPC scan.
+/// Returning null here degrades the response to generic collection art with
+/// no provenance, so each layer matters.
+async function findFaxMinted(tokenId: number): Promise<MintInfo | null> {
+  const memoized = mintInfoMemo.get(tokenId);
+  if (memoized) return memoized;
+
+  const resolved =
+    await findFaxMintedViaEnvio(tokenId)
+    ?? findFaxMintedViaLogCache(tokenId)
+    ?? await findFaxMintedViaRpc(tokenId);
+
+  // Only memoize a fully-resolved mint. A partial record (Transfer found but
+  // no FaxMinted) may just mean a transient RPC miss, so leave it retryable.
+  if (resolved && resolved.trayId) mintInfoMemo.set(tokenId, resolved);
+  return resolved;
 }
 
 /// Fetches the tray document to get the fax image (as base64 data URI) and
