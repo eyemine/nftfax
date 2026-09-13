@@ -34,6 +34,9 @@ const MINT_LIMIT_NOTICE: Record<string, string> = {
 };
 
 const DECAY_MS = 8 * 24 * 60 * 60 * 1000; // 8-day decay
+/// How long to wait for the wallet provider before falling back to the
+/// injected one. Guards against a provider promise that never settles.
+const PROVIDER_TIMEOUT_MS = 4000;
 
 const DEFAULT_PLACEMENT: OverlayPlacement = { x: 0.5, y: 0.5, scale: 1, cropX: 0, cropY: 0, cropW: 1, cropH: 1 };
 
@@ -457,15 +460,24 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       const placeholder = isPlaceholderAddress(cfg.contract);
       let txHash: string | null = null;
 
-      let provider = getEthereumProvider
-        ? await getEthereumProvider().catch(() => undefined)
-        : undefined;
-      // Fallback to window.ethereum if Privy's provider is unavailable or crashed.
-      // Privy's getEthereumProvider() can throw internally (e.g. "Cannot read
-      // properties of null (reading 'info')") when its wallet session state is
-      // stale. MetaMask's injected provider (window.ethereum) is still usable.
+      // Resolve a wallet provider, preferring Privy's active wallet and
+      // falling back to the injected one (MetaMask).
+      //
+      // The timeout matters as much as the catch: if a malformed EIP-6963
+      // announcement wedges wagmi/mipd's provider store (see the guard in
+      // layout.tsx), getEthereumProvider() can never settle at all — not
+      // reject. Awaiting it bare then hangs the mint forever with the button
+      // stuck busy, no MetaMask prompt, and no error to show the user.
+      let provider: Eip1193Provider | undefined;
+      if (getEthereumProvider) {
+        provider = await Promise.race([
+          getEthereumProvider().catch(() => undefined),
+          new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), PROVIDER_TIMEOUT_MS)),
+        ]);
+      }
       if (!provider && typeof window !== 'undefined') {
         provider = (window as { ethereum?: Eip1193Provider }).ethereum ?? undefined;
+        if (provider) console.warn('[fax] Privy provider unavailable — using window.ethereum');
       }
       if (provider && !placeholder) {
         await switchToChain(provider, cfg.chain);
