@@ -5,6 +5,7 @@
 /// `local` is the address (e.g. `dfz.1234` for @fax or `name` for @nftmail.box).
 
 import { NextRequest, NextResponse } from 'next/server';
+import { parseFaxHandle, verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 import { getCredits, spendCredit, earnSendCredit, clearJam, ensureJoinerBonus } from '@/app/lib/fax-credits';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
@@ -19,7 +20,18 @@ function workerHeaders(): Record<string, string> {
 }
 
 async function verifyOwner(local: string, wallet: string, domain: string): Promise<NextResponse | null> {
-  if (domain === 'fax') return null;
+  // @fax was skipped outright here, so any wallet could read any handle's credit
+  // balance. An @fax handle is NFT-backed, so verify it against the chain.
+  if (domain === 'fax' || parseFaxHandle(local)) {
+    if (!parseFaxHandle(local)) {
+      return NextResponse.json({ error: 'Not a recognised @fax handle.' }, { status: 404, headers: NO_STORE });
+    }
+    const auth = await verifyFaxHandleOwner(local, wallet);
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 403, headers: NO_STORE });
+    }
+    return null;
+  }
   const resolveRes = await fetch(WORKER_URL, {
     method: 'POST',
     headers: workerHeaders(),

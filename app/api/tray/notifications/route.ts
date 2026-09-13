@@ -14,11 +14,15 @@
 /// ignore the badge.
 ///
 /// Ownership: the handle list is derived SERVER-SIDE from the telegraph
-/// registry filtered by the connected wallet. Handles are never accepted from
-/// the client, so this cannot be used to enumerate someone else's inbox.
+/// registry filtered by the connected wallet, and each handle is then verified
+/// against the chain. Handles are never accepted from the client, so this
+/// cannot be used to enumerate someone else's inbox — and because the registry
+/// can hold a stale owner after a trade, the on-chain check is what actually
+/// decides.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getChainTimerMs } from '@/app/lib/fax-credits';
+import { verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -90,6 +94,11 @@ export async function GET(req: NextRequest) {
     const now = Date.now();
     const perHandle = await Promise.all(handles.map(async ({ handle, collection }) => {
       try {
+        // The registry can hold a stale owner after a trade, so confirm on-chain
+        // before reading the inbox behind it.
+        const auth = await verifyFaxHandleOwner(handle, wallet);
+        if (!auth.authorized) return { handle, collection, actionable: 0 };
+
         const res = await fetch(WORKER_URL, {
           method: 'POST',
           headers: workerHeaders(),

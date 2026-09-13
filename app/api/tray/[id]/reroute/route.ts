@@ -15,6 +15,7 @@
 /// to disable mint for the original recipient.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 import { transferForwardCredit, getChainTimerMs } from '@/app/lib/fax-credits';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
@@ -78,7 +79,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'Only the original sender can re-route this fax' }, { status: 403, headers: NO_STORE });
     }
 
-    // @fax senders are rolofax handles without on-chain ownership; skip resolve.
+    // Re-routing is destructive: it moves a fax to a new recipient and disables
+    // the original recipient's mint. @fax senders were skipped entirely here on
+    // the assumption they have "no on-chain ownership" — but an @fax handle IS
+    // an NFT, so any wallet could re-route someone else's fax. Verify on-chain.
+    if (isFaxSender) {
+      const auth = await verifyFaxHandleOwner(fromLabel, ownerWallet);
+      if (!auth.authorized) {
+        return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 403, headers: NO_STORE });
+      }
+    }
+
     if (!isFaxSender) {
       const resolveRes = await fetch(WORKER_URL, {
         method: 'POST',

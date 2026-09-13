@@ -8,6 +8,7 @@
 /// verified fail-closed via resolveAddress.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { parseFaxHandle, verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -21,7 +22,21 @@ function workerHeaders(): Record<string, string> {
   return h;
 }
 
+/// Returns a denial response, or null when the wallet may act on `local`.
+///
+/// DELETE is destructive, so this must fail CLOSED. It previously authorized via
+/// resolveAddress, which returns { exists: false } for unregistered handles and
+/// was only checked when exists === true — meaning any wallet could delete
+/// another player's fax. @fax handles are now verified against the chain.
 async function verifyOwner(local: string, wallet: string): Promise<NextResponse | null> {
+  if (parseFaxHandle(local)) {
+    const auth = await verifyFaxHandleOwner(local, wallet);
+    if (!auth.authorized) {
+      return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 403, headers: NO_STORE });
+    }
+    return null;
+  }
+
   const resolveRes = await fetch(WORKER_URL, {
     method: 'POST',
     headers: workerHeaders(),
@@ -32,14 +47,12 @@ async function verifyOwner(local: string, wallet: string): Promise<NextResponse 
     return NextResponse.json({ error: 'Could not verify mailbox ownership.' }, { status: 503, headers: NO_STORE });
   }
   const resolved = await resolveRes.json() as Record<string, unknown>;
-  if (resolved.exists === false && !resolved.sovereign) {
+  if (resolved.exists === false) {
     return NextResponse.json({ error: 'Mailbox does not exist.' }, { status: 404, headers: NO_STORE });
   }
-  if (resolved.exists === true) {
-    const controller = (resolved.onChainOwner as string | undefined)?.toLowerCase();
-    if (!controller || controller !== wallet.toLowerCase()) {
-      return NextResponse.json({ error: 'Wallet does not match the registered owner' }, { status: 403, headers: NO_STORE });
-    }
+  const controller = (resolved.onChainOwner as string | undefined)?.toLowerCase();
+  if (!controller || controller !== wallet.toLowerCase()) {
+    return NextResponse.json({ error: 'Wallet does not match the registered owner' }, { status: 403, headers: NO_STORE });
   }
   return null;
 }

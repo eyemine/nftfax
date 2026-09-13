@@ -9,6 +9,7 @@
 /// else's received-fax metadata.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { parseFaxHandle, verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -31,20 +32,30 @@ export async function GET(req: NextRequest) {
   if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
 
   try {
-    const resolveRes = await fetch(WORKER_URL, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ action: 'resolveAddress', name: local }),
-      cache: 'no-store',
-    });
-    if (!resolveRes.ok) {
-      return NextResponse.json({ error: 'Could not verify mailbox ownership. Try again.' }, { status: 503, headers: NO_STORE });
-    }
-    const resolved = await resolveRes.json() as Record<string, unknown>;
-    if (resolved.exists === false && !resolved.sovereign) {
-      return NextResponse.json({ error: 'Mailbox does not exist.' }, { status: 404, headers: NO_STORE });
-    }
-    if (resolved.exists === true) {
+    // An @fax handle IS an NFT, so verify against the chain rather than the
+    // worker's KV registry. resolveAddress returns { exists: false } for any
+    // unregistered handle, and the old code only verified when exists === true
+    // — so most fax-receiving handles were readable by ANY wallet. It also
+    // rejected the true owner whenever the registry's recorded owner was stale.
+    if (parseFaxHandle(local)) {
+      const auth = await verifyFaxHandleOwner(local, wallet);
+      if (!auth.authorized) {
+        return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 403, headers: NO_STORE });
+      }
+    } else {
+      const resolveRes = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ action: 'resolveAddress', name: local }),
+        cache: 'no-store',
+      });
+      if (!resolveRes.ok) {
+        return NextResponse.json({ error: 'Could not verify mailbox ownership. Try again.' }, { status: 503, headers: NO_STORE });
+      }
+      const resolved = await resolveRes.json() as Record<string, unknown>;
+      if (resolved.exists === false) {
+        return NextResponse.json({ error: 'Mailbox does not exist.' }, { status: 404, headers: NO_STORE });
+      }
       const controller = (resolved.onChainOwner as string | undefined)?.toLowerCase();
       if (!controller) {
         return NextResponse.json({
