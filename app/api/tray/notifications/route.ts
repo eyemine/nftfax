@@ -93,13 +93,10 @@ export async function GET(req: NextRequest) {
 
     const now = Date.now();
 
-    const checkHandle = async ({ handle, collection }: { handle: string; collection: string }) => {
+    /// Counts faxes still awaiting a forward. Reads the worker's KV only — no
+    /// chain access — so this is cheap enough to run for every owned handle.
+    const countActionable = async ({ handle, collection }: { handle: string; collection: string }) => {
       try {
-        // The registry can hold a stale owner after a trade, so confirm on-chain
-        // before reading the inbox behind it.
-        const auth = await verifyFaxHandleOwner(handle, wallet);
-        if (!auth.authorized) return { handle, collection, actionable: 0 };
-
         const res = await fetch(WORKER_URL, {
           method: 'POST',
           headers: workerHeaders(),
@@ -123,16 +120,23 @@ export async function GET(req: NextRequest) {
       }
     };
 
-    // Bounded concurrency. Verifying every handle at once throttled the public
-    // Base/Ethereum RPCs, and since the ownership check fails closed that
-    // silently reported 0 waiting faxes for mailboxes that did have them.
-    const perHandle: { handle: string; collection: string; actionable: number }[] = [];
-    const CONCURRENCY = 3;
-    for (let i = 0; i < handles.length; i += CONCURRENCY) {
-      perHandle.push(...await Promise.all(handles.slice(i, i + CONCURRENCY).map(checkHandle)));
-    }
+    // Count FIRST, verify ownership second.
+    //
+    // Verifying all owned handles up front meant one ownerOf() per handle, and a
+    // wallet holding a dozen NFTs exhausted the public Base rate limit partway
+    // through (measured: the first 5 calls succeeded, the rest errored). Because
+    // the ownership check fails closed, those handles silently reported 0 —
+    // hiding real waiting faxes. Counting is pure KV, so do that for everything
+    // and spend on-chain calls only on the handful we would actually report.
+    const counted = await Promise.all(handles.map(countActionable));
+    const candidates = counted.filter((h) => h.actionable > 0);
 
-    const withFaxes = perHandle.filter((h) => h.actionable > 0);
+    const withFaxes: typeof candidates = [];
+    for (const candidate of candidates) {
+      // Registry ownership can be stale after a trade, so the chain decides.
+      const auth = await verifyFaxHandleOwner(candidate.handle, wallet);
+      if (auth.authorized) withFaxes.push(candidate);
+    }
     return NextResponse.json({
       total: withFaxes.reduce((sum, h) => sum + h.actionable, 0),
       handles: withFaxes,

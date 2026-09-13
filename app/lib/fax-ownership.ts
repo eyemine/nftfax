@@ -50,6 +50,19 @@ export function parseFaxHandle(handle: string): FaxHandleIdentity | null {
   return { collection, tokenId };
 }
 
+/// Short-lived positive-result cache, keyed by handle+wallet.
+///
+/// This runs as a persistent process, and NFT ownership changes rarely, so
+/// re-reading the chain on every poll (the tray badge refreshes on a timer)
+/// wastes the public RPC's very limited budget — exhausting it is what caused
+/// real mailboxes to report no waiting faxes.
+///
+/// Only AUTHORIZED results are cached, and only briefly: a denial must never be
+/// sticky (the user may connect the right wallet a second later), and a stale
+/// allow is bounded to the TTL.
+const AUTH_CACHE_TTL_MS = 60_000;
+const authCache = new Map<string, { at: number; result: FaxOwnershipResult }>();
+
 export interface FaxOwnershipResult {
   authorized: boolean;
   /** Present when authorized via delegate.xyz rather than direct ownership. */
@@ -78,6 +91,10 @@ export async function verifyFaxHandleOwner(handle: string, wallet: string): Prom
     };
   }
 
+  const cacheKey = `${identity.collection}:${identity.tokenId}:${wallet.toLowerCase()}`;
+  const cached = authCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < AUTH_CACHE_TTL_MS) return cached.result;
+
   const theme = getCollectionTheme(identity.collection);
 
   // Retry transient RPC failures. This check fails closed, so a single throttled
@@ -104,7 +121,13 @@ export async function verifyFaxHandleOwner(handle: string, wallet: string): Prom
   }
 
   if (verify.verified) {
-    return { authorized: true, isDelegate: verify.isDelegate, actualOwner: verify.actualOwner };
+    const result: FaxOwnershipResult = {
+      authorized: true,
+      isDelegate: verify.isDelegate,
+      actualOwner: verify.actualOwner,
+    };
+    authCache.set(cacheKey, { at: Date.now(), result });
+    return result;
   }
 
   // No owner resolved at all means the RPC failed or the token does not exist.
