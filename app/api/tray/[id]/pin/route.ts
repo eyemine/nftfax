@@ -33,7 +33,7 @@ async function getNextTokenId(): Promise<number | null> {
   try {
     const res = await fetch(BASE_RPC, {
       method: 'POST',
-      headers: { 'Content-Type: application/json' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: BASE_FAX_COLLECTIBLE, data: TOTAL_MINTED_SELECTOR }, 'latest'], id: 1 }),
     });
     const json = await res.json() as { result?: string };
