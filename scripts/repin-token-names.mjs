@@ -142,11 +142,15 @@ async function main() {
       const meta = await fetchJsonFromIpfs(currentUri.slice('ipfs://'.length));
       const desiredName = `FAX CHAIN #${tokenId}`;
 
-      const override = TRAY_ID_OVERRIDES[tokenId];
       const trayAttr = (meta.attributes ?? []).find((a) => a.trait_type === 'Fax Tray ID');
-      const trayId = override ?? trayAttr?.value ?? '';
+      // Only treat an override as pending if the pinned metadata does not
+      // already carry it — tokens 11-14 were corrected by an earlier
+      // setTokenURI pass, so re-applying would be a no-op.
+      const expectedTray = TRAY_ID_OVERRIDES[tokenId];
+      const override = expectedTray && trayAttr?.value !== expectedTray ? expectedTray : null;
+      const trayId = trayAttr?.value ?? expectedTray ?? '';
 
-      if (meta.name === desiredName && (!override || trayAttr?.value === override)) {
+      if (meta.name === desiredName && !override) {
         console.log(`#${tokenId}: OK — already "${meta.name}"`);
         continue;
       }
