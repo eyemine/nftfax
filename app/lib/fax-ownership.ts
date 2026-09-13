@@ -80,12 +80,28 @@ export async function verifyFaxHandleOwner(handle: string, wallet: string): Prom
 
   const theme = getCollectionTheme(identity.collection);
 
-  const verify = await verifyOwnershipOrDelegate({
+  // Retry transient RPC failures. This check fails closed, so a single throttled
+  // eth_call would otherwise deny a legitimate owner — the public Base/Ethereum
+  // endpoints rate-limit readily, and any caller verifying several handles at
+  // once (e.g. the notifications summary) trips that immediately.
+  let verify = await verifyOwnershipOrDelegate({
     contract: theme.contract,
     tokenId: identity.tokenId,
     rpcUrl: theme.rpc,
     hotWallet: wallet,
   });
+  for (let attempt = 1; attempt <= 3 && !verify.verified && !verify.actualOwner; attempt++) {
+    // No actualOwner means the ownerOf call itself did not return — i.e. an RPC
+    // problem, not a permission decision. A real "not the owner" answer always
+    // carries actualOwner and must NOT be retried.
+    await new Promise((r) => setTimeout(r, 400 * attempt));
+    verify = await verifyOwnershipOrDelegate({
+      contract: theme.contract,
+      tokenId: identity.tokenId,
+      rpcUrl: theme.rpc,
+      hotWallet: wallet,
+    });
+  }
 
   if (verify.verified) {
     return { authorized: true, isDelegate: verify.isDelegate, actualOwner: verify.actualOwner };

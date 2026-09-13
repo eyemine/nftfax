@@ -92,7 +92,8 @@ export async function GET(req: NextRequest) {
     }
 
     const now = Date.now();
-    const perHandle = await Promise.all(handles.map(async ({ handle, collection }) => {
+
+    const checkHandle = async ({ handle, collection }: { handle: string; collection: string }) => {
       try {
         // The registry can hold a stale owner after a trade, so confirm on-chain
         // before reading the inbox behind it.
@@ -120,7 +121,16 @@ export async function GET(req: NextRequest) {
       } catch {
         return { handle, collection, actionable: 0 };
       }
-    }));
+    };
+
+    // Bounded concurrency. Verifying every handle at once throttled the public
+    // Base/Ethereum RPCs, and since the ownership check fails closed that
+    // silently reported 0 waiting faxes for mailboxes that did have them.
+    const perHandle: { handle: string; collection: string; actionable: number }[] = [];
+    const CONCURRENCY = 3;
+    for (let i = 0; i < handles.length; i += CONCURRENCY) {
+      perHandle.push(...await Promise.all(handles.slice(i, i + CONCURRENCY).map(checkHandle)));
+    }
 
     const withFaxes = perHandle.filter((h) => h.actionable > 0);
     return NextResponse.json({
