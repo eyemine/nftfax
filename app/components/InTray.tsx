@@ -496,6 +496,8 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         if (sent.error) throw new Error(sent.error);
         if (!sent.txHash) throw new Error('Wallet did not return a transaction hash.');
         txHash = sent.txHash;
+      } else if (kind === 'mint' && !provider && !placeholder) {
+        throw new Error('No wallet available. Connect an EVM wallet (MetaMask) to mint to Base.');
       }
 
       if (kind === 'save') {

@@ -20,7 +20,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pinImageToIPFS, pinJSONToIPFS } from '../../../../lib/pinata';
 import { uploadImageToArweave, uploadJSONToArweave, arweaveTxIdToURI } from '../../../../lib/irys';
 
-const NO_STORE = { 'Cache-Control': 'no-store' } as const;
+const NO_STORE = { 'Cache-Control: no-store' } as const;
+
+const BASE_RPC = 'https://mainnet.base.org';
+const BASE_FAX_COLLECTIBLE = '0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5';
+const TOTAL_MINTED_SELECTOR = '0xa2309ff8'; // totalMinted()
+
+/// Queries the on-chain totalMinted to predict the next token ID for metadata.
+/// Racy if two mints land simultaneously, but mints are infrequent and the
+/// metadata API route (/api/metadata/[tokenId]) is the authoritative source.
+async function getNextTokenId(): Promise<number | null> {
+  try {
+    const res = await fetch(BASE_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type: application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'eth_call', params: [{ to: BASE_FAX_COLLECTIBLE, data: TOTAL_MINTED_SELECTOR }, 'latest'], id: 1 }),
+    });
+    const json = await res.json() as { result?: string };
+    if (json.result && json.result.startsWith('0x')) {
+      return parseInt(json.result, 16) + 1;
+    }
+  } catch { /* non-fatal */ }
+  return null;
+}
 
 /// Tier names based on chain depth (hop count), matching CHAIN_GAME_DESIGN
 /// and the existing /api/metadata/[tokenId] route.
@@ -96,9 +118,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ tokenURI: null, reason: 'image_pin_failed' }, { status: 200, headers: NO_STORE });
     }
 
+    const nextTokenId = await getNextTokenId();
     const metadata = {
-      name: `FAX CHAIN`,
-      description: `NFTFax Collectible — minted from ${local || 'a fax mailbox'} (fax ${id}). A chain-letter fax machine collectible on Base.`,
+      name: nextTokenId ? `FAX CHAIN #${nextTokenId}` : 'FAX CHAIN',
+      description: `NFTFax Collectible${nextTokenId ? ` #${nextTokenId}` : ''} — minted from ${local || 'a fax mailbox'} (fax ${id}). A chain-letter fax machine collectible on Base.`,
       image: imageUri,
       external_url: `https://nftmail.box/tray/${id}`,
       attributes: [

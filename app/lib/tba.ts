@@ -149,7 +149,7 @@ async function getTBANFTsViaRPC(tbaAddress: `0x${string}`): Promise<TBANFT[]> {
       contract,
       tokenId,
       tokenType: 'ERC721',
-      name: contract === BASE_FAX_COLLECTIBLE.toLowerCase() ? 'FAX CHAIN' : 'NFT',
+      name: contract === BASE_FAX_COLLECTIBLE.toLowerCase() ? `FAX CHAIN #${tokenId}` : 'NFT',
       image: '',
       isFaxChain: contract === BASE_FAX_COLLECTIBLE.toLowerCase(),
     });
