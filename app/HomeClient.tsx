@@ -42,6 +42,10 @@ export default function HomeClient() {
   const [rolofaxEntries, setRolofaxEntries] = useState<{ handle: string; wallet: string; collection: string }[]>([]);
   const [allRolofaxEntries, setAllRolofaxEntries] = useState<{ handle: string; wallet: string; collection: string }[]>([]);
   const [showSplash, setShowSplash] = useState(!searchParams.get('to'));
+  /// Actionable (unforwarded, not-yet-jammed) fax counts per owned @fax handle.
+  /// Identities are per-NFT, so a fax often lands on a handle the player is not
+  /// looking at and silently jams — these drive the Fax-Tray badge.
+  const [faxAlerts, setFaxAlerts] = useState<{ handle: string; collection: string; actionable: number }[]>([]);
 
   const handleMailboxChange = (handle: string) => {
     setMailbox(handle);
@@ -81,6 +85,36 @@ export default function HomeClient() {
   const otherRolofaxEntries = useMemo(
     () => walletAddress ? allRolofaxEntries.filter((e) => e.wallet?.toLowerCase() !== walletAddress) : allRolofaxEntries,
     [allRolofaxEntries, walletAddress]
+  );
+
+  // Poll for waiting faxes across every @fax identity this wallet owns.
+  // Re-runs when the tray view is opened or the mailbox changes so the badge
+  // clears promptly once the player has actually looked at a mailbox.
+  useEffect(() => {
+    if (!walletAddress) { setFaxAlerts([]); return; }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/api/tray/notifications?wallet=${encodeURIComponent(walletAddress)}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json() as { handles?: { handle: string; collection: string; actionable: number }[] };
+        if (!cancelled) setFaxAlerts(json.handles ?? []);
+      } catch { /* non-fatal: the badge is cosmetic */ }
+    };
+    void load();
+    const timer = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [walletAddress, view, mailbox]);
+
+  /// Handles the player is NOT currently looking at. The mailbox on screen has
+  /// its own visible inbox, so badging it too would just be noise.
+  const unseenFaxAlerts = useMemo(
+    () => faxAlerts.filter((a) => a.handle !== mailbox.trim().toLowerCase()),
+    [faxAlerts, mailbox],
+  );
+  const unseenFaxTotal = useMemo(
+    () => unseenFaxAlerts.reduce((sum, a) => sum + a.actionable, 0),
+    [unseenFaxAlerts],
   );
 
   async function handleDisconnect() {
@@ -176,9 +210,20 @@ export default function HomeClient() {
           </button>
           <button
             onClick={() => { setShowSplash(false); setView('tray'); }}
-            className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+            title={unseenFaxTotal > 0
+              ? `${unseenFaxTotal} fax${unseenFaxTotal === 1 ? '' : 'es'} waiting on ${unseenFaxAlerts.map((a) => `${a.handle}@fax`).join(', ')}`
+              : undefined}
+            className={`key-shadow relative flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
             <Inbox size={14} /> <span className="hidden sm:inline">Fax-Tray</span>
+            {unseenFaxTotal > 0 && (
+              <span
+                aria-label={`${unseenFaxTotal} fax${unseenFaxTotal === 1 ? '' : 'es'} awaiting a forward`}
+                className="absolute -right-1.5 -top-1.5 flex min-w-[18px] items-center justify-center rounded-full border border-[#7a1e0c] bg-[#d32f0f] px-1 text-[10px] font-black leading-[16px] text-white"
+              >
+                {unseenFaxTotal > 9 ? '9+' : unseenFaxTotal}
+              </span>
+            )}
           </button>
           <Link
             href="/leaderboard"
@@ -258,10 +303,39 @@ export default function HomeClient() {
             {rolofaxEntries.length > 0 && (
               <select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]">
                 <option value="">Select a Rolofax handle…</option>
-                {rolofaxEntries.map((entry) => (
-                  <option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>
-                ))}
+                {rolofaxEntries.map((entry) => {
+                  // <option> cannot host a styled badge, so the count goes in
+                  // the label. The clickable chips below carry the red badge.
+                  const waiting = faxAlerts.find((a) => a.handle === entry.handle)?.actionable ?? 0;
+                  return (
+                    <option key={entry.handle} value={entry.handle}>
+                      {entry.handle}@fax ({entry.collection}){waiting > 0 ? ` — ${waiting} waiting` : ''}
+                    </option>
+                  );
+                })}
               </select>
+            )}
+
+            {/* Handles with faxes still awaiting a forward. Shown as chips so
+                the count is visible without opening the dropdown, and so a
+                player can jump straight to the mailbox that needs them. */}
+            {unseenFaxAlerts.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-[.14em] text-[#8a3e1e]">Awaiting forward:</span>
+                {unseenFaxAlerts.map((alert) => (
+                  <button
+                    key={alert.handle}
+                    type="button"
+                    onClick={() => handleMailboxChange(alert.handle)}
+                    className="key-shadow flex items-center gap-1 border border-[#7a1e0c] bg-[#f5dcc8] px-2 py-1 text-[11px] font-bold text-[#8a3e1e] hover:bg-[#f0cbb0]"
+                  >
+                    {alert.handle}@fax
+                    <span className="flex min-w-[16px] items-center justify-center rounded-full bg-[#d32f0f] px-1 text-[10px] font-black leading-[14px] text-white">
+                      {alert.actionable}
+                    </span>
+                  </button>
+                ))}
+              </div>
             )}
             <div className="flex">
               <input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" />
