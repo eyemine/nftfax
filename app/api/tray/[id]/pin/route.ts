@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pinImageToIPFS, pinJSONToIPFS } from '../../../../lib/pinata';
 import { uploadImageToArweave, uploadJSONToArweave, arweaveTxIdToURI } from '../../../../lib/irys';
 
-const NO_STORE = { 'Cache-Control: no-store' } as const;
+const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 
 const BASE_RPC = 'https://mainnet.base.org';
 const BASE_FAX_COLLECTIBLE = '0xcC121BF9E3a13d03EACd55E15495e3E8De61fac5';
