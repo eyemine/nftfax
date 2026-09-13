@@ -320,7 +320,7 @@ export async function GET(
 
   const mintInfo = await findFaxMinted(tokenId);
 
-  const { image: rawFaxImage, chainDepth, forwardedTrayId } = await getFaxData(mintInfo?.trayId ?? '');
+  const { image: rawFaxImage, chainDepth: receivedChainDepth, forwardedTrayId } = await getFaxData(mintInfo?.trayId ?? '');
 
   // The on-chain trayId is the RECEIVED fax (ownership/provenance), but the
   // artwork the collectible should represent is the FORWARDED fax (the
@@ -328,9 +328,15 @@ export async function GET(
   // forwardedTrayId, fetch that tray's image and use it for display.
   const displayTrayId = forwardedTrayId || mintInfo?.trayId || '';
   let image = rawFaxImage ?? COLLECTION_IMAGE;
+  // Depth must describe the SAME fax as the tray id / artwork above. Taking it
+  // from the received fax while everything else described the forwarded hop
+  // reported a tier one hop too shallow (e.g. token 14 showed depth 0 while the
+  // leaderboard showed 2) — and Tier gates prize-draw eligibility.
+  let chainDepth = receivedChainDepth;
   if (forwardedTrayId) {
     const fwdData = await getFaxData(forwardedTrayId);
     if (fwdData.image) image = fwdData.image;
+    if (fwdData.chainDepth != null) chainDepth = fwdData.chainDepth;
   }
 
   const communityName = mintInfo ? COMMUNITY_NAMES[mintInfo.community] ?? 'UNKNOWN' : 'FAX';

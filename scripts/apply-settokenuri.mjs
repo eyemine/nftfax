@@ -162,13 +162,26 @@ async function main() {
     }
 
     // Read back so a "success" receipt can't mask a wrong value.
-    const afterRaw = await withRetry(`#${tokenId} verify`, () => publicClient.call({
-      to: CONTRACT,
-      data: `${TOKEN_URI_SELECTOR}${encodeUint256(tokenId)}`,
-    }));
-    const after = decodeAbiString(afterRaw.data);
+    //
+    // The public Base RPC is load-balanced and NOT read-after-write consistent:
+    // a read issued right after a confirmed receipt can land on a node that has
+    // not yet applied the block, returning the pre-write value. Poll until the
+    // expected value appears before treating a mismatch as a real failure.
+    let after = '';
+    for (let i = 1; i <= 6; i++) {
+      const afterRaw = await withRetry(`#${tokenId} verify`, () => publicClient.call({
+        to: CONTRACT,
+        data: `${TOKEN_URI_SELECTOR}${encodeUint256(tokenId)}`,
+      }));
+      after = decodeAbiString(afterRaw.data);
+      if (after === uri) break;
+      if (i < 6) {
+        console.log(`    #${tokenId} verify: stale read (attempt ${i}/6), waiting for propagation`);
+        await sleep(2000 * i);
+      }
+    }
     if (after !== uri) {
-      throw new Error(`#${tokenId}: verify FAILED — chain says ${after}, expected ${uri}. Aborting.`);
+      throw new Error(`#${tokenId}: verify FAILED after retries — chain says ${after}, expected ${uri}. Aborting.`);
     }
 
     console.log(`#${tokenId}: OK  gas=${receipt.gasUsed}  ${hash}`);
