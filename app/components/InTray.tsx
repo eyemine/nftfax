@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
 import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlacement } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
-import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity, checkSmartWalletMintEligibility } from '../lib/fax-mint';
+import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
@@ -491,8 +491,8 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         // Smart accounts route value-bearing txs through redeemDelegations,
         // which fails with Panic(0x11) due to a NativeBalanceChangeEnforcer
         // gas-reserve underflow bug in MetaMask's delegation framework.
-        const smartWalletError = await checkSmartWalletMintEligibility(provider, wallet, MINT_CONFIG.chain.rpcUrl);
-        if (smartWalletError) throw new Error(smartWalletError);
+        const fundsError = await checkMintFundsEligibility(provider, wallet, MINT_CONFIG.chain.rpcUrl);
+        if (fundsError) throw new Error(fundsError);
         // The ARTWORK/metadata must reflect the fax the caller forwarded onward
         // (their own composited hop), not the received fax — minting is only
         // unlocked after forwarding, so the collectible should represent what

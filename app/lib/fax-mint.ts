@@ -323,31 +323,42 @@ export function formatEth(wei: bigint): string {
   return eth.toFixed(6).replace(/\.?0+$/, '') || '0';
 }
 
-/// Pre-mint check for EIP-7702 smart accounts. Returns a user-facing error
-/// message if the smart wallet cannot complete the mint, or null if OK.
-/// The mint price is read from the contract (fetchMintPrice); gas is estimated
-/// at a conservative 0.001 ETH overhead on Base.
-export async function checkSmartWalletMintEligibility(
+/// Pre-mint funds check. Returns a user-facing error message if the wallet
+/// cannot cover the mint, or null if OK. The mint price is read from the
+/// contract (fetchMintPrice); gas is estimated at a conservative 0.001 ETH
+/// overhead on Base.
+///
+/// This deliberately runs for EVERY account type. It used to bail out early
+/// for anything that was not an EIP-7702 smart account, so a plain EOA with
+/// too little ETH got no warning at all: the mint reverted with OutOfFunds and
+/// sendMintTx's error classification then swallowed the reason (see below),
+/// surfacing as a silent no-op with no MetaMask prompt.
+export async function checkMintFundsEligibility(
   provider: EthereumProvider,
   address: string,
   rpcUrl: string,
 ): Promise<string | null> {
-  const isSmart = await isEip7702Account(provider, address);
-  if (!isSmart) return null;
+  const [isSmart, balance, mintPrice] = await Promise.all([
+    isEip7702Account(provider, address),
+    getEthBalance(rpcUrl, address),
+    fetchMintPrice(rpcUrl),
+  ]);
 
-  const balance = await getEthBalance(rpcUrl, address);
-  const mintPrice = await fetchMintPrice(rpcUrl);
   const estimatedGas = BigInt('1000000000000000'); // 0.001 ETH gas estimate on Base
   const required = mintPrice + estimatedGas;
+  if (balance >= required) return null;
 
-  if (balance < required) {
+  const shortfall =
+    `Current balance: ${formatEth(balance)} ETH\n` +
+    `Needed: ~${formatEth(required)} ETH (${formatEth(mintPrice)} mint fee + gas)\n\n`;
+
+  if (isSmart) {
     return (
       `Smart Wallet Needs ETH\n\n` +
       `Your MetaMask smart wallet is a separate account from your regular wallet. ` +
       `It needs its own ETH to make transactions.\n\n` +
       `Smart wallet address: ${address}\n` +
-      `Current balance: ${formatEth(balance)} ETH\n` +
-      `Needed: ~${formatEth(required)} ETH (0.002 mint fee + gas)\n\n` +
+      shortfall +
       `To fix:\n` +
       `1. Send ~0.005 ETH to your smart wallet address (${address})\n` +
       `2. Try minting again\n\n` +
@@ -355,7 +366,14 @@ export async function checkSmartWalletMintEligibility(
     );
   }
 
-  return null;
+  return (
+    `Not Enough ETH on Base\n\n` +
+    `This mint must be sent from the wallet that owns the source NFT, and that ` +
+    `wallet does not have enough ETH on Base to cover it.\n\n` +
+    `Wallet: ${address}\n` +
+    shortfall +
+    `To fix: send ~0.005 ETH on Base to that wallet, then try minting again.`
+  );
 }
 
 function sleep(ms: number): Promise<void> {
@@ -469,6 +487,18 @@ export async function sendMintTx(
     const isRevert = errMsg.includes('revert') || errMsg.includes('Panic') || errMsg.includes('execution')
       || errMsg.includes('0x') && errMsg.length > 10;
     if (isRevert) return { error: errMsg };
+
+    // Insufficient funds and user rejection are DEFINITIVE outcomes, not
+    // "method unsupported". They match none of the revert patterns above (no
+    // 'revert'/'Panic'/'execution', no hex payload), so they previously fell
+    // through to wallet_sendCalls and the real reason was discarded — the mint
+    // then failed with nothing shown to the user.
+    if (/insufficient funds|OutOfFunds|exceeds the balance|gas \* price/i.test(errMsg)) {
+      return { error: `Not enough ETH on Base to cover the mint fee plus gas.\n\n${errMsg}` };
+    }
+    if (/user rejected|user denied|ACTION_REJECTED|4001/i.test(errMsg)) {
+      return { error: 'Transaction rejected in your wallet.' };
+    }
 
     // If eth_sendTransaction is not supported (method not found, etc.),
     // fall through to wallet_sendCalls.
