@@ -55,6 +55,7 @@ async function getUploader(): Promise<IrysUploader | null> {
 async function upload(
   data: Buffer | string,
   contentType: string,
+  extraTags: { name: string; value: string }[] = [],
 ): Promise<{ id: string; url: string } | null> {
   const irys = await getUploader();
   if (!irys) return null;
@@ -63,6 +64,7 @@ async function upload(
     const tags = [
       { name: "Content-Type", value: contentType },
       { name: "App-Name", value: "nftfax" },
+      ...extraTags,
     ];
     const receipt = await irys.upload(data, { tags });
     const url = `https://gateway.irys.xyz/${receipt.id}`;
@@ -78,18 +80,27 @@ async function upload(
 // Public API — mirrors pinata.ts surface
 // ---------------------------------------------------------------------------
 
-/** Upload a raw image buffer to Arweave via Irys. */
+/**
+ * Upload a raw image buffer to Arweave via Irys.
+ *
+ * `tags` should carry the fax's identity (e.g. Tray-Id) — without it an upload
+ * cannot be mapped back to a token, which is what made earlier Arweave backups
+ * unusable for recovery.
+ */
 export async function uploadImageToArweave(
   imageBuffer: Buffer,
+  contentType: "image/png" | "image/jpeg" = "image/png",
+  tags: { name: string; value: string }[] = [],
 ): Promise<{ id: string; url: string } | null> {
-  return upload(imageBuffer, "image/png");
+  return upload(imageBuffer, contentType, tags);
 }
 
 /** Upload JSON metadata to Arweave via Irys. */
 export async function uploadJSONToArweave(
   json: Record<string, unknown>,
+  tags: { name: string; value: string }[] = [],
 ): Promise<{ id: string; url: string } | null> {
-  return upload(JSON.stringify(json), "application/json");
+  return upload(JSON.stringify(json), "application/json", tags);
 }
 
 /** Convert an Arweave txId to the ar:// URI scheme (usable as tokenURI). */

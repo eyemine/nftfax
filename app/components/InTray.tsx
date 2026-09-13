@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
 import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlacement } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
-import { buildMintTx, sendMintTx, pinFaxMetadata, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
+import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
@@ -459,6 +459,9 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       const cfg = kind === 'mint' ? MINT_CONFIG : SAVE_CONFIG;
       const placeholder = isPlaceholderAddress(cfg.contract);
       let txHash: string | null = null;
+      /// `ar://<txId>` of the Arweave metadata backup, recorded with the mint so
+      /// the token can be repointed at Arweave if IPFS ever becomes unavailable.
+      let arweaveUri: string | undefined;
 
       // Resolve a wallet provider, preferring Privy's active wallet and
       // falling back to the injected one (MetaMask).
@@ -502,7 +505,12 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         const mintTrayId = activeTab === 'sent' ? fax.id : (fax.forwardedTrayId || fax.id);
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
-          tokenURI = await pinFaxMetadata(mintTrayId, cleanLocal).catch(() => null) || undefined;
+          // Capture the Arweave backup pointer too, so it can be recorded
+          // against the mint below — otherwise the ar:// txId is created and
+          // then discarded, leaving the backup unreachable.
+          const pinned = await pinFaxMetadataFull(mintTrayId, cleanLocal).catch(() => null);
+          tokenURI = pinned?.tokenURI || undefined;
+          arweaveUri = pinned?.arweaveURI || undefined;
         }
         // The mint always identifies the token via the CALLER's own mailbox
         // identity (cleanLocal) — the fax being minted is always one the caller
@@ -575,7 +583,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           ownerWallet: wallet,
           chainId: cfg.chain.id,
           contract: cfg.contract,
-          ...(kind === 'mint' ? { baseTx: txHash } : { gnosisTx: txHash }),
+          ...(kind === 'mint' ? { baseTx: txHash, arweaveUri } : { gnosisTx: txHash }),
         }),
       });
       const data = await res.json() as { error?: string };

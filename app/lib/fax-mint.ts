@@ -250,24 +250,37 @@ export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, 
   return { to: BASE_FAX_COLLECTIBLE, data, value, chainId: BASE_CHAIN.hexId, rpcUrl: BASE_CHAIN.rpcUrl, warning: resolved.warning };
 }
 
+export interface PinnedFax {
+  /** `ipfs://<cid>` metadata URI — used as the on-chain tokenURI. */
+  tokenURI: string | null;
+  /** `ar://<txId>` of the self-contained Arweave metadata backup, if stored. */
+  arweaveURI: string | null;
+}
+
 /// Pins the fax's image + metadata JSON to IPFS via the `/api/tray/[id]/pin`
-/// route (Pinata under the hood). Returns the resulting `ipfs://<cid>`
-/// metadata URI, or `null` if pinning is unconfigured/unavailable — callers
-/// should treat `null` as "mint without a per-token URI" rather than an
+/// route (Pinata under the hood), which also mirrors both to Arweave. Returns
+/// the `ipfs://<cid>` metadata URI plus the `ar://<txId>` backup pointer.
+/// Either may be null if pinning is unconfigured/unavailable — callers should
+/// treat a null tokenURI as "mint without a per-token URI" rather than an
 /// error, so minting is never blocked by an IPFS outage.
-export async function pinFaxMetadata(trayId: string, local: string): Promise<string | null> {
+export async function pinFaxMetadataFull(trayId: string, local: string): Promise<PinnedFax> {
   try {
     const res = await fetch(`/api/tray/${encodeURIComponent(trayId)}/pin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ local }),
     });
-    if (!res.ok) return null;
-    const json = await res.json() as { tokenURI?: string | null };
-    return json.tokenURI || null;
+    if (!res.ok) return { tokenURI: null, arweaveURI: null };
+    const json = await res.json() as { tokenURI?: string | null; arweaveURI?: string | null };
+    return { tokenURI: json.tokenURI || null, arweaveURI: json.arweaveURI || null };
   } catch {
-    return null;
+    return { tokenURI: null, arweaveURI: null };
   }
+}
+
+/// Back-compat wrapper for callers that only need the IPFS tokenURI.
+export async function pinFaxMetadata(trayId: string, local: string): Promise<string | null> {
+  return (await pinFaxMetadataFull(trayId, local)).tokenURI;
 }
 
 /// ABI-encodes FaxTray.saveFax(address to, string trayId, string tokenURI).

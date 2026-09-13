@@ -139,24 +139,56 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // Belt-and-suspenders: also store permanently on Arweave (non-fatal).
-    // IPFS stays the primary tokenURI; Arweave is a backup you can switch to
-    // via setTokenURI(tokenId, ar://<txId>) if Pinata ever goes down.
+    // IPFS stays the primary tokenURI; Arweave is the backup you switch to via
+    // setTokenURI(tokenId, ar://<txId>) if Pinata ever goes down.
+    //
+    // For that switch to actually work the Arweave copy must be SELF-CONTAINED.
+    // Previously both uploads ran in parallel and the image's txId was thrown
+    // away, so the Arweave metadata still pointed `image` at ipfs:// — if IPFS
+    // was the thing that failed, the ar:// metadata resolved with a dead image.
+    // So: upload the image first, then reference it as ar:// in an Arweave-only
+    // metadata variant. The IPFS copy above is untouched and still points at
+    // ipfs://, so nothing about the primary path changes.
+    //
+    // Both uploads are tagged with the tray id so a txId can be recovered later
+    // (tokenId -> mint record -> trayId -> Irys GraphQL by Tray-Id tag).
     let arweaveURI: string | null = null;
+    let arweaveImageURI: string | null = null;
     try {
       const imageBuffer = Buffer.from(doc.dataBase64, 'base64');
-      const [arweaveImage, arweaveMeta] = await Promise.all([
-        uploadImageToArweave(imageBuffer),
-        uploadJSONToArweave(metadata),
-      ]);
+      const tags = [
+        { name: 'Tray-Id', value: id },
+        ...(local ? [{ name: 'Fax-Mailbox', value: local }] : []),
+        ...(nextTokenId ? [{ name: 'Expected-Token-Id', value: String(nextTokenId) }] : []),
+      ];
+
+      const arweaveImage = await uploadImageToArweave(
+        imageBuffer,
+        format === 'png' ? 'image/png' : 'image/jpeg',
+        [...tags, { name: 'Fax-Asset', value: 'image' }],
+      );
+      if (arweaveImage) arweaveImageURI = arweaveTxIdToURI(arweaveImage.id);
+
+      const arweaveMetadata = arweaveImageURI ? { ...metadata, image: arweaveImageURI } : metadata;
+      const arweaveMeta = await uploadJSONToArweave(
+        arweaveMetadata,
+        [...tags, { name: 'Fax-Asset', value: 'metadata' }],
+      );
       if (arweaveMeta) {
         arweaveURI = arweaveTxIdToURI(arweaveMeta.id);
-        console.log(`[pin] Arweave backup stored: ${arweaveURI}`);
+        console.log(
+          `[pin] Arweave backup stored: ${arweaveURI}` +
+          (arweaveImageURI ? ` (self-contained, image ${arweaveImageURI})` : ' (WARNING: image upload failed, image still points at IPFS)'),
+        );
       }
     } catch {
       // Arweave is best-effort; never block the response on it.
     }
 
-    return NextResponse.json({ tokenURI: metadataUri, imageUri, arweaveURI }, { status: 200, headers: NO_STORE });
+    return NextResponse.json(
+      { tokenURI: metadataUri, imageUri, arweaveURI, arweaveImageURI },
+      { status: 200, headers: NO_STORE },
+    );
   } catch {
     return NextResponse.json({ tokenURI: null, reason: 'pin_failed' }, { status: 200, headers: NO_STORE });
   }

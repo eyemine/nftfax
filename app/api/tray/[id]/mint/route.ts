@@ -40,6 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     baseTx?: string;
     baseTokenId?: string | number;
     ipfsCid?: string;
+    arweaveUri?: string;
   };
   const local = (body.local || '').toLowerCase().trim().replace(/@nftmail\.box$/, '');
   const wallet = (body.ownerWallet || '').trim();
@@ -119,6 +120,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         baseTx: body.baseTx || null,
         baseTokenId: body.baseTokenId ?? null,
         ipfsCid: body.ipfsCid || null,
+        // Recorded so a token can be repointed at its Arweave backup via
+        // setTokenURI if IPFS becomes unavailable. Previously the pin route
+        // returned this and it was dropped, leaving backups unreachable.
+        arweaveUri: body.arweaveUri || null,
       }),
     });
     const data = await res.json();
