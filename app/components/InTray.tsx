@@ -457,9 +457,16 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       const placeholder = isPlaceholderAddress(cfg.contract);
       let txHash: string | null = null;
 
-      const provider = getEthereumProvider
+      let provider = getEthereumProvider
         ? await getEthereumProvider().catch(() => undefined)
-        : (typeof window !== 'undefined' ? (window as { ethereum?: Eip1193Provider }).ethereum : undefined);
+        : undefined;
+      // Fallback to window.ethereum if Privy's provider is unavailable or crashed.
+      // Privy's getEthereumProvider() can throw internally (e.g. "Cannot read
+      // properties of null (reading 'info')") when its wallet session state is
+      // stale. MetaMask's injected provider (window.ethereum) is still usable.
+      if (!provider && typeof window !== 'undefined') {
+        provider = (window as { ethereum?: Eip1193Provider }).ethereum ?? undefined;
+      }
       if (provider && !placeholder) {
         await switchToChain(provider, cfg.chain);
       }
