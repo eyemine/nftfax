@@ -1091,12 +1091,15 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                       <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">{replyError}</div>
                     )}
 
-                    <input
-                      value={replyTo}
-                      onChange={(e) => setReplyTo(e.target.value)}
-                      placeholder="collection.1234@fax"
-                      className="mb-3 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
-                    />
+                    <div className="mb-3 flex items-stretch gap-2">
+                      <FaxHandleThumb handle={replyTo} label="Replying to" size={46} />
+                      <input
+                        value={replyTo}
+                        onChange={(e) => setReplyTo(e.target.value)}
+                        placeholder="collection.1234@fax"
+                        className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                      />
+                    </div>
 
                     <div className="mb-3">
                       <textarea
@@ -1186,12 +1189,15 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                       );
                     })()}
 
-                    <input
-                      value={forwardTo}
-                      onChange={(e) => setForwardTo(e.target.value)}
-                      placeholder="collection.1234@fax"
-                      className="mb-3 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
-                    />
+                    <div className="mb-3 flex items-stretch gap-2">
+                      <FaxHandleThumb handle={forwardTo} label="Forwarding to" size={46} />
+                      <input
+                        value={forwardTo}
+                        onChange={(e) => setForwardTo(e.target.value)}
+                        placeholder="collection.1234@fax"
+                        className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                      />
+                    </div>
 
                     <div className="mb-3">
                       <textarea
