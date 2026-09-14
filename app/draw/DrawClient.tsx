@@ -16,6 +16,7 @@ import {
   type DrawPhase,
   type MintEntry,
   PRIZE_TIERS,
+  TIER_SUPPLY,
   tierForChainDepth,
 } from '../lib/draw';
 
@@ -363,8 +364,8 @@ export default function DrawClient() {
                     <tr>
                       <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
                       <th className="border-b border-[#8f8878] p-3 font-bold text-center">Mints</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">NFT</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">Winner wallet</th>
+                      <th className="border-b border-[#8f8878] p-3 font-bold">@fax</th>
+                      <th className="border-b border-[#8f8878] p-3 font-bold">Winner Wallet</th>
                       <th className="border-b border-[#8f8878] p-3 font-bold text-center">Claimed</th>
                       {isOwner && <th className="border-b border-[#8f8878] p-3 font-bold">Action</th>}
                     </tr>
@@ -373,13 +374,15 @@ export default function DrawClient() {
                     {PRIZE_TIERS.map((tier, index) => {
                       const tw = tieredWinners.find((w) => w.tier === tier);
                       const mints = tierMints[tier] ?? 0;
+                      const supply = TIER_SUPPLY[tier] ?? 0;
                       const entry = tw ? entries.find((e) => e.tokenId === tw.tokenId) : undefined;
                       const accountLabel = tw && entry ? getFaxAccountLabel(entry) : '—';
                       return (
                         <tr key={tier} className="border-b border-[#8f8878]/50">
                           <td className="p-3 font-bold">{tier}</td>
-                          <td className="p-3 text-center font-mono">
-                            {mints > 0 ? mints : <span className="text-[#847d6e]">0</span>}
+                          <td className="p-3 text-center font-mono whitespace-nowrap">
+                            <span className={mints > 0 ? 'font-bold' : 'text-[#847d6e]'}>{mints}</span>
+                            <span className="text-[#847d6e]">/{supply.toLocaleString()}</span>
                           </td>
                           <td className="p-3">
                             {tw ? (
