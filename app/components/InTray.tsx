@@ -16,6 +16,7 @@ import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlac
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
 import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
+import { FaxHandleThumb } from './FaxHandleThumb';
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
 
@@ -903,6 +904,22 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
               {/* Right: metadata + actions + chain builder */}
               <div className="min-h-0 overflow-auto bg-[#bbb3a2] p-5">
+                {/* Thumbnail of the NFT identity this transmission is with. The
+                    handle shown below is opaque on its own, so render the artwork
+                    for whichever address the label names: the recipient on the
+                    Sent tab, otherwise the sender. */}
+                {(() => {
+                  const counterparty = activeTab === 'sent' && !selected.forwarded
+                    ? (selected.to || '')
+                    : selected.from;
+                  const role = activeTab === 'sent' && !selected.forwarded ? 'Sent to' : 'From';
+                  if (!counterparty) return null;
+                  return (
+                    <div className="mb-3">
+                      <FaxHandleThumb handle={counterparty} label={role} size={64} />
+                    </div>
+                  );
+                })()}
                 <div className="mb-5 grid gap-1.5 text-[12px] font-bold uppercase text-[#4a4638]">
                   <p>{activeTab === 'sent' && selected.forwarded ? `Forwarded from: ${selected.from}` : activeTab === 'sent' ? `To: ${selected.to || '?'}` : `From: ${selected.from}`}</p>
                   <p>{activeTab === 'sent' && selected.forwarded ? 'Forwarded' : activeTab === 'sent' ? 'Sent' : 'Received'}: {formatDate(selected.createdAt)}</p>
