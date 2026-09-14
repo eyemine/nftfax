@@ -15,14 +15,12 @@ import {
   type DrawRoundData,
   type DrawPhase,
   type MintEntry,
+  PRIZE_TIERS,
+  tierForChainDepth,
 } from '../lib/draw';
 
 const MAX_SUPPLY = 2222;
 
-const TIERS: string[] = [
-  'Dial Tone', 'Hop 2', 'Hop 3', 'Hop 4', 'Hop 5',
-  'Hop 6', 'Hop 7', 'Hop 8', 'Hop 9', 'Hop 10', 'Dead Letter',
-];
 
 const PHASE_STEPS: { phase: DrawPhase; label: string }[] = [
   { phase: 'committed', label: 'Draw committed' },
@@ -74,6 +72,12 @@ export default function DrawClient() {
   const [distributeMsg, setDistributeMsg] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState('');
+  /// Live mints per tier, and address -> ENS. Sourced from the leaderboard,
+  /// which already resolves both, so the table can show real standings before
+  /// the draw unlocks at MAX_SUPPLY.
+  const [tierMints, setTierMints] = useState<Record<string, number>>({});
+  const [ensByAddress, setEnsByAddress] = useState<Record<string, string>>({});
+  const [mintsCounted, setMintsCounted] = useState(0);
 
   const isOwner = owner === walletAddress && !!walletAddress;
 
@@ -115,11 +119,35 @@ export default function DrawClient() {
     }
   }, []);
 
+  const refreshTierMints = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tray/leaderboard?pageSize=${MAX_SUPPLY}`, { cache: 'no-store' });
+      if (!res.ok) return;
+      const json = await res.json() as {
+        mints?: { minter?: string; minterEns?: string; chainDepth?: number | null }[];
+      };
+      const mints = json.mints ?? [];
+      const counts: Record<string, number> = {};
+      const ens: Record<string, string> = {};
+      for (const mint of mints) {
+        const tier = tierForChainDepth(mint.chainDepth);
+        counts[tier] = (counts[tier] ?? 0) + 1;
+        if (mint.minter && mint.minterEns) ens[mint.minter.toLowerCase()] = mint.minterEns;
+      }
+      setTierMints(counts);
+      setEnsByAddress(ens);
+      setMintsCounted(mints.length);
+    } catch {
+      // Non-fatal: the table falls back to showing zero counts.
+    }
+  }, []);
+
   useEffect(() => {
     void refresh();
-    const interval = setInterval(() => { void refresh(); }, 15000);
+    void refreshTierMints();
+    const interval = setInterval(() => { void refresh(); void refreshTierMints(); }, 15000);
     return () => clearInterval(interval);
-  }, [refresh]);
+  }, [refresh, refreshTierMints]);
 
   const phase = getDrawPhase(data, currentBlock);
   const step = phaseIndex(phase);
@@ -317,38 +345,52 @@ export default function DrawClient() {
               </div>
             )}
 
-            {/* Winners by tier */}
-            {supplyReached && (
+            {/* Prize table by tier. Shown at all times: before the draw unlocks
+                it is the live standings (mints per tier) with winners pending;
+                afterwards the winner columns fill in. */}
+            {(
               <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
                 <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em] flex items-center gap-2">
-                  <Trophy size={14} /> Winners by tier
+                  <Trophy size={14} /> {supplyReached ? 'Winners by tier' : 'Prize table — one winner per tier'}
                 </div>
+                {!supplyReached && (
+                  <p className="border-b border-[#8f8878] bg-[#c1b9a7] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-[#6e685a]">
+                    Provisional · {mintsCounted} mint{mintsCounted === 1 ? '' : 's'} counted · winners drawn at {MAX_SUPPLY.toLocaleString()} mints
+                  </p>
+                )}
                 <table className="w-full border-collapse text-left text-[12px]">
                   <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                     <tr>
                       <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">Account</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">Wallet</th>
+                      <th className="border-b border-[#8f8878] p-3 font-bold text-center">Mints</th>
+                      <th className="border-b border-[#8f8878] p-3 font-bold">NFT</th>
+                      <th className="border-b border-[#8f8878] p-3 font-bold">Winner wallet</th>
                       <th className="border-b border-[#8f8878] p-3 font-bold text-center">Claimed</th>
                       {isOwner && <th className="border-b border-[#8f8878] p-3 font-bold">Action</th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {TIERS.map((tier, index) => {
+                    {PRIZE_TIERS.map((tier, index) => {
                       const tw = tieredWinners.find((w) => w.tier === tier);
+                      const mints = tierMints[tier] ?? 0;
                       const entry = tw ? entries.find((e) => e.tokenId === tw.tokenId) : undefined;
                       const accountLabel = tw && entry ? getFaxAccountLabel(entry) : '—';
                       return (
                         <tr key={tier} className="border-b border-[#8f8878]/50">
                           <td className="p-3 font-bold">{tier}</td>
+                          <td className="p-3 text-center font-mono">
+                            {mints > 0 ? mints : <span className="text-[#847d6e]">0</span>}
+                          </td>
                           <td className="p-3">
                             {tw ? (
-                              <span className="font-mono">{accountLabel}</span>
+                              <span className="font-mono">{accountLabel}{tw.tokenId ? ` · #${tw.tokenId}` : ''}</span>
                             ) : (
-                              <span className="text-[#847d6e]">No winner</span>
+                              <span className="text-[#847d6e]">{mints > 0 ? 'Pending draw' : 'No mints yet'}</span>
                             )}
                           </td>
-                          <td className="p-3 font-mono">{tw ? truncate(tw.winner) : '—'}</td>
+                          <td className="p-3 font-mono">
+                            {tw ? (ensByAddress[tw.winner.toLowerCase()] ?? truncate(tw.winner)) : <span className="text-[#847d6e]">—</span>}
+                          </td>
                           <td className="p-3 text-center">
                             {tw ? (
                               tw.claimed ? (

@@ -178,6 +178,29 @@ export async function getAllMinters(): Promise<string[]> {
   return logs.map((log) => `0x${log.topics[2].slice(-40)}`.toLowerCase());
 }
 
+// ── Prize tiers ──────────────────────────────────────────────────────────────
+
+/// The 11 prize tiers, shallowest first. One winner is drawn per tier (with one
+/// tier randomly left out, giving 10 winners) — see selectTieredWinners.
+export const PRIZE_TIERS = [
+  'Dial Tone', 'Hop 2', 'Hop 3', 'Hop 4', 'Hop 5',
+  'Hop 6', 'Hop 7', 'Hop 8', 'Hop 9', 'Hop 10', 'Dead Letter',
+] as const;
+
+/// Maps a fax's raw chainDepth to its prize tier.
+///
+/// The worker counts the initial send as depth 1, and that first send is not a
+/// hop, so the hop count is depth - 1. Kept identical to the derivation in
+/// /api/metadata/[tokenId] so the tier shown here matches the tier minted into
+/// each token's metadata — the draw itself reads that metadata trait.
+export function tierForChainDepth(chainDepth?: number | null): string {
+  if (chainDepth == null) return PRIZE_TIERS[0];
+  const hop = Math.max(0, chainDepth - 1);
+  if (hop < 1) return PRIZE_TIERS[0];
+  if (hop >= PRIZE_TIERS.length) return PRIZE_TIERS[PRIZE_TIERS.length - 1];
+  return PRIZE_TIERS[hop - 1];
+}
+
 export interface MintEntry {
   tokenId: number;
   minter: string;
