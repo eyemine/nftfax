@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Trophy, Dices, Backpack as BackpackIcon } from 'lucide-react';
+import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Trophy, Dices, Backpack as BackpackIcon, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
 type View = 'send' | 'tray' | 'delegate' | 'backpack';
 
-import { prepareImage } from './lib/image';
+import { prepareImage, type ImageTransform, type Quarter } from './lib/image';
 import { disconnectWallet } from './lib/disconnect';
 import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
 import { SkinPanel } from './components/SkinPanel';
@@ -30,6 +30,11 @@ export default function HomeClient() {
   const [fileName, setFileName] = useState('');
   const [base64, setBase64] = useState('');
   const [preview, setPreview] = useState('');
+  /// Retained so flip/rotate re-processes the ORIGINAL file. Re-encoding an
+  /// already-greyscaled, already-compressed result would compound loss on every
+  /// press.
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [transform, setTransform] = useState<ImageTransform>({});
   const [sizeKb, setSizeKb] = useState(0);
   const [coverNote, setCoverNote] = useState('');
   const [status, setStatus] = useState<Status>('idle');
@@ -122,12 +127,14 @@ export default function HomeClient() {
     await disconnectWallet(activeWallet, { authenticated, logout });
   }
 
-  async function selectFile(file: File) {
+  async function selectFile(file: File, nextTransform: ImageTransform = {}) {
     setError('');
     setTrayUrl('');
     setStatus('processing');
+    setSourceFile(file);
+    setTransform(nextTransform);
     try {
-      const prepared = await prepareImage(file);
+      const prepared = await prepareImage(file, nextTransform);
       setBase64(prepared.base64);
       setPreview(prepared.preview);
       setSizeKb(prepared.sizeKb);
@@ -137,6 +144,17 @@ export default function HomeClient() {
       setStatus('idle');
       setError(cause instanceof Error ? cause.message : 'Image processing failed.');
     }
+  }
+
+  /// Re-processes the selected file with an updated orientation.
+  function applyTransform(change: Partial<ImageTransform>) {
+    if (!sourceFile) return;
+    void selectFile(sourceFile, { ...transform, ...change });
+  }
+
+  function rotateBy(step: 90 | -90) {
+    const next = ((((transform.rotate ?? 0) + step) + 360) % 360) as Quarter;
+    applyTransform({ rotate: next });
   }
 
   async function transmit() {
@@ -400,6 +418,38 @@ export default function HomeClient() {
               {status === 'processing' && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/90"><Loader2 className="animate-spin" /><p className="mt-10 text-[12px] font-bold uppercase">Calibrating image…</p></div>}
             </button>
             <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.bmp,image/png,image/jpeg,image/bmp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void selectFile(file); }} />
+
+            {/* Orientation. Only meaningful once a document is loaded, and each
+                press re-runs the pipeline from the original file so repeated
+                presses do not compound compression loss. */}
+            {preview && (
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {([
+                  { key: 'ccw', Icon: RotateCcw, label: 'Left', title: 'Rotate 90° left' },
+                  { key: 'cw', Icon: RotateCw, label: 'Right', title: 'Rotate 90° right' },
+                  { key: 'flipH', Icon: FlipHorizontal, label: 'Flip H', title: 'Mirror horizontally' },
+                  { key: 'flipV', Icon: FlipVertical, label: 'Flip V', title: 'Mirror vertically' },
+                ] as const).map(({ key, Icon, label, title }) => {
+                  const active = (key === 'flipH' && transform.flipH) || (key === 'flipV' && transform.flipV);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      title={title}
+                      disabled={status === 'processing'}
+                      onClick={() => {
+                        if (key === 'flipH') return applyTransform({ flipH: !transform.flipH });
+                        if (key === 'flipV') return applyTransform({ flipV: !transform.flipV });
+                        return rotateBy(key === 'cw' ? 90 : -90);
+                      }}
+                      className={`key-shadow flex flex-col items-center gap-1 border px-1 py-2 text-[10px] font-black uppercase disabled:opacity-50 ${active ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+                    >
+                      <Icon size={14} /> {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="mt-3 flex min-h-5 items-center justify-between text-[11px] font-bold uppercase text-[#615c50]"><span>{fileName || 'Feeder empty'}</span><span>{sizeKb ? `${sizeKb} KB / GREYSCALE` : 'Auto reduction enabled'}</span></div>
           </div>
 

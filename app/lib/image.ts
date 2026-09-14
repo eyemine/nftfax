@@ -15,7 +15,18 @@ export const CHAIN_OPS: { id: ChainOp; label: string; raw: string; hint: string 
   { id: 'stamp', label: 'Stamp', raw: 'Copy', hint: 'Assert your ink over the chain (darken).' },
 ];
 
+/// Quarter-turn rotation, clockwise. Restricted to 90-degree steps because the
+/// fax canvas is a fixed grid — arbitrary angles would need resampling and
+/// produce grey edge pixels on a 1-bit output.
+export type Quarter = 0 | 90 | 180 | 270;
+
 export interface OverlayPlacement {
+  /** Mirror horizontally. */
+  flipH?: boolean;
+  /** Mirror vertically. */
+  flipV?: boolean;
+  /** Clockwise quarter-turn rotation. */
+  rotate?: Quarter;
   /** Horizontal anchor (0..1) of the overlay's center on the base. */
   x: number;
   /** Vertical anchor (0..1) of the overlay's center on the base. */
@@ -95,12 +106,31 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   const srcY = Math.min(oh - 1, Math.floor(oh * cropY));
   const srcW = Math.max(1, Math.min(Math.floor(ow * cropW), ow - srcX));
   const srcH = Math.max(1, Math.min(Math.floor(oh * cropH), oh - srcY));
-  const containScale = Math.min(width / srcW, height / srcH);
+  // A quarter turn swaps the effective footprint, so the contain fit has to be
+  // computed against the rotated dimensions or a 90-degree overlay overflows
+  // the canvas.
+  const rotate: Quarter = (p.rotate ?? 0) as Quarter;
+  const quarterTurned = rotate === 90 || rotate === 270;
+  const fitW = quarterTurned ? srcH : srcW;
+  const fitH = quarterTurned ? srcW : srcH;
+  const containScale = Math.min(width / fitW, height / fitH);
   const dstW = Math.max(1, Math.round(srcW * containScale * p.scale));
   const dstH = Math.max(1, Math.round(srcH * containScale * p.scale));
-  const dstX = Math.round(width * clamp01(p.x) - dstW / 2);
-  const dstY = Math.round(height * clamp01(p.y) - dstH / 2);
-  ctx.drawImage(overlay, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
+  const centerX = width * clamp01(p.x);
+  const centerY = height * clamp01(p.y);
+
+  if (rotate || p.flipH || p.flipV) {
+    // Transform about the placement centre so rotation and mirroring do not
+    // move the overlay away from where the user positioned it.
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    if (rotate) ctx.rotate((rotate * Math.PI) / 180);
+    ctx.scale(p.flipH ? -1 : 1, p.flipV ? -1 : 1);
+    ctx.drawImage(overlay, srcX, srcY, srcW, srcH, -dstW / 2, -dstH / 2, dstW, dstH);
+    ctx.restore();
+  } else {
+    ctx.drawImage(overlay, srcX, srcY, srcW, srcH, Math.round(centerX - dstW / 2), Math.round(centerY - dstH / 2), dstW, dstH);
+  }
   const overData = ctx.getImageData(0, 0, width, height);
 
   if (negative) {
@@ -189,9 +219,47 @@ export async function compositeChain(baseSrc: string, overlaySrc: string, op: Ch
   return { base64, preview: dataUri, sizeKb: Math.round(base64.length * 0.75 / 1024), format };
 }
 
-export async function prepareImage(file: File): Promise<{ base64: string; preview: string; sizeKb: number }> {
+/// Renders a bitmap through a flip/rotate transform and returns a new bitmap.
+/// A quarter turn swaps width and height.
+async function applyTransform(
+  bitmap: ImageBitmap,
+  { flipH = false, flipV = false, rotate = 0 }: ImageTransform,
+): Promise<ImageBitmap> {
+  const quarterTurned = rotate === 90 || rotate === 270;
+  const outW = quarterTurned ? bitmap.height : bitmap.width;
+  const outH = quarterTurned ? bitmap.width : bitmap.height;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('This browser cannot operate the image processor.');
+
+  ctx.translate(outW / 2, outH / 2);
+  if (rotate) ctx.rotate((rotate * Math.PI) / 180);
+  ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+  ctx.drawImage(bitmap, -bitmap.width / 2, -bitmap.height / 2);
+
+  return createImageBitmap(canvas);
+}
+
+export interface ImageTransform {
+  flipH?: boolean;
+  flipV?: boolean;
+  rotate?: Quarter;
+}
+
+export async function prepareImage(file: File, transform?: ImageTransform): Promise<{ base64: string; preview: string; sizeKb: number }> {
   if (file.size > MAX_SOURCE_BYTES) throw new Error('Source image exceeds the 20MB intake limit.');
-  const bitmap = await createImageBitmap(file);
+  const original = await createImageBitmap(file);
+
+  // Bake any flip/rotate into a source bitmap FIRST, so everything downstream —
+  // the portrait-canvas rule, the upscale threshold, the size-reduction loop —
+  // sees the final orientation. Rotating afterwards would mean a landscape
+  // photo turned portrait still got padded as landscape.
+  const bitmap = transform && (transform.rotate || transform.flipH || transform.flipV)
+    ? await applyTransform(original, transform)
+    : original;
   const srcW = bitmap.width;
   const srcH = bitmap.height;
 

@@ -11,7 +11,7 @@
 /// Unsaved / unminted faxes decay after 8 days so the gallery stays uncluttered.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut } from 'lucide-react';
+import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
 import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlacement } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
 import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
@@ -203,6 +203,14 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   /// see, and the button looked like it did nothing.
   const [rerouteError, setRerouteError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  /// True only when a click gesture BEGAN on the backdrop itself.
+  ///
+  /// Dragging a slider and releasing outside the panel fires `click` on the
+  /// backdrop (the nearest common ancestor of press and release), which closed
+  /// the modal mid-adjustment and discarded the placement. Requiring the press
+  /// to have started on the backdrop makes click-outside-to-close behave as
+  /// intended while leaving drags alone.
+  const backdropPressed = useRef(false);
   const [forwardError, setForwardError] = useState('');
   const [replyFor, setReplyFor] = useState('');
   const [replyTo, setReplyTo] = useState('');
@@ -851,7 +859,15 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-4" onClick={() => { resetForward(); resetReply(); setSelected(null); setNotice(''); }}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-4"
+          onMouseDown={(e) => { backdropPressed.current = e.target === e.currentTarget; }}
+          onClick={(e) => {
+            if (e.target !== e.currentTarget || !backdropPressed.current) return;
+            backdropPressed.current = false;
+            resetForward(); resetReply(); setSelected(null); setNotice('');
+          }}
+        >
           <div className="machine-shadow flex h-[75vh] w-[75vw] flex-col overflow-hidden border border-[#8f8878] bg-[#c8c0ae]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3">
               <div>
@@ -1262,6 +1278,45 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                               Reset
                             </button>
                           </div>
+                          {/* Orientation. Quarter turns only — the fax output is
+                              1-bit, so arbitrary angles would resample into grey
+                              edges. */}
+                          <div className="mb-2 grid grid-cols-4 gap-1">
+                            {([
+                              { key: 'ccw', Icon: RotateCcw, label: 'Left', title: 'Rotate 90° left' },
+                              { key: 'cw', Icon: RotateCw, label: 'Right', title: 'Rotate 90° right' },
+                              { key: 'flipH', Icon: FlipHorizontal, label: 'Flip H', title: 'Mirror horizontally' },
+                              { key: 'flipV', Icon: FlipVertical, label: 'Flip V', title: 'Mirror vertically' },
+                            ] as const).map(({ key, Icon, label, title }) => {
+                              const active = (key === 'flipH' && overlayPlacement.flipH) || (key === 'flipV' && overlayPlacement.flipV);
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  title={title}
+                                  onClick={() => setOverlayPlacement((prev) => {
+                                    if (key === 'flipH') return { ...prev, flipH: !prev.flipH };
+                                    if (key === 'flipV') return { ...prev, flipV: !prev.flipV };
+                                    const step = key === 'cw' ? 90 : -90;
+                                    const next = (((prev.rotate ?? 0) + step + 360) % 360) as 0 | 90 | 180 | 270;
+                                    return { ...prev, rotate: next };
+                                  })}
+                                  className={`key-shadow flex flex-col items-center gap-0.5 border px-1 py-2 text-[9px] font-black uppercase ${active ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+                                >
+                                  <Icon size={13} /> {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {!!(overlayPlacement.rotate || overlayPlacement.flipH || overlayPlacement.flipV) && (
+                            <p className="mb-2 text-[10px] font-bold uppercase text-[#8a3e1e]">
+                              {overlayPlacement.rotate ? `Rotated ${overlayPlacement.rotate}°` : ''}
+                              {overlayPlacement.rotate && (overlayPlacement.flipH || overlayPlacement.flipV) ? ' · ' : ''}
+                              {overlayPlacement.flipH ? 'Flipped H' : ''}
+                              {overlayPlacement.flipH && overlayPlacement.flipV ? ' · ' : ''}
+                              {overlayPlacement.flipV ? 'Flipped V' : ''}
+                            </p>
+                          )}
                           <div className="grid grid-cols-2 gap-2 text-[10px] font-bold uppercase text-[#4a4638]">
                             <label className="space-y-0.5">X <input type="range" min="0" max="1" step="0.01" value={overlayPlacement.x} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, x: parseFloat(e.target.value) }))} className="w-full" /></label>
                             <label className="space-y-0.5">Y <input type="range" min="0" max="1" step="0.01" value={overlayPlacement.y} onChange={(e) => setOverlayPlacement((prev) => ({ ...prev, y: parseFloat(e.target.value) }))} className="w-full" /></label>
