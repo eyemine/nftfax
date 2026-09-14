@@ -197,6 +197,11 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [relaySuggestions, setRelaySuggestions] = useState<RelaySuggestion[]>([]);
   const [rerouteTo, setRerouteTo] = useState('');
   const [showReroute, setShowReroute] = useState(false);
+  /// Reroute errors need their own state. `notice` renders in the tray list at
+  /// the top of the component, which the detail modal (fixed inset-0 z-50)
+  /// completely covers — so a failed reroute set a message the user could never
+  /// see, and the button looked like it did nothing.
+  const [rerouteError, setRerouteError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [forwardError, setForwardError] = useState('');
   const [replyFor, setReplyFor] = useState('');
@@ -673,9 +678,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   }
 
   async function reroute(fax: InboxFax) {
-    if (!rerouteTo.includes('@')) { setNotice('Enter a valid recipient address.'); return; }
+    if (!rerouteTo.includes('@')) { setRerouteError('Enter a valid recipient address.'); return; }
     setBusyId(fax.id);
     setNotice('');
+    setRerouteError('');
     try {
       const res = await fetch(`/api/tray/${fax.id}/reroute`, {
         method: 'POST',
@@ -695,7 +701,11 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       setSelected(null);
       await load();
     } catch (cause: unknown) {
-      setNotice(cause instanceof Error ? cause.message : 'Re-route failed');
+      console.error('[fax][reroute] FAILED', cause);
+      const message = cause instanceof Error && cause.message
+        ? cause.message
+        : 'Re-route failed — see the browser console for details.';
+      setRerouteError(message);
     } finally {
       setBusyId('');
     }
@@ -959,23 +969,55 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                       <p className="mb-3 text-[12px] font-bold uppercase tracking-[.14em] text-[#8a3e1e]">⚡ Relay window open</p>
                       <p className="mb-3 text-[12px] text-[#4a4638]">The recipient hasn't forwarded this fax. Re-route it to a new player to keep the chain alive. The original recipient can still forward but their mint is disabled.</p>
                       {!showReroute ? (
-                        <button onClick={() => { setShowReroute(true); void fetchRelaySuggestions(selected); }} className="key-shadow w-full border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[12px] font-black uppercase text-white">
+                        <button onClick={() => { setShowReroute(true); setRerouteError(''); void fetchRelaySuggestions(selected); }} className="key-shadow w-full border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[12px] font-black uppercase text-white">
                           Re-route this fax
                         </button>
                       ) : (
                         <div className="space-y-3">
-                          <input
-                            value={rerouteTo}
-                            onChange={(e) => setRerouteTo(e.target.value)}
-                            placeholder="newplayer@nftmail.box or newplayer@fax"
-                            className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
-                          />
+                          {rerouteError && (
+                            <div className="border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">{rerouteError}</div>
+                          )}
+
+                          {/* Rolofax dropdown, matching the forward panel. The
+                              suggestion chips below are chain-aware picks; this
+                              lists every other player. Exclude the current
+                              recipient — re-routing to them is a no-op. */}
+                          {(() => {
+                            const current = (selected.to || '').replace(/@.*$/, '').toLowerCase();
+                            const opts = rolofaxOptions.filter((e) => e.handle !== current);
+                            return (
+                              <div>
+                                <span className="mb-1 block text-[11px] font-bold uppercase tracking-[.16em] text-[#615c50]">Rolofax directory</span>
+                                <select
+                                  value={rerouteTo.includes('@fax') ? rerouteTo.replace(/@fax$/, '') : ''}
+                                  onChange={(e) => { const h = e.target.value; setRerouteTo(h ? `${h}@fax` : ''); setRerouteError(''); }}
+                                  disabled={opts.length === 0}
+                                  className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f] disabled:opacity-60"
+                                >
+                                  <option value="">{opts.length === 0 ? 'No other Rolofax players available' : 'Select a Rolofax address…'}</option>
+                                  {opts.map((entry) => (
+                                    <option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          })()}
+
+                          <div className="flex items-stretch gap-2">
+                            <FaxHandleThumb handle={rerouteTo} label="Re-routing to" size={46} />
+                            <input
+                              value={rerouteTo}
+                              onChange={(e) => { setRerouteTo(e.target.value); setRerouteError(''); }}
+                              placeholder="newplayer@nftmail.box or newplayer@fax"
+                              className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                            />
+                          </div>
                           {relaySuggestions.length > 0 && (
                             <div>
                               <p className="mb-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#6e685a]">Suggested from Rolofax</p>
                               <div className="flex flex-wrap gap-1">
                                 {relaySuggestions.map((s) => (
-                                  <button key={s.handle} onClick={() => setRerouteTo(`${s.handle}@fax`)} className="border border-[#77705f] bg-[#d8d0bf] px-2 py-1 text-[11px] font-bold uppercase hover:bg-[#eee8dc]">
+                                  <button key={s.handle} onClick={() => { setRerouteTo(`${s.handle}@fax`); setRerouteError(''); }} className="border border-[#77705f] bg-[#d8d0bf] px-2 py-1 text-[11px] font-bold uppercase hover:bg-[#eee8dc]">
                                     {s.handle}@fax
                                   </button>
                                 ))}
@@ -986,7 +1028,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                             <button onClick={() => void reroute(selected)} disabled={busyId === selected.id || !rerouteTo.includes('@')} className="key-shadow flex flex-1 items-center justify-center gap-1 border border-[#983b21] bg-[#e65b2f] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
                               {busyId === selected.id ? <Loader2 className="animate-spin" size={13} /> : <Send size={13} />} Confirm re-route
                             </button>
-                            <button onClick={() => { setShowReroute(false); setRerouteTo(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-3 text-[12px] font-bold uppercase">Cancel</button>
+                            <button onClick={() => { setShowReroute(false); setRerouteTo(''); setRerouteError(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-4 py-3 text-[12px] font-bold uppercase">Cancel</button>
                           </div>
                         </div>
                       )}
