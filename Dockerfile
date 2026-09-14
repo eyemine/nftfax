@@ -26,5 +26,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Next's standalone output does NOT include public/ — it must be copied
+# explicitly or every static asset under it 404s in production.
+COPY --from=builder /app/public ./public
 EXPOSE 3000
 CMD ["node", "server.js"]

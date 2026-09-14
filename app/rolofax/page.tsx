@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
 import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, ArrowLeft, X, Send } from 'lucide-react';
+import { OdometerCounter } from '../components/OdometerCounter';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
 import { disconnectWallet } from '../lib/disconnect';
@@ -99,6 +100,16 @@ function NftThumbnail({ handle, collection }: { handle: string; collection: stri
     </a>
   );
 }
+
+/// Community logos, keyed by collection. Served from /public/logos.
+/// All four are 2400x1500 (1.60), so a single aspect box fits every one
+/// without letterboxing.
+const COLLECTION_LOGOS: Record<string, string> = {
+  chonk: '/logos/chonks.png',
+  deadfellaz: '/logos/deadfellaz.png',
+  normie: '/logos/normies.png',
+  pow: '/logos/pow.png',
+};
 
 export default function PreRegisterPage() {
   const { ready, authenticated, logout } = usePrivy();
@@ -476,6 +487,33 @@ export default function PreRegisterPage() {
                 })}
               </div>
             )}
+          </div>
+
+          {/* Community mark + live headcount. Sits below the scrolling list and
+              shares its horizontal padding, so the logo lines up with the rows
+              above rather than the panel edge. */}
+          <div className="relative border-t border-[#8f8878] bg-[#c1b9a7] px-5 py-4 md:px-8">
+            {COLLECTION_LOGOS[collection] && (
+              <div className="mx-auto flex w-full items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  key={collection}
+                  src={COLLECTION_LOGOS[collection]}
+                  alt={`${theme.collectionName} logo`}
+                  className="max-h-24 w-auto max-w-full object-contain"
+                />
+              </div>
+            )}
+            <div className="mt-3 flex items-center justify-end gap-3 sm:absolute sm:bottom-4 sm:right-5 sm:mt-0 md:right-8">
+              <span className="text-[10px] font-bold uppercase leading-tight tracking-[.14em] text-[#625e52]">
+                Active<br />players
+              </span>
+              <OdometerCounter
+                key={collection}
+                value={communityTotal}
+                label={`Active ${theme.collectionName} players`}
+              />
+            </div>
           </div>
         </SkinPanel>
       </div>
