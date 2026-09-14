@@ -1178,7 +1178,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
                 {forwardFor === selected.id && (
                   <div className="border-t-2 border-dashed border-[#8f8878] pt-5">
-                    <p className="mb-3 text-[11px] font-bold uppercase tracking-[.18em]">Continue the chain</p>
+                    <p className="mb-3 text-[22px] font-bold uppercase leading-tight tracking-[.18em]">Remix and continue the chain</p>
 
                     {forwardError && (
                       <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">{forwardError}</div>
