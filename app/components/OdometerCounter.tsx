@@ -71,7 +71,7 @@ export function OdometerCounter({
 
   return (
     <div
-      className="flex items-center gap-[2px] border border-[#25251f] bg-[#0a0a0a] px-2 py-2"
+      className="flex items-center gap-[2px] border border-[#252520] bg-[#252520] px-2 py-2"
       style={{ height: height + 20 }}
       role="status"
       aria-live="polite"
@@ -82,7 +82,7 @@ export function OdometerCounter({
         return (
           <span
             key={index}
-            className="relative overflow-hidden bg-[#0a0a0a]"
+            className="relative overflow-hidden bg-[#252520]"
             style={{ height, width: height * 0.62 }}
             aria-hidden="true"
           >
@@ -93,7 +93,7 @@ export function OdometerCounter({
               {Array.from({ length: 10 }, (_, n) => (
                 <span
                   key={n}
-                  className="flex w-full items-center justify-center font-mono font-bold tabular-nums text-white"
+                  className="flex w-full items-center justify-center font-mono font-bold tabular-nums text-[#c7c0b0]"
                   style={{ height, fontSize: height * 0.78, lineHeight: `${height}px` }}
                 >
                   {n}

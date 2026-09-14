@@ -500,14 +500,13 @@ export default function PreRegisterPage() {
                   key={collection}
                   src={COLLECTION_LOGOS[collection]}
                   alt={`${theme.collectionName} logo`}
-                  className="max-h-24 w-auto max-w-full object-contain"
+                  className="max-h-48 w-auto max-w-full object-contain"
                 />
               </div>
             )}
-            <div className="mt-3 flex items-center justify-end gap-3 sm:absolute sm:bottom-4 sm:right-5 sm:mt-0 md:right-8">
-              <span className="text-[10px] font-bold uppercase leading-tight tracking-[.14em] text-[#625e52]">
-                Active<br />players
-              </span>
+            {/* Flush to the panel's bottom-right corner, at the same height as
+                the Join Rolofax Directory button. */}
+            <div className="mt-3 flex justify-end sm:absolute sm:bottom-0 sm:right-0 sm:mt-0">
               <OdometerCounter
                 key={collection}
                 value={communityTotal}
