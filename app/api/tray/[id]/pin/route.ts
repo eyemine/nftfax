@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { pinImageToIPFS, pinJSONToIPFS } from '../../../../lib/pinata';
 import { uploadImageToArweave, uploadJSONToArweave, arweaveTxIdToURI } from '../../../../lib/irys';
+import { parseFaxHandle, verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 
@@ -157,12 +158,29 @@ async function mirrorToArweave(args: {
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = await req.json().catch(() => ({})) as { local?: string };
+  const body = await req.json().catch(() => ({})) as { local?: string; ownerWallet?: string };
   const local = (body.local || '').trim();
+  const wallet = (body.ownerWallet || '').trim();
   const collectionName = collectionNameFromLocal(local);
 
   if (!id) {
     return NextResponse.json({ error: 'Missing tray id' }, { status: 400, headers: NO_STORE });
+  }
+
+  // This endpoint SPENDS money: it writes permanent pins to Pinata and funds an
+  // on-chain Irys deposit before mirroring ~1MB to Arweave. It previously had no
+  // authentication of any kind, which meant anyone holding a tray id could drain
+  // the Irys wallet and burn Pinata quota. Require a wallet that actually owns
+  // the mailbox the pin is attributed to.
+  if (!local) {
+    return NextResponse.json({ error: 'Missing local' }, { status: 400, headers: NO_STORE });
+  }
+  if (!parseFaxHandle(local)) {
+    return NextResponse.json({ error: 'Not a recognised @fax handle.' }, { status: 404, headers: NO_STORE });
+  }
+  const auth = await verifyFaxHandleOwner(local, wallet);
+  if (!auth.authorized) {
+    return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 403, headers: NO_STORE });
   }
 
   try {

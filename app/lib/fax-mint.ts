@@ -263,12 +263,14 @@ export interface PinnedFax {
 /// Either may be null if pinning is unconfigured/unavailable — callers should
 /// treat a null tokenURI as "mint without a per-token URI" rather than an
 /// error, so minting is never blocked by an IPFS outage.
-export async function pinFaxMetadataFull(trayId: string, local: string): Promise<PinnedFax> {
+export async function pinFaxMetadataFull(trayId: string, local: string, ownerWallet: string): Promise<PinnedFax> {
   try {
     const res = await fetch(`/api/tray/${encodeURIComponent(trayId)}/pin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ local }),
+      // ownerWallet is required: pinning spends Pinata quota and Irys funds, so
+      // the route verifies the caller owns `local` before doing any of it.
+      body: JSON.stringify({ local, ownerWallet }),
     });
     if (!res.ok) return { tokenURI: null, arweaveURI: null };
     const json = await res.json() as { tokenURI?: string | null; arweaveURI?: string | null };
@@ -279,8 +281,8 @@ export async function pinFaxMetadataFull(trayId: string, local: string): Promise
 }
 
 /// Back-compat wrapper for callers that only need the IPFS tokenURI.
-export async function pinFaxMetadata(trayId: string, local: string): Promise<string | null> {
-  return (await pinFaxMetadataFull(trayId, local)).tokenURI;
+export async function pinFaxMetadata(trayId: string, local: string, ownerWallet: string): Promise<string | null> {
+  return (await pinFaxMetadataFull(trayId, local, ownerWallet)).tokenURI;
 }
 
 /// ABI-encodes FaxTray.saveFax(address to, string trayId, string tokenURI).

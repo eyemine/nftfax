@@ -350,7 +350,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       // the ownership/provenance trayId argument — see act()'s mint path.
       // Non-fatal: if pinning fails, mint will fall back to baseURI.
       if (data.id) {
-        pinFaxMetadata(data.id, cleanLocal).then((uri) => {
+        pinFaxMetadata(data.id, cleanLocal, wallet).then((uri) => {
           if (uri) {
             setSelected((prev) => prev ? { ...prev, pinnedURI: uri } : prev);
           }
@@ -521,7 +521,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
           // then discarded, leaving the backup unreachable.
           setNotice('Pinning fax metadata to IPFS…');
           stage(`pinning ${mintTrayId}`);
-          const pinned = await pinFaxMetadataFull(mintTrayId, cleanLocal).catch(() => null);
+          const pinned = await pinFaxMetadataFull(mintTrayId, cleanLocal, wallet).catch(() => null);
           tokenURI = pinned?.tokenURI || undefined;
           arweaveUri = pinned?.arweaveURI || undefined;
           stage(`pinned tokenURI=${tokenURI ?? 'none'}`);
@@ -551,7 +551,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         const saveTrayId = activeTab === 'sent' ? fax.id : (fax.forwardedTrayId || fax.id);
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
-          tokenURI = await pinFaxMetadata(saveTrayId, cleanLocal).catch(() => null) || undefined;
+          tokenURI = await pinFaxMetadata(saveTrayId, cleanLocal, wallet).catch(() => null) || undefined;
         }
         if (!tokenURI) throw new Error('Could not pin fax metadata for saving.');
 
