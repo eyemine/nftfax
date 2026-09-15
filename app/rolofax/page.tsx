@@ -123,8 +123,9 @@ const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; 
   chonk: { src: '/logos/chonks.png', scale: 1.25, w: 2400, h: 750 },
   deadfellaz: { src: '/logos/deadfellaz.png', scale: 1, w: 2400, h: 990 },
   normie: { src: '/logos/normies.png', scale: 1.5, w: 2400, h: 750 },
-  // Same file geometry as Normies (2400x750), so it takes the same placement.
-  pow: { src: '/logos/pow.png', scale: 1.5, w: 2400, h: 750 },
+  // Same file geometry as Chonks and Normies (2400x750); takes the Chonks
+  // scale, which renders it a touch smaller than Normies.
+  pow: { src: '/logos/pow.png', scale: 1.25, w: 2400, h: 750 },
 };
 
 export default function PreRegisterPage() {
