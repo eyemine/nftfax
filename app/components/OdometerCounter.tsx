@@ -27,7 +27,12 @@ import './odometer-theme.css';
 interface OdometerCounterProps {
   /** Target value to count to. */
   value: number;
-  /** Total width in digits; the value is zero-padded up to this. */
+  /**
+   * Total width in digits; the value is zero-padded up to this.
+   *
+   * Seven rather than six: odometer transiently renders an extra glyph
+   * mid-transition, and a seven-wide field absorbs it instead of clipping.
+   */
   digits?: number;
   /** Height of the digit window in px. */
   height?: number;
@@ -37,7 +42,7 @@ interface OdometerCounterProps {
 
 export function OdometerCounter({
   value,
-  digits = 6,
+  digits = 7,
   height = 32,
   label,
 }: OdometerCounterProps) {

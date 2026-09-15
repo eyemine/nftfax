@@ -109,8 +109,12 @@ function NftThumbnail({ handle, collection }: { handle: string; collection: stri
 /// to LOGO_BASE_HEIGHT, never to the container: the container stays a fixed
 /// LOGO_BOX_HEIGHT so no logo can change the panel's height and shift the
 /// counter — which is what POW NFT was doing.
-const LOGO_BASE_HEIGHT = 120;
-const LOGO_BOX_HEIGHT = 192;
+const LOGO_BASE_HEIGHT = 240;
+/// Must clear the tallest scaled logo (Normies at 150% = 360px) or that
+/// collection would grow the footer and shift the counter.
+const LOGO_BOX_HEIGHT = 384;
+/// Gap between the logo box and the counter beneath it.
+const LOGO_BOTTOM_GAP = 52;
 
 const COLLECTION_LOGOS: Record<string, { src: string; scale: number }> = {
   chonk: { src: '/logos/chonks.png', scale: 1.25 },
@@ -123,7 +127,7 @@ export default function PreRegisterPage() {
   const { ready, authenticated, logout } = usePrivy();
   const { connectWallet } = useConnectWallet();
   const activeWallet = useActiveWallet().wallet;
-  const [collection, setCollection] = useState<CollectionKey>('deadfellaz');
+  const [collection, setCollection] = useState<CollectionKey>('chonk');
   const theme = useMemo(() => getCollectionTheme(collection), [collection]);
   const walletAddress = activeWallet?.address?.toLowerCase() || '';
 
@@ -519,8 +523,8 @@ export default function PreRegisterPage() {
                 the per-collection scale, so the footer never reflows. mb-5 lifts
                 the mark clear of the counter below it. */}
             <div
-              className="mx-auto mb-5 flex w-full items-center justify-center"
-              style={{ height: LOGO_BOX_HEIGHT }}
+              className="mx-auto flex w-full items-center justify-center"
+              style={{ height: LOGO_BOX_HEIGHT, marginBottom: LOGO_BOTTOM_GAP }}
             >
               {COLLECTION_LOGOS[collection] && (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -530,7 +534,9 @@ export default function PreRegisterPage() {
                   alt={`${theme.collectionName} logo`}
                   width={2400}
                   height={1500}
-                  className="w-auto max-w-full object-contain sm:max-w-[calc(100%-9rem)]"
+                  /* No right-side reserve: the counter now sits entirely below
+                     the logo box, so the mark can use the full panel width. */
+                  className="w-auto max-w-full object-contain"
                   style={{ height: LOGO_BASE_HEIGHT * COLLECTION_LOGOS[collection].scale }}
                 />
               )}
