@@ -83,3 +83,33 @@
     transition: none !important;
   }
 }
+
+/* ── Skeuomorphic treatment ───────────────────────────────────────────────
+ *
+ * odometer generates its own digit elements, so the separators between them
+ * have to come from CSS; the static zero pad carries a matching border in the
+ * component. Together they give one continuous 2px rule between every digit.
+ */
+
+.fax-odometer {
+  /* Recessed housing: dark inner edge plus a faint highlight along the top. */
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.9),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.fax-odometer .odometer .odometer-digit {
+  border-right: 2px solid #000000;
+  padding: 0 1px;
+}
+
+/* The rightmost digit meets the frame, so it needs no rule of its own. */
+.fax-odometer .odometer .odometer-digit:last-child {
+  border-right: 0;
+}
+
+/* Slightly inset numerals so they sit "inside" the housing. */
+.fax-odometer .odometer .odometer-digit .odometer-value {
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+}

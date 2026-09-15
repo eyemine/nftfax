@@ -376,7 +376,7 @@ export default function PreRegisterPage() {
                 value={vaultWallet}
                 onChange={(e) => setVaultWallet(e.target.value)}
                 placeholder="0x..."
-                className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-sm outline-none focus:border-[#e65b2f]"
               />
             </label>
 
@@ -386,11 +386,11 @@ export default function PreRegisterPage() {
                 value={tokenId}
                 onChange={(e) => setTokenId(e.target.value)}
                 placeholder="e.g. 123"
-                className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-sm outline-none focus:border-[#e65b2f]"
               />
             </label>
 
-            <div className="border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm">
+            <div className="border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-sm">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-[.18em] block mb-1">Wallet</span>
                 {walletAddress && (
@@ -462,7 +462,11 @@ export default function PreRegisterPage() {
             <span>{readyCount}/{communityTotal} ready</span>
           </div>
 
-          <div className="max-h-[500px] overflow-y-auto bg-[#c8c0ae] p-5 md:p-8">
+          {/* FIXED height, not max-height: the list grows from empty to full as
+              entries load, and with max-height that growth resized the whole
+              panel after the NFTs populated. A fixed box reserves the space up
+              front, so the panel is the same height before and after. */}
+          <div className="h-[500px] overflow-y-auto bg-[#c8c0ae] p-5 md:p-8">
             {entries.length === 0 ? (
               <p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No players registered for {theme.collectionName} yet. Be the first.</p>
             ) : (

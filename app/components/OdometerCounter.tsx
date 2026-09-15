@@ -98,25 +98,38 @@ export function OdometerCounter({
 
   return (
     <div
-      className="fax-odometer flex items-center justify-end overflow-hidden border border-[#252520] bg-[#252520] px-2"
-      style={{ height: height + 16, width: digits * glyphWidth + 16 }}
+      className="fax-odometer relative flex items-stretch justify-end overflow-hidden border-2 border-black bg-[#252520]"
+      style={{ height: height + 16, width: digits * (glyphWidth + 2) + 6 }}
       role="status"
       aria-live="polite"
       aria-label={label ? `${label}: ${safeValue}` : String(safeValue)}
     >
-      {padCount > 0 && (
+      {/* Static zero pad. Rendered as individual cells rather than one string
+          so every digit carries the same 2px separator as odometer's own. */}
+      {Array.from({ length: padCount }, (_, i) => (
         <span
-          className="font-mono font-bold tabular-nums text-[#c7c0b0]"
-          style={{ fontSize: height * 0.78, lineHeight: `${height}px` }}
+          key={`pad-${i}`}
+          className="flex items-center justify-center border-r-2 border-black font-mono font-bold tabular-nums text-[#c7c0b0]"
+          style={{ width: glyphWidth + 2, fontSize: height * 0.78 }}
           aria-hidden="true"
         >
-          {'0'.repeat(padCount)}
+          0
         </span>
-      )}
+      ))}
       <span
         ref={elRef}
-        className="font-mono font-bold tabular-nums text-[#c7c0b0]"
+        className="flex items-center font-mono font-bold tabular-nums text-[#c7c0b0]"
         style={{ fontSize: height * 0.78, lineHeight: `${height}px` }}
+        aria-hidden="true"
+      />
+      {/* Drum shading: darkens the top and bottom of the digit window so the
+          numerals read as printed on a curved cylinder rather than flat text. */}
+      <span
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.12) 22%, rgba(255,255,255,.06) 50%, rgba(0,0,0,.18) 78%, rgba(0,0,0,.6) 100%)',
+        }}
         aria-hidden="true"
       />
     </div>
