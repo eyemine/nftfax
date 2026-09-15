@@ -369,7 +369,7 @@ export default function HomeClient() {
 
       {view === 'delegate' && (
         <SkinPanel theme={collectionTheme} className="machine-shadow mx-auto max-w-6xl overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] p-5 md:p-8">
-          <DelegatePanel collection={collection || FAX_THEME.key} walletAddress={walletAddress} />
+          <DelegatePanel collection={collection || FAX_THEME.key} walletAddress={walletAddress} onConnect={() => connectWallet()} />
         </SkinPanel>
       )}
 

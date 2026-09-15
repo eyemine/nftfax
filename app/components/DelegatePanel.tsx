@@ -13,13 +13,15 @@ import {
 interface DelegatePanelProps {
   collection: CollectionKey;
   walletAddress: string;
+  /** Opens the wallet picker for step 1. Omit to show a static badge. */
+  onConnect?: () => void;
 }
 
 type ActionStatus = 'idle' | 'checking' | 'granting' | 'granted';
 
 const COLLECTIONS: CollectionKey[] = ['chonk', 'deadfellaz', 'normie', 'pow'];
 
-export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps) {
+export function DelegatePanel({ collection, walletAddress, onConnect }: DelegatePanelProps) {
   // Selectable here rather than inherited: delegation is set up for whichever
   // collection holds the NFT, which is not necessarily the skin currently on
   // screen. The prop is only the starting point.
@@ -34,8 +36,11 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
   const [loadingTokens, setLoadingTokens] = useState(false);
 
   const [tokenId, setTokenId] = useState('');
-  const [vaultWallet, setVaultWallet] = useState('');
-  const [hotWallet, setHotWallet] = useState(walletAddress);
+  // The flow is "connect your COLD wallet, type the hot one", so the vault
+  // seeds from the connection and the hot wallet starts empty. It was the
+  // other way round, which contradicted the instructions beside it.
+  const [vaultWallet, setVaultWallet] = useState(walletAddress);
+  const [hotWallet, setHotWallet] = useState('');
   const [status, setStatus] = useState<ActionStatus>('idle');
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [txHash, setTxHash] = useState('');
@@ -84,6 +89,10 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
     setTokenId('');
     setOwnedTokenIds([]);
   }, [selected]);
+
+  useEffect(() => {
+    if (walletAddress) setVaultWallet((prev) => prev || walletAddress);
+  }, [walletAddress]);
 
   async function handleCheck() {
     setError('');
@@ -222,25 +231,45 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Hot wallet (delegate)</span>
-            <input
-              value={hotWallet}
-              onChange={(e) => setHotWallet(e.target.value)}
-              placeholder={walletAddress || '0x...'}
-              className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
-            />
-            <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">This wallet plays the fax game.</p>
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Cold vault wallet (owner)</span>
+            <span className="mb-1.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.18em]">
+              <span>1.</span>
+              {walletAddress ? (
+                <span className="border border-[#56705a] bg-[#cad8c7] px-1.5 py-0.5 text-[10px] text-[#2f4a33]">Connected</span>
+              ) : onConnect ? (
+                <button
+                  type="button"
+                  onClick={onConnect}
+                  className="key-shadow border border-[#983b21] bg-[#e65b2f] px-1.5 py-0.5 text-[10px] uppercase text-white"
+                >
+                  Connect
+                </button>
+              ) : (
+                <span className="border border-[#a94228] bg-[#e2c9bc] px-1.5 py-0.5 text-[10px] text-[#a94228]">Connect</span>
+              )}
+              <span>Cold vault wallet (NFT owner)</span>
+            </span>
             <input
               value={vaultWallet}
               onChange={(e) => setVaultWallet(e.target.value)}
               placeholder="0x..."
               className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
             />
-            <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">Holds the {theme.collectionName} NFT.</p>
+            {/* collectionName already ends in "NFT" for POW NFT, which produced
+                "Holds the POW NFT NFT." */}
+            <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">
+              Holds the {theme.collectionName}{/NFTs?$/i.test(theme.collectionName) ? '' : ' NFT'}.
+            </p>
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">2. Hot wallet (delegate)</span>
+            <input
+              value={hotWallet}
+              onChange={(e) => setHotWallet(e.target.value)}
+              placeholder="0x… / ENS name"
+              className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+            />
+            <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">This wallet will play the fax game.</p>
           </label>
 
           <button
@@ -249,7 +278,7 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
             className="key-shadow flex w-full items-center justify-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-5 py-3 text-[12px] font-bold uppercase tracking-[.12em] disabled:opacity-50"
           >
             {status === 'checking' ? <Loader2 size={15} className="animate-spin" /> : <UserCheck size={15} />}
-            Check delegation
+            3. Check delegation
           </button>
         </div>
 
@@ -308,8 +337,8 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
           {!result && !error && (
             <div className="text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">
               <p className="mb-2">NFT holders can keep their NFT in cold storage while a hot wallet plays the chain game.</p>
-              <p>1. Connect your cold wallet to MetaMask.</p>
-              <p>2. Enter the hot wallet address you want to use.</p>
+              <p>1. Connect your cold wallet to MetaMask that holds the {theme.collectionName} NFT.</p>
+              <p>2. Enter the hot wallet address you want to use to Fax.</p>
               <p>3. Approve the Delegate.xyz transaction.</p>
             </div>
           )}
