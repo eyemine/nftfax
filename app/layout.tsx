@@ -16,10 +16,10 @@ import Providers from './providers';
 // break. Point this at nftfax.app only once that domain serves the app
 // directly.
 const SITE_URL = process.env.NEXT_PUBLIC_FAX_SITE_URL || 'https://fax.nftmail.box';
-const SITE_NAME = 'NFTFAX.app';
-const SITE_TITLE = 'NFTFAX.app — Internet Fax Machine';
+const SITE_NAME = 'nftfax.app';
+const SITE_TITLE = 'FAX CHAIN — nftfax.app';
 const SITE_DESCRIPTION =
-  'NFTFAX.app is an internet fax machine for NFT communities. Claim a free @fax identity with the NFT you already own, send bitmap transmissions, and mint the chain letter on Base.';
+  'nftfax.app is an internet fax machine for NFT communities. Claim a free @fax identity with the NFT you already own, send bitmap transmissions, and mint the chain letter on Base.';
 
 export const metadata: Metadata = {
   title: {
