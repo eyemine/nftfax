@@ -1,20 +1,60 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Providers from './providers';
-import { FAX_THEME } from './lib/theme';
 
-const siteUrl = process.env.NEXT_PUBLIC_FAX_SITE_URL || 'https://fax.nftmail.box';
+/// Canonical site identity.
+///
+/// Deliberately NOT derived from FAX_THEME. The theme is set per deployment via
+/// NEXT_PUBLIC_FAX_COLLECTION, so the title used to change with whichever skin
+/// was live — which is why search results show both "CHONKS NFTFAX" and
+/// "DEADFELLAZ NFTFAX" for the same site. Search engines treat a title that
+/// changes under them as an unstable identity and split the ranking signal.
+/// The brand is the domain; the skin is presentation.
+const SITE_URL = process.env.NEXT_PUBLIC_FAX_SITE_URL || 'https://nftfax.app';
+const SITE_NAME = 'NFTFAX.app';
+const SITE_TITLE = 'NFTFAX.app — Internet Fax Machine';
+const SITE_DESCRIPTION =
+  'NFTFAX.app is an internet fax machine for NFT communities. Claim a free @fax identity with the NFT you already own, send bitmap transmissions, and mint the chain letter on Base.';
 
 export const metadata: Metadata = {
-  title: `${FAX_THEME.siteName} — Internet Fax Machine`,
-  description: `Send trackless bitmap transmissions from your ${FAX_THEME.collectionName} mailbox.`,
-  metadataBase: new URL(siteUrl),
+  title: {
+    default: SITE_TITLE,
+    // Sub-pages read "Rolofax — NFTFAX.app" rather than inventing their own
+    // brand, so every result in a SERP reinforces the same name.
+    template: `%s — ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  keywords: [
+    'NFTFAX', 'NFT fax', 'fax identity', 'chain letter NFT', 'Base NFT',
+    'Chonks', 'Deadfellaz', 'Normies', 'POW NFT', 'onchain messaging',
+  ],
+  alternates: { canonical: '/' },
   openGraph: {
-    title: `${FAX_THEME.siteName} — Internet Fax Machine`,
-    description: FAX_THEME.tagline,
-    url: siteUrl,
-    siteName: FAX_THEME.siteName,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_NAME,
     type: 'website',
+    locale: 'en_GB',
+    images: [
+      { url: '/og/nftfax-og.png', width: 1200, height: 630, alt: SITE_NAME },
+      { url: '/og/nftfax-og-square.png', width: 1200, height: 1200, alt: SITE_NAME },
+    ],
+  },
+  twitter: {
+    // summary_large_image, not summary: the latter renders a small square
+    // thumbnail and was what the site previously advertised.
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ['/og/nftfax-og.png'],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
   },
 };
 

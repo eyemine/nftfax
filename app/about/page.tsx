@@ -4,7 +4,9 @@ import { FAX_THEME } from '../lib/theme';
 import { SkinPanel } from '../components/SkinPanel';
 
 export const metadata = {
-  title: `Fax Chain Game — ${FAX_THEME.siteName}`,
+  title: 'Fax Chain Game',
+  description: 'How the NFTFAX chain letter works: free @fax identities, credits, thermal-fade hop timers, and minting the chain on Base.',
+  alternates: { canonical: '/about' },
 };
 
 export default function AboutPage() {
