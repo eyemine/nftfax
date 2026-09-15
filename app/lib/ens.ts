@@ -74,3 +74,35 @@ export async function resolveEnsNames(addresses: string[]): Promise<Map<string, 
 
   return out;
 }
+
+/// Forward ENS resolution: name -> address.
+///
+/// Separate cache from the reverse map above, keyed by normalised name. Unlike a
+/// reverse record, a forward record IS authoritative — it is set by the name's
+/// owner — so no round-trip confirmation is needed.
+///
+/// Returns null for anything that is not a resolvable name, including a name
+/// with no address record. Never throws; an RPC failure returns null WITHOUT
+/// caching, so a transient outage does not pin a name to "unresolvable" for a
+/// full TTL.
+const forwardCache = new Map<string, { address: string | null; at: number }>();
+
+export async function resolveEnsAddress(name: string): Promise<string | null> {
+  const key = name.trim().toLowerCase();
+  // Must contain a dot and no whitespace to be a plausible name. Cheap guard so
+  // typing a raw 0x address never costs an RPC call.
+  if (!key || !key.includes('.') || /\s/.test(key) || key.startsWith('0x')) return null;
+
+  const now = Date.now();
+  const hit = forwardCache.get(key);
+  if (hit && now - hit.at < CACHE_TTL_MS) return hit.address;
+
+  try {
+    const address = await client.getEnsAddress({ name: key });
+    const out = address ? address.toLowerCase() : null;
+    forwardCache.set(key, { address: out, at: now });
+    return out;
+  } catch {
+    return null;
+  }
+}

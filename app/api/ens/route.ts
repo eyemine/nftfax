@@ -3,7 +3,7 @@
 /// app/lib/ens.ts's in-process cache — see that file for caching/perf notes.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { resolveEnsNames } from '../../lib/ens';
+import { resolveEnsAddress, resolveEnsNames } from '../../lib/ens';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 const MAX_ADDRESSES = 100;
@@ -25,4 +25,18 @@ export async function POST(req: NextRequest) {
     console.error('[ens] batch resolve failed', cause);
     return NextResponse.json({ names: {} }, { status: 502, headers: NO_STORE });
   }
+}
+
+/// GET /api/ens?name=vitalik.eth — forward resolution for a single name.
+///
+/// Used by the delegate panel so a player can enter an ENS name as the hot
+/// wallet. Resolution happens server-side: the browser has no mainnet RPC, and
+/// the in-process cache is shared with every other caller.
+export async function GET(req: NextRequest) {
+  const name = new URL(req.url).searchParams.get('name') || '';
+  if (!name.trim()) {
+    return NextResponse.json({ error: 'Missing name' }, { status: 400, headers: NO_STORE });
+  }
+  const address = await resolveEnsAddress(name);
+  return NextResponse.json({ name: name.trim().toLowerCase(), address }, { headers: NO_STORE });
 }

@@ -41,6 +41,11 @@ export function DelegatePanel({ collection, walletAddress, onConnect }: Delegate
   // other way round, which contradicted the instructions beside it.
   const [vaultWallet, setVaultWallet] = useState(walletAddress);
   const [hotWallet, setHotWallet] = useState('');
+  /// Resolved address for an ENS name typed into the hot-wallet field, plus its
+  /// lookup state. Kept separate from the raw input so the field still shows
+  /// what the player typed.
+  const [hotResolved, setHotResolved] = useState<string | null>(null);
+  const [hotResolving, setHotResolving] = useState(false);
   const [status, setStatus] = useState<ActionStatus>('idle');
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [txHash, setTxHash] = useState('');
@@ -94,6 +99,39 @@ export function DelegatePanel({ collection, walletAddress, onConnect }: Delegate
     if (walletAddress) setVaultWallet((prev) => prev || walletAddress);
   }, [walletAddress]);
 
+  // Resolve an ENS name in the hot-wallet field, debounced so each keystroke
+  // does not cost a lookup.
+  useEffect(() => {
+    const raw = hotWallet.trim().toLowerCase();
+    if (!raw || !raw.includes('.') || raw.startsWith('0x')) {
+      setHotResolved(null);
+      setHotResolving(false);
+      return;
+    }
+    let cancelled = false;
+    setHotResolving(true);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/ens?name=${encodeURIComponent(raw)}`, { cache: 'no-store' });
+          const json = await res.json() as { address?: string | null };
+          if (!cancelled) setHotResolved(json.address ?? null);
+        } catch {
+          if (!cancelled) setHotResolved(null);
+        }
+        if (!cancelled) setHotResolving(false);
+      })();
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [hotWallet]);
+
+  /// The address the delegation actually grants to.
+  ///
+  /// An ENS name cannot be sent on-chain, so a resolved name MUST be swapped
+  /// for its address before building the transaction — otherwise the grant
+  /// would either revert or, worse, target the wrong account.
+  const effectiveHotWallet = hotResolved || hotWallet.trim() || walletAddress;
+
   async function handleCheck() {
     setError('');
     setResult(null);
@@ -110,7 +148,7 @@ export function DelegatePanel({ collection, walletAddress, onConnect }: Delegate
       contract: theme.contract,
       tokenId,
       rpcUrl: theme.rpc,
-      hotWallet: hotWallet.trim() || walletAddress,
+      hotWallet: effectiveHotWallet,
       vaultWallet: vaultWallet.trim(),
     });
 
@@ -144,7 +182,7 @@ export function DelegatePanel({ collection, walletAddress, onConnect }: Delegate
 
       const res = await sendDelegateERC721({
         fromAccount: cold,
-        to: hotWallet.trim() || walletAddress,
+        to: effectiveHotWallet,
         contract: theme.contract,
         tokenId,
       });
@@ -269,6 +307,23 @@ export function DelegatePanel({ collection, walletAddress, onConnect }: Delegate
               placeholder="0x… / ENS name"
               className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
             />
+            {/* Show the resolved address explicitly. Delegating to the wrong
+                account is unrecoverable from this UI, so the player should see
+                exactly what the transaction will grant to rather than trusting
+                that a name resolved the way they expected. */}
+            {hotResolving ? (
+              <p className="mt-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#847d6e]">
+                <Loader2 size={11} className="animate-spin" /> Resolving ENS…
+              </p>
+            ) : hotResolved ? (
+              <p className="mt-1 break-all text-[11px] font-bold uppercase tracking-wider text-[#2f4a33]">
+                <Check size={11} className="inline" /> {hotResolved}
+              </p>
+            ) : hotWallet.trim().includes('.') && !hotWallet.trim().startsWith('0x') ? (
+              <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-[#a94228]">
+                No address record for that name
+              </p>
+            ) : null}
             <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">This wallet will play the fax game.</p>
           </label>
 
