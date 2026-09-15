@@ -96,6 +96,17 @@ export function OdometerCounter({
   // internal to the library can resize it.
   const glyphWidth = height * 0.62;
 
+  // Line box must equal the WINDOW height, not the nominal digit height.
+  //
+  // With a shorter line box the glyph is centred within that box, and the box
+  // is then centred in the window — but odometer positions its ribbon from the
+  // TOP of the digit, so its numerals landed high while the flex-centred pad
+  // did not. Making every line box exactly the window height removes the
+  // discrepancy: each value block fills the window and the glyph sits dead
+  // centre. The ribbon still steps by a full block per digit, so rolling is
+  // unaffected.
+  const windowHeight = height + 12; // outer height (height + 16) less the 2px frame
+
   return (
     <div
       className="fax-odometer relative flex items-stretch justify-end overflow-hidden border-2 border-black bg-[#252520]"
@@ -113,7 +124,7 @@ export function OdometerCounter({
           /* lineHeight must match the odometer span exactly. Without it the pad
              used the default `normal` (~1.2em) while odometer's digits sit in a
              `height`px line box, and the two baselines diverged by ~4px. */
-          style={{ width: glyphWidth + 2, fontSize: height * 0.78, lineHeight: `${height}px` }}
+          style={{ width: glyphWidth + 2, fontSize: height * 0.78, lineHeight: `${windowHeight}px` }}
           aria-hidden="true"
         >
           0
@@ -122,7 +133,7 @@ export function OdometerCounter({
       <span
         ref={elRef}
         className="flex items-center font-mono font-bold tabular-nums text-[#c7c0b0]"
-        style={{ fontSize: height * 0.78, lineHeight: `${height}px` }}
+        style={{ fontSize: height * 0.78, lineHeight: `${windowHeight}px` }}
         aria-hidden="true"
       />
       {/* Drum shading: darkens the top and bottom of the digit window so the

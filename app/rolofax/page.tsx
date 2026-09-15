@@ -119,15 +119,16 @@ const LOGO_BOX_HEIGHT = 180;
 /// Gap between the logo box and the counter beneath it.
 const LOGO_BOTTOM_GAP = 52;
 
-const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; h: number }> = {
+const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; h: number; lift?: number }> = {
   chonk: { src: '/logos/chonks.png', scale: 1.25, w: 2400, h: 750 },
   deadfellaz: { src: '/logos/deadfellaz.png', scale: 1, w: 2400, h: 990 },
   normie: { src: '/logos/normies.png', scale: 1.5, w: 2400, h: 750 },
-  // Square circular mark, not a wordmark. Since scale multiplies a base
-  // WIDTH, a square file needs a far smaller factor than the wide wordmarks
-  // to read at the same optical size — 0.39 gives a 150px circle against
-  // their 150-180px cap height.
-  pow: { src: '/logos/pow.png', scale: 0.39, w: 600, h: 600 },
+  // Square circular mark, not a wordmark. Scale multiplies a base WIDTH, so a
+  // square file needs a far smaller factor than the wide wordmarks: 0.46875
+  // gives a 180px circle, exactly filling the box. `lift` raises it via a
+  // transform, which does not affect layout — the box stays 180px so the
+  // footer height (and the counter beneath it) cannot move.
+  pow: { src: '/logos/pow.png', scale: 0.46875, w: 600, h: 600, lift: 32 },
 };
 
 export default function PreRegisterPage() {
@@ -558,6 +559,9 @@ export default function PreRegisterPage() {
                   style={{
                     width: LOGO_BASE_WIDTH * COLLECTION_LOGOS[collection].scale,
                     maxHeight: LOGO_BOX_HEIGHT,
+                    transform: COLLECTION_LOGOS[collection].lift
+                      ? `translateY(-${COLLECTION_LOGOS[collection].lift}px)`
+                      : undefined,
                   }}
                 />
               )}
