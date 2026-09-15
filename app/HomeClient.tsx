@@ -200,7 +200,6 @@ export default function HomeClient() {
             <LayersArrowDown size={28} className="text-[#1a1a14]" />
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-[#1a1a14] font-black sm:font-bold [-webkit-text-stroke:0.6px_#1a1a14] sm:[-webkit-text-stroke:0.2px_#1a1a14]">{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
-              {(!showSplash || collection) && <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{collectionTheme.tagline}</p>}
             </div>
           </div>
         </div>

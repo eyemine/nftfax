@@ -470,7 +470,7 @@ export default function PreRegisterPage() {
           contentClassName="flex h-full flex-col"
         >
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            <span>Active player radar</span>
+            <span>{theme.collectionName} — Active player radar</span>
             <span>{readyCount}/{communityTotal} ready</span>
           </div>
 
