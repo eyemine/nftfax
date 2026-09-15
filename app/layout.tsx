@@ -10,7 +10,12 @@ import Providers from './providers';
 /// "DEADFELLAZ NFTFAX" for the same site. Search engines treat a title that
 /// changes under them as an unstable identity and split the ranking signal.
 /// The brand is the domain; the skin is presentation.
-const SITE_URL = process.env.NEXT_PUBLIC_FAX_SITE_URL || 'https://nftfax.app';
+// Default is fax.nftmail.box, NOT nftfax.app: the latter is registrar
+// domain-forwarding that 301s to it and DROPS THE PATH, so an absolute
+// nftfax.app/og/... URL resolves to the homepage HTML and social previews
+// break. Point this at nftfax.app only once that domain serves the app
+// directly.
+const SITE_URL = process.env.NEXT_PUBLIC_FAX_SITE_URL || 'https://fax.nftmail.box';
 const SITE_NAME = 'NFTFAX.app';
 const SITE_TITLE = 'NFTFAX.app — Internet Fax Machine';
 const SITE_DESCRIPTION =
