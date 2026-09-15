@@ -123,7 +123,11 @@ const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; 
   chonk: { src: '/logos/chonks.png', scale: 1.25, w: 2400, h: 750 },
   deadfellaz: { src: '/logos/deadfellaz.png', scale: 1, w: 2400, h: 990 },
   normie: { src: '/logos/normies.png', scale: 1.5, w: 2400, h: 750 },
-  pow: { src: '/logos/pow.png', scale: 0.8, w: 2400, h: 1335 },
+  // Square circular mark, not a wordmark. Since scale multiplies a base
+  // WIDTH, a square file needs a far smaller factor than the wide wordmarks
+  // to read at the same optical size — 0.39 gives a 150px circle against
+  // their 150-180px cap height.
+  pow: { src: '/logos/pow.png', scale: 0.39, w: 600, h: 600 },
 };
 
 export default function PreRegisterPage() {
