@@ -123,12 +123,8 @@ const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; 
   chonk: { src: '/logos/chonks.png', scale: 1.25, w: 2400, h: 750 },
   deadfellaz: { src: '/logos/deadfellaz.png', scale: 1, w: 2400, h: 990 },
   normie: { src: '/logos/normies.png', scale: 1.5, w: 2400, h: 750 },
-  // Square circular mark, not a wordmark. Scale multiplies a base WIDTH, so a
-  // square file needs a far smaller factor than the wide wordmarks: 0.46875
-  // gives a 180px circle, exactly filling the box. `lift` raises it via a
-  // transform, which does not affect layout — the box stays 180px so the
-  // footer height (and the counter beneath it) cannot move.
-  pow: { src: '/logos/pow.png', scale: 0.46875, w: 600, h: 600, lift: 32 },
+  // Same file geometry as Normies (2400x750), so it takes the same placement.
+  pow: { src: '/logos/pow.png', scale: 1.5, w: 2400, h: 750 },
 };
 
 export default function PreRegisterPage() {
