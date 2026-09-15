@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Loader2, ShieldCheck, UserCheck, AlertCircle, Check } from 'lucide-react';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
+import { FaxHandleThumb } from './FaxHandleThumb';
 import {
   verifyOwnershipOrDelegate,
   sendDelegateERC721,
@@ -16,8 +17,21 @@ interface DelegatePanelProps {
 
 type ActionStatus = 'idle' | 'checking' | 'granting' | 'granted';
 
+const COLLECTIONS: CollectionKey[] = ['chonk', 'deadfellaz', 'normie', 'pow'];
+
 export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps) {
-  const theme = useMemo(() => getCollectionTheme(collection), [collection]);
+  // Selectable here rather than inherited: delegation is set up for whichever
+  // collection holds the NFT, which is not necessarily the skin currently on
+  // screen. The prop is only the starting point.
+  const [selected, setSelected] = useState<CollectionKey>(collection);
+  const theme = useMemo(() => getCollectionTheme(selected), [selected]);
+  const prefix = useMemo(
+    () => (theme.mailboxHint || theme.mailboxPlaceholder || selected).split('.')[0],
+    [theme, selected],
+  );
+
+  const [ownedTokenIds, setOwnedTokenIds] = useState<number[]>([]);
+  const [loadingTokens, setLoadingTokens] = useState(false);
 
   const [tokenId, setTokenId] = useState('');
   const [vaultWallet, setVaultWallet] = useState('');
@@ -26,6 +40,50 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [txHash, setTxHash] = useState('');
   const [error, setError] = useState('');
+
+  /// Lists qualifying tokens for the wallet that actually holds the NFT.
+  ///
+  /// That is the cold vault, not the connected wallet: in a delegation the hot
+  /// wallet holds nothing, so listing its tokens would return an empty set and
+  /// look broken. Falls back to the connected wallet before a vault is entered,
+  /// which covers the case of connecting the vault directly.
+  const lookupWallet = /^0x[a-fA-F0-9]{40}$/.test(vaultWallet.trim())
+    ? vaultWallet.trim()
+    : walletAddress;
+
+  useEffect(() => {
+    if (!lookupWallet || !theme.contract || !theme.chainId) {
+      setOwnedTokenIds([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingTokens(true);
+    void (async () => {
+      try {
+        const params = new URLSearchParams({
+          wallet: lookupWallet,
+          contract: theme.contract,
+          chainId: String(theme.chainId),
+          rpc: theme.rpc,
+        });
+        const res = await fetch(`/api/nft-tokens?${params}`, { cache: 'no-store' });
+        if (res.ok) {
+          const json = (await res.json()) as { tokenIds?: number[] };
+          if (!cancelled) setOwnedTokenIds(json.tokenIds ?? []);
+        }
+      } catch {
+        // Non-fatal: the manual Token ID field still works.
+      }
+      if (!cancelled) setLoadingTokens(false);
+    })();
+    return () => { cancelled = true; };
+  }, [lookupWallet, theme.contract, theme.chainId, theme.rpc]);
+
+  // A token id is meaningless across collections, so clear it on switch.
+  useEffect(() => {
+    setTokenId('');
+    setOwnedTokenIds([]);
+  }, [selected]);
 
   async function handleCheck() {
     setError('');
@@ -105,13 +163,62 @@ export function DelegatePanel({ collection, walletAddress }: DelegatePanelProps)
       <div className="grid gap-4 p-5 md:grid-cols-2 md:p-8">
         <div className="space-y-4">
           <label className="block">
+            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Community</span>
+            <select
+              value={selected}
+              onChange={(e) => setSelected(e.target.value as CollectionKey)}
+              className="key-shadow w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-[12px] font-bold uppercase"
+            >
+              {COLLECTIONS.map((key) => (
+                <option key={key} value={key}>{getCollectionTheme(key).collectionName}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
             <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Token ID</span>
-            <input
-              value={tokenId}
-              onChange={(e) => setTokenId(e.target.value)}
-              placeholder="1234"
-              className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
-            />
+
+            {/* Fixed-height slot: this position cycles between the dropdown and
+                two different messages, and letting them size themselves would
+                shift everything below as the token list resolves. */}
+            <div className="mb-2 flex h-[34px] items-center">
+              {ownedTokenIds.length > 0 ? (
+                <select
+                  value={tokenId}
+                  onChange={(e) => setTokenId(e.target.value)}
+                  className="h-[34px] w-full border border-[#847d6e] bg-[#eee8dc] px-3 text-xs outline-none focus:border-[#e65b2f]"
+                >
+                  <option value="">Select a qualifying {theme.collectionName}…</option>
+                  {ownedTokenIds.map((tid) => (
+                    <option key={tid} value={String(tid)}>{prefix}.{tid}</option>
+                  ))}
+                </select>
+              ) : loadingTokens ? (
+                <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]"><Loader2 size={12} className="animate-spin" /> Reading {theme.collectionName} tokens…</p>
+              ) : (
+                <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]">No {theme.collectionName} tokens in that wallet</p>
+              )}
+            </div>
+
+            <div className="flex items-start gap-3">
+              <FaxHandleThumb
+                handle={tokenId ? `${prefix}.${tokenId}` : ''}
+                size={96}
+                label="Delegating"
+              />
+              <div className="min-w-0 flex-1">
+                <input
+                  value={tokenId}
+                  onChange={(e) => setTokenId(e.target.value.replace(/[^0-9]/g, ''))}
+                  placeholder="1234"
+                  inputMode="numeric"
+                  className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                />
+                <p className="mt-1 text-[11px] uppercase tracking-wider text-[#625e52]">
+                  {ownedTokenIds.length > 0 ? 'Select above or type a token ID.' : 'Enter the token ID held by the vault.'}
+                </p>
+              </div>
+            </div>
           </label>
 
           <label className="block">
