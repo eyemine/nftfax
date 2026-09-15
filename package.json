@@ -13,6 +13,7 @@
     "@privy-io/react-auth": "^3.34.0",
     "lucide-react": "^1.30.0",
     "next": "^16.2.10",
+    "odometer": "^0.4.8",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "viem": "^2.52.0"

@@ -1,0 +1,85 @@
+/* Stylesheet for odometer.js, adapted from its bundled "car" theme.
+ *
+ * The vendor themes are NOT imported: they contain IE7 star-hacks
+ * (`*display: inline`, `*zoom: 1`) which modern PostCSS rejects outright, so
+ * `import 'odometer/themes/odometer-theme-car.css'` fails the build with
+ * "Unexpected token Semicolon". These are the same rules with the hacks
+ * removed and the colours/timing matched to the fax panels.
+ *
+ * odometer.js supplies the markup and toggles the animating classes; these
+ * rules are what make the digits roll rather than swap. Without them the
+ * numbers still update, just instantly.
+ */
+
+.fax-odometer .odometer {
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+}
+
+.fax-odometer .odometer .odometer-digit {
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+}
+
+.fax-odometer .odometer .odometer-digit .odometer-digit-spacer {
+  display: inline-block;
+  vertical-align: middle;
+  visibility: hidden;
+}
+
+.fax-odometer .odometer .odometer-digit .odometer-digit-inner {
+  text-align: left;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.fax-odometer .odometer .odometer-digit .odometer-ribbon {
+  display: block;
+}
+
+.fax-odometer .odometer .odometer-digit .odometer-ribbon-inner {
+  display: block;
+  backface-visibility: hidden;
+}
+
+.fax-odometer .odometer .odometer-digit .odometer-value {
+  display: block;
+  transform: translateZ(0);
+}
+
+.fax-odometer .odometer .odometer-digit .odometer-value.odometer-last-value {
+  position: absolute;
+}
+
+/* Roll up on increase, down on decrease. 0.28s per step reads as mechanical
+ * without dragging out the count. */
+.fax-odometer .odometer.odometer-animating-up .odometer-ribbon-inner {
+  transition: transform 0.28s ease-out;
+}
+
+.fax-odometer .odometer.odometer-animating-up.odometer-animating .odometer-ribbon-inner {
+  transform: translateY(-100%);
+}
+
+.fax-odometer .odometer.odometer-animating-down .odometer-ribbon-inner {
+  transform: translateY(-100%);
+}
+
+.fax-odometer .odometer.odometer-animating-down.odometer-animating .odometer-ribbon-inner {
+  transition: transform 0.28s ease-out;
+  transform: translateY(0);
+}
+
+/* Respect reduced-motion: land on the value without rolling. */
+@media (prefers-reduced-motion: reduce) {
+  .fax-odometer .odometer .odometer-ribbon-inner {
+    transition: none !important;
+  }
+}

@@ -432,13 +432,13 @@ export default function PreRegisterPage() {
           </div>
         </SkinPanel>
 
-        <SkinPanel theme={theme} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+        <SkinPanel theme={theme} className="machine-shadow relative overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c0b9a9]">
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span>Active player radar — {theme.collectionName}</span>
             <span>{readyCount}/{communityTotal} ready</span>
           </div>
 
-          <div className="max-h-[500px] overflow-y-auto p-5 md:p-8">
+          <div className="max-h-[500px] overflow-y-auto bg-[#c8c0ae] p-5 md:p-8">
             {entries.length === 0 ? (
               <p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No players registered for {theme.collectionName} yet. Be the first.</p>
             ) : (
@@ -492,7 +492,7 @@ export default function PreRegisterPage() {
           {/* Community mark + live headcount. Sits below the scrolling list and
               shares its horizontal padding, so the logo lines up with the rows
               above rather than the panel edge. */}
-          <div className="relative border-t border-[#8f8878] bg-[#c1b9a7] px-5 py-4 md:px-8">
+          <div className="border-t border-[#8f8878] px-5 py-4 md:px-8">
             {COLLECTION_LOGOS[collection] && (
               <div className="mx-auto flex w-full items-center justify-center">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -504,9 +504,13 @@ export default function PreRegisterPage() {
                 />
               </div>
             )}
-            {/* Flush to the panel's bottom-right corner, at the same height as
-                the Join Rolofax Directory button. */}
-            <div className="mt-3 flex justify-end sm:absolute sm:bottom-0 sm:right-0 sm:mt-0">
+            {/* Inset by the panel's content padding so it lines up with the
+                Join Rolofax Directory button in the adjacent panel, which sits
+                one padding-step above its own panel's bottom edge. Positioned
+                against the panel (not the footer) so it stays pinned to the
+                bottom when the grid stretches this panel taller than its
+                content. */}
+            <div className="mt-3 flex justify-end sm:absolute sm:bottom-5 sm:right-5 sm:mt-0 md:bottom-8 md:right-8">
               <OdometerCounter
                 key={collection}
                 value={communityTotal}
