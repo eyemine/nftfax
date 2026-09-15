@@ -104,23 +104,26 @@ function NftThumbnail({ handle, collection }: { handle: string; collection: stri
 
 /// Community logos, keyed by collection. Served from /public/logos.
 ///
-/// All four files are 2400x1500, but the marks sit differently inside that
-/// frame, so each gets a scale factor to look optically equal. Scale is applied
-/// to LOGO_BASE_HEIGHT, never to the container: the container stays a fixed
-/// LOGO_BOX_HEIGHT so no logo can change the panel's height and shift the
-/// counter — which is what POW NFT was doing.
-const LOGO_BASE_HEIGHT = 240;
-/// Must clear the tallest scaled logo (Normies at 150% = 360px) or that
-/// collection would grow the footer and shift the counter.
-const LOGO_BOX_HEIGHT = 384;
+/// The files are cropped to their marks, so they do NOT share an aspect ratio.
+/// Scale is therefore applied to a base WIDTH, not a height: the crop was
+/// vertical, so matching width is what makes the marks look optically equal.
+/// Intrinsic w/h are declared per file so the browser reserves the right space
+/// before decoding — a single shared 2400x1500 would now be wrong for all four.
+const LOGO_BASE_WIDTH = 384;
+
+/// Fixed box, sized to the tallest scaled logo (Normies, 180px). Constant
+/// across collections so no logo can change the footer height and shift the
+/// counter.
+const LOGO_BOX_HEIGHT = 180;
+
 /// Gap between the logo box and the counter beneath it.
 const LOGO_BOTTOM_GAP = 52;
 
-const COLLECTION_LOGOS: Record<string, { src: string; scale: number }> = {
-  chonk: { src: '/logos/chonks.png', scale: 1.25 },
-  deadfellaz: { src: '/logos/deadfellaz.png', scale: 1 },
-  normie: { src: '/logos/normies.png', scale: 1.5 },
-  pow: { src: '/logos/pow.png', scale: 0.8 },
+const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; h: number }> = {
+  chonk: { src: '/logos/chonks.png', scale: 1.25, w: 2400, h: 750 },
+  deadfellaz: { src: '/logos/deadfellaz.png', scale: 1, w: 2400, h: 990 },
+  normie: { src: '/logos/normies.png', scale: 1.5, w: 2400, h: 750 },
+  pow: { src: '/logos/pow.png', scale: 0.8, w: 2400, h: 1335 },
 };
 
 export default function PreRegisterPage() {
@@ -532,12 +535,15 @@ export default function PreRegisterPage() {
                   key={collection}
                   src={COLLECTION_LOGOS[collection].src}
                   alt={`${theme.collectionName} logo`}
-                  width={2400}
-                  height={1500}
-                  /* No right-side reserve: the counter now sits entirely below
-                     the logo box, so the mark can use the full panel width. */
-                  className="w-auto max-w-full object-contain"
-                  style={{ height: LOGO_BASE_HEIGHT * COLLECTION_LOGOS[collection].scale }}
+                  width={COLLECTION_LOGOS[collection].w}
+                  height={COLLECTION_LOGOS[collection].h}
+                  /* Width-driven: height follows the file's own aspect, capped
+                     by the box so nothing can overflow it. */
+                  className="h-auto max-w-full object-contain"
+                  style={{
+                    width: LOGO_BASE_WIDTH * COLLECTION_LOGOS[collection].scale,
+                    maxHeight: LOGO_BOX_HEIGHT,
+                  }}
                 />
               )}
             </div>
