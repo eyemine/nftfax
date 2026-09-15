@@ -103,13 +103,20 @@ function NftThumbnail({ handle, collection }: { handle: string; collection: stri
 }
 
 /// Community logos, keyed by collection. Served from /public/logos.
-/// All four are 2400x1500 (1.60), so a single aspect box fits every one
-/// without letterboxing.
-const COLLECTION_LOGOS: Record<string, string> = {
-  chonk: '/logos/chonks.png',
-  deadfellaz: '/logos/deadfellaz.png',
-  normie: '/logos/normies.png',
-  pow: '/logos/pow.png',
+///
+/// All four files are 2400x1500, but the marks sit differently inside that
+/// frame, so each gets a scale factor to look optically equal. Scale is applied
+/// to LOGO_BASE_HEIGHT, never to the container: the container stays a fixed
+/// LOGO_BOX_HEIGHT so no logo can change the panel's height and shift the
+/// counter — which is what POW NFT was doing.
+const LOGO_BASE_HEIGHT = 120;
+const LOGO_BOX_HEIGHT = 192;
+
+const COLLECTION_LOGOS: Record<string, { src: string; scale: number }> = {
+  chonk: { src: '/logos/chonks.png', scale: 1.25 },
+  deadfellaz: { src: '/logos/deadfellaz.png', scale: 1 },
+  normie: { src: '/logos/normies.png', scale: 1.5 },
+  pow: { src: '/logos/pow.png', scale: 0.8 },
 };
 
 export default function PreRegisterPage() {
@@ -337,7 +344,10 @@ export default function PreRegisterPage() {
               {walletAddress && !loadingTokens && ownedTokenIds.length === 0 && (
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]">No {theme.collectionName} tokens found in your wallet</p>
               )}
-              <div className="flex items-stretch gap-2">
+              <div className="flex items-start gap-2">
+                {/* Preview of the identity being registered. Updates from either
+                    the dropdown or the manual field, since both write faxTokenId. */}
+                <FaxHandleThumb handle={faxTokenId ? `${prefix}.${faxTokenId}` : ''} size={69} label="Your fax identity" />
                 <div className="flex min-w-0 flex-1">
                   <span className="border border-r-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-sm font-bold">{prefix}.</span>
                   <input
@@ -349,9 +359,6 @@ export default function PreRegisterPage() {
                   />
                   <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span>
                 </div>
-                {/* Preview of the identity being registered. Updates from either
-                    the dropdown or the manual field, since both write faxTokenId. */}
-                <FaxHandleThumb handle={faxTokenId ? `${prefix}.${faxTokenId}` : ''} size={46} label="Your fax identity" />
               </div>
               <span className="mt-1 block text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]">{ownedTokenIds.length > 0 ? 'Select from dropdown or type your token ID' : 'Enter your ' + theme.collectionName + ' token ID'}</span>
             </label>
@@ -507,17 +514,24 @@ export default function PreRegisterPage() {
               footer does not reflow when the image decodes or when the list
               above changes length — that reflow was what made the counter jump
               between collections. */}
-          <div className="relative mt-auto border-t border-[#8f8878] px-5 py-4 md:px-8">
-            <div className="mx-auto flex h-48 w-full items-center justify-center">
+          <div className="relative mt-auto px-5 py-4 md:px-8">
+            {/* Fixed-height box: reserved before the image decodes, and immune to
+                the per-collection scale, so the footer never reflows. mb-5 lifts
+                the mark clear of the counter below it. */}
+            <div
+              className="mx-auto mb-5 flex w-full items-center justify-center"
+              style={{ height: LOGO_BOX_HEIGHT }}
+            >
               {COLLECTION_LOGOS[collection] && (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   key={collection}
-                  src={COLLECTION_LOGOS[collection]}
+                  src={COLLECTION_LOGOS[collection].src}
                   alt={`${theme.collectionName} logo`}
                   width={2400}
                   height={1500}
-                  className="max-h-full w-auto object-contain sm:max-w-[calc(100%-9rem)] max-w-full"
+                  className="w-auto max-w-full object-contain sm:max-w-[calc(100%-9rem)]"
+                  style={{ height: LOGO_BASE_HEIGHT * COLLECTION_LOGOS[collection].scale }}
                 />
               )}
             </div>

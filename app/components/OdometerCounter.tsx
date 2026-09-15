@@ -77,18 +77,27 @@ export function OdometerCounter({
     odometerRef.current.update(Math.max(0, Math.floor(value)));
   }, [ready, value]);
 
-  // Width of the zero pad shrinks as the value gains digits, so the overall
-  // field stays `digits` wide.
-  const significantDigits = String(Math.max(0, Math.floor(value))).length;
-  const padCount = Math.max(0, digits - significantDigits);
+  // Zero pad fills the field to `digits`. Derived from the target value, which
+  // is stable for the duration of a roll — deriving it from odometer's
+  // in-flight display was what made the digit count flicker.
+  const safeValue = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  const padCount = Math.max(0, digits - String(safeValue).length);
+
+  // The field is a FIXED width for `digits` glyphs, right-aligned.
+  //
+  // odometer's own width tracks the magnitude of its value and it briefly
+  // renders extra markup mid-transition, which made the box grow to a seventh
+  // digit and then snap back. Reserving the width up front means nothing
+  // internal to the library can resize it.
+  const glyphWidth = height * 0.62;
 
   return (
     <div
-      className="fax-odometer flex items-center border border-[#252520] bg-[#252520] px-2"
-      style={{ height: height + 16 }}
+      className="fax-odometer flex items-center justify-end overflow-hidden border border-[#252520] bg-[#252520] px-2"
+      style={{ height: height + 16, width: digits * glyphWidth + 16 }}
       role="status"
       aria-live="polite"
-      aria-label={label ? `${label}: ${value}` : String(value)}
+      aria-label={label ? `${label}: ${safeValue}` : String(safeValue)}
     >
       {padCount > 0 && (
         <span
