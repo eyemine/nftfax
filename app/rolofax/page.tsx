@@ -126,7 +126,9 @@ const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; 
   // 384x120 at scale 1.0. Smaller than the other marks by design: it stays
   // centred in the same 180px box, so the reduced height reads as extra
   // clearance above the counter rather than a shift in position.
-  pow: { src: '/logos/pow.png', scale: 1.0, w: 2400, h: 750 },
+  // lift is a transform, so raising it cannot change the box height or move
+  // the counter below.
+  pow: { src: '/logos/pow.png', scale: 1.0, w: 2400, h: 750, lift: 8 },
 };
 
 export default function PreRegisterPage() {
@@ -426,7 +428,7 @@ export default function PreRegisterPage() {
                 onChange={(e) => setReadyReceive(e.target.checked)}
                 className="h-4 w-4 accent-[#e65b2f]"
               />
-              Signal ready to receive faxes on {new Date().toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit' })}
+              Signal ready to receive faxes
             </label>
 
             {!walletAddress ? (
@@ -468,7 +470,7 @@ export default function PreRegisterPage() {
           contentClassName="flex h-full flex-col"
         >
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            <span>Active player radar — {theme.collectionName}</span>
+            <span>Active player radar</span>
             <span>{readyCount}/{communityTotal} ready</span>
           </div>
 
