@@ -113,3 +113,14 @@
 .fax-odometer .odometer .odometer-digit .odometer-value {
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
 }
+
+/* Digits inherit the housing's line box so they share a baseline with the
+ * static zero pad. odometer's markup nests several blocks between the housing
+ * and the numeral, any of which would otherwise reset line-height. */
+.fax-odometer .odometer,
+.fax-odometer .odometer .odometer-digit,
+.fax-odometer .odometer .odometer-digit .odometer-digit-spacer,
+.fax-odometer .odometer .odometer-digit .odometer-value {
+  line-height: inherit;
+  vertical-align: middle;
+}

@@ -110,7 +110,10 @@ export function OdometerCounter({
         <span
           key={`pad-${i}`}
           className="flex items-center justify-center border-r-2 border-black font-mono font-bold tabular-nums text-[#c7c0b0]"
-          style={{ width: glyphWidth + 2, fontSize: height * 0.78 }}
+          /* lineHeight must match the odometer span exactly. Without it the pad
+             used the default `normal` (~1.2em) while odometer's digits sit in a
+             `height`px line box, and the two baselines diverged by ~4px. */
+          style={{ width: glyphWidth + 2, fontSize: height * 0.78, lineHeight: `${height}px` }}
           aria-hidden="true"
         >
           0

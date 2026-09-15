@@ -333,23 +333,30 @@ export default function PreRegisterPage() {
 
             <label className="block">
               <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Fax handle</span>
-              {walletAddress && ownedTokenIds.length > 0 && (
-                <select
-                  value={faxTokenId}
-                  onChange={(e) => setFaxTokenId(e.target.value)}
-                  className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"
-                >
-                  <option value="">Select your {theme.collectionName} token…</option>
-                  {ownedTokenIds.map((tid) => (
-                    <option key={tid} value={String(tid)}>{prefix}.{tid}@fax</option>
-                  ))}
-                </select>
-              )}
-              {walletAddress && loadingTokens && (
-                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]"><Loader2 size={12} className="animate-spin" /> Loading your {theme.collectionName} tokens…</p>
-              )}
-              {walletAddress && !loadingTokens && ownedTokenIds.length === 0 && (
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]">No {theme.collectionName} tokens found in your wallet</p>
+              {/* Fixed-height slot. This position cycles through three states —
+                  loading message, "none found" message, and the token dropdown —
+                  which have different intrinsic heights, so the panel jumped
+                  once a wallet's NFTs resolved. Reserving the dropdown's height
+                  keeps the layout still through every state. */}
+              {walletAddress && (
+                <div className="mb-2 flex h-[34px] items-center">
+                  {ownedTokenIds.length > 0 ? (
+                    <select
+                      value={faxTokenId}
+                      onChange={(e) => setFaxTokenId(e.target.value)}
+                      className="h-[34px] w-full border border-[#847d6e] bg-[#eee8dc] px-3 text-xs outline-none focus:border-[#e65b2f]"
+                    >
+                      <option value="">Select your {theme.collectionName} token…</option>
+                      {ownedTokenIds.map((tid) => (
+                        <option key={tid} value={String(tid)}>{prefix}.{tid}@fax</option>
+                      ))}
+                    </select>
+                  ) : loadingTokens ? (
+                    <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]"><Loader2 size={12} className="animate-spin" /> Loading your {theme.collectionName} tokens…</p>
+                  ) : (
+                    <p className="text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]">No {theme.collectionName} tokens found in your wallet</p>
+                  )}
+                </div>
               )}
               <div className="flex items-start gap-2">
                 {/* Preview of the identity being registered. Updates from either
