@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
 import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, ArrowLeft, X, Send } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
+import { FaxHandleThumb } from '../components/FaxHandleThumb';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
 import { disconnectWallet } from '../lib/disconnect';
@@ -336,16 +337,21 @@ export default function PreRegisterPage() {
               {walletAddress && !loadingTokens && ownedTokenIds.length === 0 && (
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]">No {theme.collectionName} tokens found in your wallet</p>
               )}
-              <div className="flex">
-                <span className="border border-r-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-sm font-bold">{prefix}.</span>
-                <input
-                  value={faxTokenId}
-                  onChange={(e) => setFaxTokenId(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="1234"
-                  inputMode="numeric"
-                  className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
-                />
-                <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span>
+              <div className="flex items-stretch gap-2">
+                <div className="flex min-w-0 flex-1">
+                  <span className="border border-r-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-sm font-bold">{prefix}.</span>
+                  <input
+                    value={faxTokenId}
+                    onChange={(e) => setFaxTokenId(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="1234"
+                    inputMode="numeric"
+                    className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                  />
+                  <span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span>
+                </div>
+                {/* Preview of the identity being registered. Updates from either
+                    the dropdown or the manual field, since both write faxTokenId. */}
+                <FaxHandleThumb handle={faxTokenId ? `${prefix}.${faxTokenId}` : ''} size={46} label="Your fax identity" />
               </div>
               <span className="mt-1 block text-[11px] font-bold uppercase tracking-[.14em] text-[#847d6e]">{ownedTokenIds.length > 0 ? 'Select from dropdown or type your token ID' : 'Enter your ' + theme.collectionName + ' token ID'}</span>
             </label>
@@ -432,7 +438,11 @@ export default function PreRegisterPage() {
           </div>
         </SkinPanel>
 
-        <SkinPanel theme={theme} className="machine-shadow relative overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c0b9a9]">
+        <SkinPanel
+          theme={theme}
+          className="machine-shadow h-full overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c0b9a9]"
+          contentClassName="flex h-full flex-col"
+        >
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span>Active player radar — {theme.collectionName}</span>
             <span>{readyCount}/{communityTotal} ready</span>
@@ -492,24 +502,28 @@ export default function PreRegisterPage() {
           {/* Community mark + live headcount. Sits below the scrolling list and
               shares its horizontal padding, so the logo lines up with the rows
               above rather than the panel edge. */}
-          <div className="border-t border-[#8f8878] px-5 py-4 md:px-8">
-            {COLLECTION_LOGOS[collection] && (
-              <div className="mx-auto flex w-full items-center justify-center">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/* mt-auto pins this to the panel's bottom even when the grid stretches
+              the panel past its content. The logo box has a FIXED height, so the
+              footer does not reflow when the image decodes or when the list
+              above changes length — that reflow was what made the counter jump
+              between collections. */}
+          <div className="relative mt-auto border-t border-[#8f8878] px-5 py-4 md:px-8">
+            <div className="mx-auto flex h-48 w-full items-center justify-center">
+              {COLLECTION_LOGOS[collection] && (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   key={collection}
                   src={COLLECTION_LOGOS[collection]}
                   alt={`${theme.collectionName} logo`}
-                  className="max-h-48 w-auto max-w-full object-contain"
+                  width={2400}
+                  height={1500}
+                  className="max-h-full w-auto object-contain sm:max-w-[calc(100%-9rem)] max-w-full"
                 />
-              </div>
-            )}
-            {/* Inset by the panel's content padding so it lines up with the
-                Join Rolofax Directory button in the adjacent panel, which sits
-                one padding-step above its own panel's bottom edge. Positioned
-                against the panel (not the footer) so it stays pinned to the
-                bottom when the grid stretches this panel taller than its
-                content. */}
+              )}
+            </div>
+            {/* Inset by the panel's content padding so it lines up with the Join
+                Rolofax Directory button, which sits one padding-step above its
+                own panel's bottom edge. */}
             <div className="mt-3 flex justify-end sm:absolute sm:bottom-5 sm:right-5 sm:mt-0 md:bottom-8 md:right-8">
               <OdometerCounter
                 key={collection}
