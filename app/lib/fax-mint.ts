@@ -359,13 +359,19 @@ export async function checkMintFundsEligibility(
     fetchMintPrice(rpcUrl),
   ]);
 
-  const estimatedGas = BigInt('1000000000000000'); // 0.001 ETH gas estimate on Base
-  const required = mintPrice + estimatedGas;
+  // Gas headroom. A FAX CHAIN mint on Base costs on the order of 0.0000002 ETH
+  // (a 29k-gas transferOwnership cost 0.00000018). This was hardcoded to
+  // 0.001 ETH - roughly 5,000x the real cost - so a wallet holding 0.0023 ETH
+  // was refused a 0.002 ETH mint it could comfortably afford, and because the
+  // refusal rendered behind the modal, the button simply appeared dead.
+  // 0.0001 ETH is still ~500x actual gas and survives a fee spike.
+  const gasHeadroom = BigInt('100000000000000'); // 0.0001 ETH
+  const required = mintPrice + gasHeadroom;
   if (balance >= required) return null;
 
   const shortfall =
     `Current balance: ${formatEth(balance)} ETH\n` +
-    `Needed: ~${formatEth(required)} ETH (${formatEth(mintPrice)} mint fee + gas)\n\n`;
+    `Needed: ~${formatEth(required)} ETH (${formatEth(mintPrice)} mint fee + gas headroom)\n\n`;
 
   if (isSmart) {
     return (

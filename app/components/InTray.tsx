@@ -945,6 +945,19 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
               {/* Right: metadata + actions + chain builder */}
               <div className="min-h-0 overflow-auto bg-[#bbb3a2] p-5">
+                {/* Surface the shared notice INSIDE the modal. It also renders in
+                    the tray list, but this overlay (fixed inset-0 z-50) covers
+                    that completely — so every mint/save failure was being
+                    written to an element the player could not see, and the
+                    button looked dead. Errors have their own styling so they are
+                    not mistaken for progress. */}
+                {notice && (
+                  <div className={`mb-4 border-l-4 p-3 text-[12px] font-bold uppercase ${/fail|error|insufficient|cannot|could not|does not|not enough|rejected|revert|unavailable|missing/i.test(notice)
+                    ? 'border-[#a94228] bg-[#e2c9bc] text-[#a94228]'
+                    : 'border-[#56705a] bg-[#cad8c7] text-[#2f4a33]'}`}>
+                    <span className="whitespace-pre-line">{notice}</span>
+                  </div>
+                )}
                 {/* Thumbnail of the NFT identity this transmission is with. The
                     handle shown below is opaque on its own, so render the artwork
                     for whichever address the label names: the recipient on the
