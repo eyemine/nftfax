@@ -17,6 +17,7 @@ import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAU
 import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
 import { FaxHandleThumb } from './FaxHandleThumb';
+import { FaxHandleOwner } from './FaxHandleOwner';
 
 const OP_ICON: Record<ChainOp, typeof Stamp> = { stamp: Stamp, ghost: Ghost, illuminate: Sun };
 
@@ -1233,14 +1234,17 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                       );
                     })()}
 
-                    <div className="mb-3 flex items-stretch gap-2">
-                      <FaxHandleThumb handle={forwardTo} label="Forwarding to" size={46} />
-                      <input
-                        value={forwardTo}
-                        onChange={(e) => setForwardTo(e.target.value)}
-                        placeholder="collection.1234@fax"
-                        className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
-                      />
+                    <div className="mb-3">
+                      <div className="flex items-stretch gap-2">
+                        <FaxHandleThumb handle={forwardTo} label="Forwarding to" size={46} />
+                        <input
+                          value={forwardTo}
+                          onChange={(e) => setForwardTo(e.target.value)}
+                          placeholder="collection.1234@fax"
+                          className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]"
+                        />
+                      </div>
+                      <FaxHandleOwner handle={forwardTo} />
                     </div>
 
                     <div className="mb-3">

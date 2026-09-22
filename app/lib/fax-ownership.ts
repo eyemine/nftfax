@@ -150,3 +150,36 @@ export async function verifyFaxHandleOwner(handle: string, wallet: string): Prom
     status: 403,
   };
 }
+
+/// Who currently holds the NFT behind an @fax handle.
+///
+/// Read-only companion to verifyFaxHandleOwner for UI that wants to SHOW the
+/// holder rather than authorise against them — e.g. confirming the wallet a
+/// fax is about to be addressed to. Resolves on-chain, never from the KV
+/// registry, for the same reason authorisation does not: the registry goes
+/// stale the moment the NFT is traded.
+///
+/// Positive results are cached briefly; failures are not, so a throttled RPC
+/// cannot pin a handle to "unknown".
+const ownerCache = new Map<string, { at: number; owner: string }>();
+
+export async function resolveFaxHandleOwner(handle: string): Promise<{ owner: string; collection: CollectionKey; tokenId: string } | null> {
+  const identity = parseFaxHandle(handle);
+  if (!identity) return null;
+  const key = `${identity.collection}:${identity.tokenId}`;
+  const hit = ownerCache.get(key);
+  if (hit && Date.now() - hit.at < AUTH_CACHE_TTL_MS) return { owner: hit.owner, ...identity };
+
+  const theme = getCollectionTheme(identity.collection);
+  // Any address works as the "hot wallet" here: we only want actualOwner, which
+  // the verifier returns regardless of whether that address matches.
+  let verify = await verifyOwnershipOrDelegate({ contract: theme.contract, tokenId: identity.tokenId, rpcUrl: theme.rpc, hotWallet: '0x0000000000000000000000000000000000000001' });
+  for (let attempt = 1; attempt <= 3 && !verify.actualOwner; attempt++) {
+    await new Promise((r) => setTimeout(r, 400 * attempt));
+    verify = await verifyOwnershipOrDelegate({ contract: theme.contract, tokenId: identity.tokenId, rpcUrl: theme.rpc, hotWallet: '0x0000000000000000000000000000000000000001' });
+  }
+  if (!verify.actualOwner) return null;
+  const owner = verify.actualOwner.toLowerCase();
+  ownerCache.set(key, { at: Date.now(), owner });
+  return { owner, ...identity };
+}
