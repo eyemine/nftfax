@@ -33,7 +33,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers: workerHeaders(),
-      body: JSON.stringify({ action: 'checkFaxMintEligibility', trayId: id }),
+      // `local` is the MINTER. The worker keys the one-per-chain gate on it; it
+      // used to infer the identity from the tray's recipient, which is the next
+      // player for a forwarded hop, not the account minting.
+      body: JSON.stringify({ action: 'checkFaxMintEligibility', trayId: id, local }),
     });
     const data = await res.json().catch(() => ({ error: 'Worker unavailable' })) as { eligible?: boolean; reason?: string; error?: string };
     return NextResponse.json(data, { status: res.status, headers: NO_STORE });

@@ -719,13 +719,28 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     }
   }
 
+  /// Chain roots in which THIS account has already minted. The one-per-chain
+  /// rule is per chain, so this is the unit the banner must reason about.
+  const mintedChainRoots = useMemo(() => {
+    const roots = new Set<string>();
+    for (const f of [...faxes, ...sentFaxes]) {
+      if (f.mintedBase) roots.add(f.rootTrayId || f.chainTrayId || f.id);
+    }
+    return roots;
+  }, [faxes, sentFaxes]);
+
   const mintLimitAlert = useMemo(() => {
     const identity = parseFaxIdentity(cleanLocal);
     const notice = identity ? MINT_LIMIT_NOTICE[identity.collection] : null;
-    // Only count this user's own mints, not upstream source mints.
-    const hasMinted = faxes.some((f) => f.mintedBase) || sentFaxes.some((f) => f.mintedBase);
-    return notice ? { notice, hasMinted } : null;
-  }, [cleanLocal, faxes, sentFaxes]);
+    if (!notice) return null;
+    // Red only when the fax on screen is in a chain this account has ALREADY
+    // minted in. It used to go red on any mint anywhere, which told a player
+    // who had minted in chain A that they were blocked in chain B — the rule
+    // is one per chain, not one ever. With nothing selected, it is a reminder.
+    const selectedRoot = selected ? (selected.rootTrayId || selected.chainTrayId || selected.id) : null;
+    const hasMinted = !!selectedRoot && mintedChainRoots.has(selectedRoot);
+    return { notice, hasMinted };
+  }, [cleanLocal, selected, mintedChainRoots]);
 
   const sentMintedIds = useMemo(() => new Set(
     sentFaxes.filter((f) => f.mintedBase).map((f) => f.id),
