@@ -56,6 +56,12 @@ interface AlchemyNFT {
   media?: { gateway?: string }[];
 }
 
+/// Alchemy returns token ids as either decimal strings or 0x-hex depending on
+/// the API version; the metadata route and display want decimal.
+function normalizeTokenId(raw: string): string {
+  return raw.startsWith('0x') ? BigInt(raw).toString() : raw;
+}
+
 /// Fetch all NFTs held by a Token Bound Account (a Chonk's backpack).
 /// Tries Alchemy first (fast, has metadata); falls back to scanning ERC-721
 /// Transfer events into the TBA address via RPC (slower, name/image-light,
@@ -71,13 +77,22 @@ export async function getTBANFTs(tbaAddress: `0x${string}`): Promise<TBANFT[]> {
       return (data.ownedNfts || [])
         .map((nft) => {
           const contract = (nft.contract?.address || nft.contractAddress || '').toLowerCase();
+          const tokenId = normalizeTokenId(nft.tokenId || nft.id?.tokenId || '0');
+          const isFaxChain = contract === BASE_FAX_COLLECTIBLE.toLowerCase();
           return {
             contract,
-            tokenId: nft.tokenId || nft.id?.tokenId || '0',
+            tokenId,
             tokenType: nft.tokenType || 'ERC721',
-            name: nft.name || nft.title || 'Unknown',
-            image: nft.image?.cachedUrl || nft.image?.pngUrl || nft.image?.thumbnailUrl || nft.media?.[0]?.gateway || '',
-            isFaxChain: contract === BASE_FAX_COLLECTIBLE.toLowerCase(),
+            // For our own contract, never trust the third-party index for
+            // presentation. Alchemy's cache went stale after every token URI
+            // was rewritten (the "FAX CHAIN #N" rename) and returned name "#12"
+            // with an empty image, so the backpack showed a blank tile. We are
+            // the source of truth for this metadata; use it.
+            name: isFaxChain ? `FAX CHAIN #${tokenId}` : (nft.name || nft.title || 'Unknown'),
+            image: isFaxChain
+              ? `/api/metadata/${tokenId}/image`
+              : (nft.image?.cachedUrl || nft.image?.pngUrl || nft.image?.thumbnailUrl || nft.media?.[0]?.gateway || ''),
+            isFaxChain,
           };
         })
         .filter((nft) => BACKPACK_CONTRACT_WHITELIST.has(nft.contract));
@@ -145,13 +160,16 @@ async function getTBANFTsViaRPC(tbaAddress: `0x${string}`): Promise<TBANFT[]> {
     const key = `${contract}-${tokenId}`;
     if (seen.has(key)) continue;
     seen.add(key);
+    const isFaxChain = contract === BASE_FAX_COLLECTIBLE.toLowerCase();
     nfts.push({
       contract,
       tokenId,
       tokenType: 'ERC721',
-      name: contract === BASE_FAX_COLLECTIBLE.toLowerCase() ? `FAX CHAIN #${tokenId}` : 'NFT',
-      image: '',
-      isFaxChain: contract === BASE_FAX_COLLECTIBLE.toLowerCase(),
+      name: isFaxChain ? `FAX CHAIN #${tokenId}` : 'NFT',
+      // The log scan has no metadata, but for our own contract we do — so a
+      // FAX CHAIN tile never goes blank even when Alchemy is down.
+      image: isFaxChain ? `/api/metadata/${tokenId}/image` : '',
+      isFaxChain,
     });
   }
   return nfts;
