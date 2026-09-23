@@ -148,6 +148,8 @@ export default function PreRegisterPage() {
   const [tokenId, setTokenId] = useState('');
   const [entries, setEntries] = useState<RolofaxEntry[]>([]);
   const [ensNames, setEnsNames] = useState<Record<string, string>>({});
+  /// Free-text filter on the holder wallet: matches address or ENS name.
+  const [walletFilter, setWalletFilter] = useState('');
   const [ownedTokenIds, setOwnedTokenIds] = useState<number[]>([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
 
@@ -293,6 +295,18 @@ export default function PreRegisterPage() {
 
   const communityTotal = entries.length;
   const readyCount = entries.filter((e) => e.ready).length;
+
+  /// Entries whose holder matches the wallet filter. Matches a substring of
+  /// the address (so a pasted 0x… prefix works) or of the ENS name, case-
+  /// insensitively. An empty filter passes everything through.
+  const filterQuery = walletFilter.trim().toLowerCase();
+  const visibleEntries = filterQuery
+    ? entries.filter((e) => {
+        const w = e.wallet.toLowerCase();
+        const ens = (ensNames[w] || '').toLowerCase();
+        return w.includes(filterQuery) || ens.includes(filterQuery);
+      })
+    : entries;
 
   return (
     <main className="min-h-screen px-4 py-6 md:px-8 md:py-10" style={{ backgroundColor: '#c8c0ae' }}>
@@ -478,12 +492,46 @@ export default function PreRegisterPage() {
               entries load, and with max-height that growth resized the whole
               panel after the NFTs populated. A fixed box reserves the space up
               front, so the panel is the same height before and after. */}
+          {/* Filter by holder wallet. Static strip, so it does not change the
+              panel height as data loads. Sits outside the scroll box so it stays
+              put while the list scrolls. */}
+          <div className="flex items-center gap-2 border-b border-[#8f8878] bg-[#c1b9a7] px-5 py-2 md:px-8">
+            <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[.16em] text-[#625e52]">Filter by EOA</span>
+            <input
+              value={walletFilter}
+              onChange={(e) => setWalletFilter(e.target.value)}
+              placeholder="0x… or name.eth"
+              spellCheck={false}
+              className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-1.5 font-mono text-xs outline-none focus:border-[#e65b2f]"
+            />
+            {walletAddress && (
+              <button
+                type="button"
+                onClick={() => setWalletFilter(walletFilter.toLowerCase() === walletAddress.toLowerCase() ? '' : walletAddress)}
+                title="Show only my identities"
+                className={`key-shadow whitespace-nowrap border px-2 py-1.5 text-[10px] font-bold uppercase ${walletFilter.toLowerCase() === walletAddress.toLowerCase() ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+              >
+                Mine
+              </button>
+            )}
+            {walletFilter && (
+              <button type="button" onClick={() => setWalletFilter('')} title="Clear filter" className="text-[#625e52] hover:text-[#a94228]">
+                <X size={14} />
+              </button>
+            )}
+            {filterQuery && (
+              <span className="whitespace-nowrap text-[10px] font-bold uppercase text-[#847d6e]">{visibleEntries.length}/{entries.length}</span>
+            )}
+          </div>
+
           <div className="h-[500px] overflow-y-auto bg-[#c8c0ae] p-5 md:p-8">
             {entries.length === 0 ? (
               <p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No players registered for {theme.collectionName} yet. Be the first.</p>
+            ) : visibleEntries.length === 0 ? (
+              <p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No {theme.collectionName} identities held by a wallet matching “{walletFilter.trim()}”.</p>
             ) : (
               <div className="space-y-2">
-                {entries.map((entry) => {
+                {visibleEntries.map((entry) => {
                   const isOwn = walletAddress && entry.wallet.toLowerCase() === walletAddress.toLowerCase();
                   return (
                   <div key={entry.handle} className={`flex items-center justify-between gap-3 border border-[#847d6e] bg-[#eee8dc] px-3 py-2 ${isOwn ? '' : 'hover:border-[#e65b2f]'} transition-colors`}>
