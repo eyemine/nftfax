@@ -1,12 +1,10 @@
 services:
   nftfax:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        - NEXT_PUBLIC_PRIVY_APP_ID=${NEXT_PUBLIC_PRIVY_APP_ID}
-        - NEXT_PUBLIC_NFTMAIL_URL=${NEXT_PUBLIC_NFTMAIL_URL}
-        - NEXT_PUBLIC_WORKER_URL=${NEXT_PUBLIC_WORKER_URL}
+    # Pulled from GHCR, built by .github/workflows/build-image.yml. Never build
+    # on this box: the 8 GB host runs the live containers, and an on-box
+    # `next build` OOM-killed dockerd once already. Deploy with:
+    #   docker compose pull && docker compose up -d
+    image: ghcr.io/eyemine/nftfax:latest
     container_name: nftfax-nftfax-1
     environment:
       - WORKER_SECRET=${WORKER_SECRET}
