@@ -40,6 +40,7 @@
 /// Keys (when a keyboard is attached): F fullscreen · C camera · T test · Esc
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import { Camera, CameraOff, Maximize2, Printer, Radio, Wifi, WifiOff } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
@@ -524,8 +525,10 @@ export default function ExhibitPage() {
                     title={`FAX CHAIN #${m.tokenId} · ${handleFor(m)}`}
                     className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={`/api/metadata/${m.tokenId}/image`} alt="" className="h-full w-full object-cover opacity-95" loading="lazy" />
+                    {/* next/image resizes through sharp and caches on disk, so the
+                        tablet pulls a ~20KB thumbnail instead of the ~700KB master,
+                        and the image route is hit once per size rather than per view. */}
+                    <Image src={`/api/metadata/${m.tokenId}/image`} alt="" fill sizes="(min-width: 1280px) 160px, 120px" className="object-cover opacity-95" loading="lazy" />
                     <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
                       #{m.tokenId} · hop {m.chainDepth ?? 1}
                     </span>

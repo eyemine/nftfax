@@ -80,7 +80,15 @@ interface RpcResponse {
 }
 
 /// Reads totalMinted() from the contract to validate tokenId range.
-async function getTotalMinted(): Promise<number> {
+/// Supply, memoised. Supply only ever grows, so a cached value is never wrong
+/// about a token that exists — at worst it lags on a token minted seconds ago,
+/// which the refresh below covers. Returns null (not 0) on RPC failure: the
+/// public Base RPC throttles under a burst of requests, and treating that as
+/// "supply is zero" made every token 404 the moment a page asked for a dozen
+/// thumbnails at once.
+let supplyMemo: { value: number; at: number } | null = null;
+async function getTotalMinted(): Promise<number | null> {
+  if (supplyMemo && Date.now() - supplyMemo.at < 30_000) return supplyMemo.value;
   try {
     const res = await fetch(RPC_URL, {
       method: 'POST',
@@ -91,9 +99,14 @@ async function getTotalMinted(): Promise<number> {
       }),
     });
     const json = (await res.json()) as RpcResponse;
-    if (typeof json.result === 'string') return parseInt(json.result, 16);
-  } catch { /* ignore */ }
-  return 0;
+    if (typeof json.result === 'string') {
+      const value = parseInt(json.result, 16);
+      supplyMemo = { value, at: Date.now() };
+      return value;
+    }
+  } catch { /* fall through */ }
+  // Stale beats wrong: an old supply still proves every already-minted token exists.
+  return supplyMemo?.value ?? null;
 }
 
 /// @fax handle prefix per contract Community enum (NONE=0, CHONK, DEADFELLAZ, POW, NORMIE).
@@ -328,6 +341,10 @@ export async function GET(
   }
 
   const totalMinted = await getTotalMinted();
+  if (totalMinted === null) {
+    // Cannot tell — say so, rather than telling a marketplace the token is gone.
+    return NextResponse.json({ error: 'Supply lookup unavailable, retry' }, { status: 503, headers: { 'Retry-After': '5' } });
+  }
   if (tokenId > totalMinted) {
     return NextResponse.json({ error: 'Token does not exist' }, { status: 404 });
   }
