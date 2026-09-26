@@ -24,10 +24,30 @@ dashboard from the same origin as the trays is the only clean way to embed the f
 That also means the webcam works (getUserMedia needs HTTPS), and the leaderboard calls are
 same-origin so no CORS is involved on the read side.
 
-## Setting up the iPad (landscape, kiosk)
+## Device compatibility — check this first
 
-The page is laid out for a landscape tablet: iPad 1024×768 through 1366×1024. It fits with
-no scrolling; portrait stacks the two columns as a fallback.
+The page is laid out for a landscape tablet (1024×768 through 1366×1024). It fits with no
+scrolling; portrait stacks the two columns as a fallback.
+
+**Load `/exhibit?debug=1` on the device before anything else.** A strip at the bottom reports
+`js: hydrated` once the React bundle is running. If it instead reads *"React bundle did not
+hydrate"*, that browser cannot execute the current Next.js output and the device is unusable
+for this — the shell renders but no data, camera, or print events will ever appear.
+
+That was the outcome on the first iPad tried: its Safari was too old. **A recent Android
+tablet running Chrome is the known-good target.** A current-generation iPad on an up-to-date
+iPadOS should also work, but verify with the debug strip rather than assuming.
+
+## Setting up an Android tablet (landscape, kiosk)
+
+1. **Open in Chrome**, allow the camera when prompted. Confirm `js: hydrated` with `?debug=1`.
+2. **Tap the fullscreen button** (bottom-centre) — Android has the Fullscreen API. Or
+   Chrome menu → **Add to Home screen** and launch from the icon for a chrome-less window.
+3. **Settings → Security → App pinning** (name varies by vendor: "Screen pinning", "Pin
+   windows"). Pin Chrome; the tablet is locked to it until unpinned with the lock code.
+4. **Settings → Display → Screen timeout → longest / never**, and keep it on power.
+
+## Setting up an iPad (only if the debug strip says hydrated)
 
 1. **Open in Safari** at the URL below, allow the camera when prompted.
 2. **Share → Add to Home Screen.** Launching from that icon runs it as a standalone web app
