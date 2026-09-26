@@ -50,6 +50,7 @@ const MAX_CONCURRENT_CHUNKS = 4;
 const RPC_RETRIES = 3;
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
+const WEBHOOK_SECRET = process.env.NFTMAIL_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET || '';
 // Envio HyperIndex GraphQL endpoint (hosted at envio.dev, repo:
 // eyemine/nftfax-indexer). When set, mint history comes from the indexer
 // instead of chunked eth_getLogs — faster and immune to public-RPC rate
@@ -103,7 +104,11 @@ async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; roo
     const res = await fetch(WORKER_URL, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ action: 'getTrayDocument', id: trayId }),
+      // Authenticated: the worker withholds `to` on public reads, and the
+      // display rule needs it to tell whether the minter received this tray.
+      // Without it every mint resolved to the event tray and #7 kept showing
+      // the received image even after its forward marker was repaired.
+      body: JSON.stringify({ action: 'getTrayDocument', id: trayId, secret: WEBHOOK_SECRET }),
     });
     if (!res.ok) return {};
     const doc = await res.json().catch(() => null) as { chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string } | null;
