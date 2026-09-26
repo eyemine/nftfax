@@ -7,18 +7,25 @@
 ///
 ///   1. features the minted fax full-size (an iframe of its /tray permalink),
 ///   2. runs a "printing" overlay so the room knows something is happening,
-///   3. POSTs the event to a local middleware (`?middleware=http://localhost:…`)
-///      which drives the Bluetooth printer and the fax handshake audio.
+///   3. POSTs the event to a local middleware (`?middleware=http://…`) which
+///      drives the Bluetooth printer and the fax handshake audio.
 ///
 /// A webcam feed of the physical print shows picture-in-picture.
 ///
+/// TARGET DEVICE: a tablet in landscape (iPad 1024×768 up to 1366×1024, or an
+/// Android equivalent), run as a Home Screen web app under Guided Access /
+/// kiosk mode. Everything is sized to fit that viewport with no scrolling.
+///
 /// WHY THIS LIVES ON nftfax.app AND NOT A LOCAL FILE
 /// Both nftfax.app and nftmail.box send `X-Frame-Options: SAMEORIGIN`, so a
-/// page served from anywhere else cannot iframe a tray permalink. Serving the
-/// dashboard from the same origin is the only clean way to embed the fax.
-/// (Chrome and Firefox treat http://localhost as a secure context, so the
-/// POST from this HTTPS page to a local middleware is allowed; the middleware
-/// must answer CORS with `Access-Control-Allow-Origin: https://nftfax.app`.)
+/// page served from anywhere else cannot iframe a tray permalink.
+///
+/// WHY OPTIONS COME FROM window.location, NOT useSearchParams
+/// useSearchParams forces a client-side-rendering bailout, and Next renders a
+/// Suspense fallback until the client tree resolves. On the iPad that fallback
+/// ("Warming up the fax machine…") was all that ever appeared. Reading the
+/// query string in an effect lets the full shell server-render and hydrate
+/// normally, so the display is never blocked behind a boundary.
 ///
 /// URL parameters
 ///   middleware=<url>   POST each mint event here (default: none)
@@ -27,10 +34,9 @@
 ///   pip=br|bl|tr|tl    webcam corner (default br)
 ///   test=1             fire a print event for the latest mint on load
 ///
-/// Keys: F fullscreen · C toggle camera · T test print event · Esc dismiss
+/// Keys (when a keyboard is attached): F fullscreen · C camera · T test · Esc
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, CameraOff, Maximize2, Printer, Radio, Wifi, WifiOff } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
@@ -70,11 +76,20 @@ interface PrintEvent {
   delivered: 'none' | 'ok' | 'failed';
 }
 
+interface Options {
+  middleware: string;
+  pollMs: number;
+  cam: boolean;
+  pip: 'br' | 'bl' | 'tr' | 'tl';
+  test: boolean;
+}
+
 // Contract enum: NONE=0, CHONK=1, DEADFELLAZ=2, POW=3, NORMIE=4.
 const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfellaz', 3: 'pow', 4: 'normie' };
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
+const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: true, pip: 'br', test: false };
 
 function short(addr: string): string { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 function handleFor(m: Mint): string {
@@ -84,6 +99,21 @@ function handleFor(m: Mint): string {
 function collectionFor(m: Mint): string {
   const key = COMMUNITY_KEY[m.community];
   return key ? getCollectionTheme(key).collectionName : 'Unknown';
+}
+// The leaderboard labels collections inconsistently ("POWNFT", "chonks"), so
+// compare on a normalised key: lowercase, alphanumerics only.
+const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+function readOptions(): Options {
+  const p = new URLSearchParams(window.location.search);
+  const pip = p.get('pip');
+  return {
+    middleware: p.get('middleware') || '',
+    pollMs: Math.max(3, Number(p.get('poll') || 8)) * 1000,
+    cam: p.get('cam') !== '0',
+    pip: pip === 'bl' || pip === 'tr' || pip === 'tl' ? pip : 'br',
+    test: p.get('test') === '1',
+  };
 }
 
 // ── Featured fax: iframe with decay fallback ─────────────────────────────────
@@ -106,11 +136,11 @@ function FeaturedFax({ mint, highlight }: { mint: Mint; highlight: boolean }) {
   }, [mint.trayId]);
 
   const frame = highlight
-    ? 'border-[#e65b2f] shadow-[0_0_0_6px_rgba(230,91,47,.35),0_0_60px_rgba(230,91,47,.5)]'
-    : 'border-[#3d6fd6] shadow-[0_0_0_4px_rgba(61,111,214,.3)]';
+    ? 'border-[#e65b2f] shadow-[0_0_0_5px_rgba(230,91,47,.35),0_0_50px_rgba(230,91,47,.5)]'
+    : 'border-[#3d6fd6] shadow-[0_0_0_3px_rgba(61,111,214,.3)]';
 
   return (
-    <div className={`relative h-full w-full overflow-hidden border-[6px] bg-[#25251f] transition-all duration-700 ${frame}`}>
+    <div className={`relative h-full w-full overflow-hidden border-4 bg-[#25251f] transition-all duration-700 ${frame}`}>
       {trayAlive === false ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/api/metadata/${mint.tokenId}/image`} alt={`FAX CHAIN #${mint.tokenId}`} className="h-full w-full object-contain" />
@@ -123,8 +153,8 @@ function FeaturedFax({ mint, highlight }: { mint: Mint; highlight: boolean }) {
           sandbox="allow-same-origin allow-scripts"
         />
       )}
-      <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-2 bg-[#25251f]/90 px-4 py-2 text-[12px] font-black uppercase tracking-[.18em] text-[#efe8d8]">
-        <span className={`h-2.5 w-2.5 rounded-full ${highlight ? 'animate-pulse bg-[#e65b2f]' : 'bg-[#7fa178]'}`} />
+      <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-2 bg-[#25251f]/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
+        <span className={`h-2 w-2 rounded-full ${highlight ? 'animate-pulse bg-[#e65b2f]' : 'bg-[#7fa178]'}`} />
         Minted · FAX CHAIN #{mint.tokenId}
       </div>
     </div>
@@ -133,31 +163,35 @@ function FeaturedFax({ mint, highlight }: { mint: Mint; highlight: boolean }) {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-function ExhibitDashboard() {
-  const params = useSearchParams();
-  const middleware = params.get('middleware') || '';
-  const pollMs = Math.max(3, Number(params.get('poll') || 8)) * 1000;
-  const camWanted = params.get('cam') !== '0';
-  const pip = (params.get('pip') || 'br') as 'br' | 'bl' | 'tr' | 'tl';
-  const testOnLoad = params.get('test') === '1';
-
+export default function ExhibitPage() {
+  const [opts, setOpts] = useState<Options>(DEFAULTS);
   const [board, setBoard] = useState<Leaderboard | null>(null);
   const [telegraph, setTelegraph] = useState<Telegraph | null>(null);
   const [online, setOnline] = useState(true);
   const [featured, setFeatured] = useState<Mint | null>(null);
   const [printing, setPrinting] = useState<Mint | null>(null);
   const [events, setEvents] = useState<PrintEvent[]>([]);
-  const [camOn, setCamOn] = useState(camWanted);
+  const [camOn, setCamOn] = useState(false);
   const [camError, setCamError] = useState('');
+  const [canFullscreen, setCanFullscreen] = useState(false);
 
   const lastSeenTokenId = useRef<number | null>(null);
   const printTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const testFired = useRef(false);
 
+  // Options from the URL, read once on the client. See the header comment for
+  // why this is not useSearchParams.
+  useEffect(() => {
+    const o = readOptions();
+    setOpts(o);
+    setCamOn(o.cam);
+    setCanFullscreen(typeof document.documentElement.requestFullscreen === 'function');
+  }, []);
+
   // ── Middleware hook ───────────────────────────────────────────────────────
   const notifyMiddleware = useCallback(async (mint: Mint): Promise<'none' | 'ok' | 'failed'> => {
-    if (!middleware) return 'none';
+    if (!opts.middleware) return 'none';
     const origin = window.location.origin;
     const key = COMMUNITY_KEY[mint.community];
     const payload = {
@@ -172,19 +206,18 @@ function ExhibitDashboard() {
       minterEns: mint.minterEns ?? null,
       chainDepth: mint.chainDepth ?? null,
       tier: tierForChainDepth(mint.chainDepth),
-      // The thermal printer wants pixels, not a web page. This is the same
-      // 1-bit-style artwork the token carries, served as PNG bytes.
+      // The thermal printer wants pixels, not a web page.
       imageUrl: `${origin}/api/metadata/${mint.tokenId}/image`,
       trayUrl: `${origin}/tray/${mint.trayId}`,
     };
     try {
-      const res = await fetch(middleware, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(opts.middleware, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       return res.ok ? 'ok' : 'failed';
     } catch (err) {
       console.error('[exhibit] middleware POST failed', err);
       return 'failed';
     }
-  }, [middleware]);
+  }, [opts.middleware]);
 
   // ── Print event ───────────────────────────────────────────────────────────
   const firePrint = useCallback((mint: Mint) => {
@@ -214,7 +247,7 @@ function ExhibitDashboard() {
           // First load: show the latest, but do not "print" history.
           lastSeenTokenId.current = newest.tokenId;
           setFeatured((f) => f ?? newest);
-          if (testOnLoad && !testFired.current) { testFired.current = true; firePrint(newest); }
+          if (opts.test && !testFired.current) { testFired.current = true; firePrint(newest); }
         } else if (newest.tokenId > lastSeenTokenId.current) {
           // Fire for every mint we missed, oldest first, so a burst prints all.
           const fresh = data.mints.filter((m) => m.tokenId > (lastSeenTokenId.current as number)).reverse();
@@ -226,9 +259,9 @@ function ExhibitDashboard() {
       }
     }
     void tick();
-    const id = setInterval(tick, pollMs);
+    const id = setInterval(tick, opts.pollMs);
     return () => { cancelled = true; clearInterval(id); };
-  }, [pollMs, firePrint, testOnLoad]);
+  }, [opts.pollMs, opts.test, firePrint]);
 
   useEffect(() => {
     let cancelled = false;
@@ -249,7 +282,11 @@ function ExhibitDashboard() {
     let stream: MediaStream | null = null;
     void (async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+        // Optional chaining: older WebViews and non-secure contexts have no
+        // mediaDevices at all, and that must degrade to a message, not a crash.
+        const md = navigator.mediaDevices;
+        if (!md?.getUserMedia) throw new Error('camera API unavailable');
+        stream = await md.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
         if (videoRef.current) videoRef.current.srcObject = stream;
         setCamError('');
       } catch (err) {
@@ -273,26 +310,27 @@ function ExhibitDashboard() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const recent = useMemo(() => (board?.mints ?? []).slice(0, 8), [board]);
-  // The leaderboard labels collections inconsistently ("POWNFT", "chonks",
-  // "deadfellaz"), so compare on a normalised key: lowercase, alphanumerics only.
-  const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, '');
   const perCollection = useMemo(() => {
     const out: Record<string, number> = {};
     for (const row of board?.leaderboard ?? []) out[norm(row.collection)] = (out[norm(row.collection)] || 0) + row.mints;
     return out;
   }, [board]);
 
-  const pipClass = { br: 'bottom-6 right-6', bl: 'bottom-6 left-6', tr: 'top-24 right-6', tl: 'top-24 left-6' }[pip];
+  const pipClass = { br: 'bottom-3 right-3', bl: 'bottom-3 left-3', tr: 'top-[4.5rem] right-3', tl: 'top-[4.5rem] left-3' }[opts.pip];
 
   return (
-    <main className="fixed inset-0 grid grid-rows-[auto_1fr] overflow-hidden bg-[#c8c0ae] text-[#25251f]" style={{ fontFamily: 'var(--font-mono, ui-monospace, monospace)' }}>
-      {/* ── Top bar: brand + network summary ─────────────────────────────── */}
-      <header className="grid grid-cols-[auto_1fr_auto] items-center gap-6 border-b-2 border-[#575244] bg-[#b5ad9d] px-8 py-4">
-        <div className="flex items-center gap-4">
-          <div className="grid h-14 w-14 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Radio size={28} /></div>
+    // h-[100dvh] rather than fixed inset-0: Safari's toolbar changes the
+    // viewport height, and dvh tracks it. Landscape is the primary layout;
+    // portrait stacks so a rotated tablet still shows everything.
+    <main className="grid h-[100dvh] w-screen grid-rows-[auto_1fr] overflow-hidden bg-[#c8c0ae] text-[#25251f] font-mono">
+
+      {/* ── Top bar ───────────────────────────────────────────────────────── */}
+      <header className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b-2 border-[#575244] bg-[#b5ad9d] px-4 py-2 xl:gap-6 xl:px-8 xl:py-4">
+        <div className="flex items-center gap-3">
+          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8] xl:h-14 xl:w-14"><Radio className="h-5 w-5 xl:h-7 xl:w-7" /></div>
           <div>
-            <h1 className="text-3xl font-black leading-none tracking-[-0.06em]">FAX CHAIN<span className="text-[#e65b2f]">.</span></h1>
-            <p className="mt-1 text-[12px] font-bold uppercase tracking-[.3em] text-[#625e52]">nftfax.app · live · Marfa</p>
+            <h1 className="text-xl font-black leading-none tracking-[-0.06em] xl:text-3xl">FAX CHAIN<span className="text-[#e65b2f]">.</span></h1>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[.25em] text-[#625e52] xl:text-[12px] xl:tracking-[.3em]">nftfax.app · live · Marfa</p>
           </div>
         </div>
 
@@ -302,78 +340,77 @@ function ExhibitDashboard() {
             ['Senders', telegraph?.uniqueSenders ?? '—'],
             ['Recipients', telegraph?.uniqueRecipients ?? '—'],
             ['Wallets', board?.uniqueMintersTotal ?? '—'],
-            ['24h velocity', telegraph?.velocity24h ?? '—'],
-            ['Prize pool', board ? `${board.contractBalanceEth ?? '0'} ETH` : '—'],
+            ['24h', telegraph?.velocity24h ?? '—'],
+            ['Pool ETH', board?.contractBalanceEth ?? '—'],
           ] as [string, string | number][]).map(([label, value]) => (
-            <div key={label} className="bg-[#c8c0ae] px-4 py-2 text-center">
-              <p className="text-2xl font-black leading-none text-[#e65b2f]">{value}</p>
-              <p className="mt-1 text-[10px] font-bold uppercase tracking-[.16em] text-[#615c50]">{label}</p>
+            <div key={label} className="bg-[#c8c0ae] px-2 py-1 text-center xl:px-4 xl:py-2">
+              <p className="text-base font-black leading-none text-[#e65b2f] xl:text-2xl">{value}</p>
+              <p className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[.12em] text-[#615c50] xl:text-[10px] xl:tracking-[.16em]">{label}</p>
             </div>
           ))}
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-[.2em] text-[#625e52]">Minted on Base</p>
-            <OdometerCounter value={board?.mintsTotal ?? 0} digits={4} height={44} label="FAX CHAIN mints" />
+            <p className="text-[8px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[10px]">Minted on Base</p>
+            <OdometerCounter value={board?.mintsTotal ?? 0} digits={4} height={34} label="FAX CHAIN mints" />
           </div>
-          <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase ${online ? 'text-[#3d5a40]' : 'text-[#a94228]'}`}>
-            {online ? <Wifi size={14} /> : <WifiOff size={14} />} {online ? 'live' : 'offline'}
+          <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ${online ? 'text-[#3d5a40]' : 'text-[#a94228]'}`}>
+            {online ? <Wifi size={13} /> : <WifiOff size={13} />}
           </div>
         </div>
       </header>
 
       {/* ── Body ──────────────────────────────────────────────────────────── */}
-      <section className="grid min-h-0 grid-cols-[1.55fr_1fr] gap-6 p-6">
+      <section className="grid min-h-0 grid-cols-[1.4fr_1fr] gap-3 p-3 portrait:grid-cols-1 portrait:grid-rows-[1.2fr_1fr] xl:gap-6 xl:p-6">
+
         {/* Featured fax */}
-        <div className="grid min-h-0 grid-rows-[1fr_auto] gap-3">
+        <div className="grid min-h-0 grid-rows-[1fr_auto] gap-2">
           <div className="min-h-0">
             {featured ? (
               <FeaturedFax mint={featured} highlight={!!printing && printing.tokenId === featured.tokenId} />
             ) : (
-              <div className="grid h-full place-items-center border-[6px] border-dashed border-[#8f8878] text-[14px] font-bold uppercase tracking-[.2em] text-[#625e52]">
+              <div className="grid h-full place-items-center border-4 border-dashed border-[#8f8878] text-[12px] font-bold uppercase tracking-[.2em] text-[#625e52]">
                 {online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
               </div>
             )}
           </div>
           {featured && (
-            <div className="grid grid-cols-[1fr_auto] items-end gap-4 border-t-2 border-[#575244] pt-3">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-[.2em] text-[#625e52]">Latest transmission</p>
-                <p className="text-2xl font-black tracking-[-0.03em]">T/#{featured.trayId.toUpperCase()}</p>
-                <p className="mt-1 text-[12px] font-bold uppercase tracking-[.12em] text-[#3d5a40]">
-                  Minted by {featured.minterEns || short(featured.minter)} · {handleFor(featured)} · {collectionFor(featured)}
+            <div className="grid grid-cols-[1fr_auto] items-end gap-3 border-t-2 border-[#575244] pt-2">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission</p>
+                <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{featured.trayId.toUpperCase()}</p>
+                <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[.1em] text-[#3d5a40] xl:text-[12px]">
+                  {featured.minterEns || short(featured.minter)} · {handleFor(featured)} · {collectionFor(featured)}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[11px] font-bold uppercase tracking-[.2em] text-[#625e52]">Chain hop</p>
-                <p className="text-2xl font-black text-[#e65b2f]">{featured.chainDepth ?? 1}</p>
-                <p className="text-[11px] font-bold uppercase tracking-[.12em] text-[#625e52]">{tierForChainDepth(featured.chainDepth)}</p>
+                <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
+                <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{featured.chainDepth ?? 1}</p>
+                <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#625e52] xl:text-[11px]">{tierForChainDepth(featured.chainDepth)}</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Right column */}
-        <div className="grid min-h-0 grid-rows-[auto_1fr_auto] gap-4">
-          {/* Per-collection */}
+        <div className="grid min-h-0 grid-rows-[auto_1fr_auto] gap-2 xl:gap-4">
           <div className="grid grid-cols-4 gap-px border border-[#8f8878] bg-[#8f8878]">
             {(['chonk', 'deadfellaz', 'pow', 'normie'] as CollectionKey[]).map((key) => {
               const name = getCollectionTheme(key).collectionName;
-              const count = perCollection[norm(name)] ?? 0;
               return (
-                <div key={key} className="bg-[#c8c0ae] px-3 py-2 text-center">
-                  <p className="text-xl font-black leading-none">{count}</p>
-                  <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[.12em] text-[#615c50]">{name}</p>
+                <div key={key} className="bg-[#c8c0ae] px-2 py-1 text-center xl:py-2">
+                  <p className="text-base font-black leading-none xl:text-xl">{perCollection[norm(name)] ?? 0}</p>
+                  <p className="mt-0.5 truncate text-[8px] font-bold uppercase tracking-[.1em] text-[#615c50] xl:text-[10px]">{name}</p>
                 </div>
               );
             })}
           </div>
 
           {/* Recent mints — every one is minted, so every frame is highlighted */}
-          <div className="min-h-0 overflow-hidden">
-            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.2em] text-[#625e52]">Recent mints · click to feature</p>
-            <div className="grid h-[calc(100%-1.5rem)] grid-cols-4 grid-rows-2 gap-3">
+          <div className="grid min-h-0 grid-rows-[auto_1fr] gap-1">
+            <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Recent mints · tap to feature</p>
+            <div className="grid min-h-0 grid-cols-4 grid-rows-2 gap-2">
               {recent.map((m) => {
                 const isFeatured = featured?.tokenId === m.tokenId;
                 return (
@@ -381,11 +418,11 @@ function ExhibitDashboard() {
                     key={m.tokenId}
                     onClick={() => setFeatured(m)}
                     title={`FAX CHAIN #${m.tokenId} · ${handleFor(m)}`}
-                    className={`relative min-h-0 overflow-hidden border-4 bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_24px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
+                    className={`relative min-h-0 overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`/api/metadata/${m.tokenId}/image`} alt="" className="h-full w-full object-cover opacity-95" loading="lazy" />
-                    <span className="absolute bottom-0 left-0 right-0 bg-[#25251f]/85 px-2 py-1 text-[10px] font-black uppercase tracking-[.1em] text-[#efe8d8]">
+                    <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
                       #{m.tokenId} · hop {m.chainDepth ?? 1}
                     </span>
                   </button>
@@ -395,22 +432,22 @@ function ExhibitDashboard() {
           </div>
 
           {/* Event log */}
-          <div className="border-t-2 border-[#575244] pt-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-[.2em] text-[#625e52]">Print events</p>
-              <p className="text-[10px] font-bold uppercase tracking-[.12em] text-[#847d6e]">
-                {middleware ? `→ ${middleware.replace(/^https?:\/\//, '')}` : 'no middleware · display only'}
+          <div className="border-t-2 border-[#575244] pt-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Print events</p>
+              <p className="truncate text-[8px] font-bold uppercase tracking-[.1em] text-[#847d6e] xl:text-[10px]">
+                {opts.middleware ? `→ ${opts.middleware.replace(/^https?:\/\//, '')}` : 'no middleware · display only'}
               </p>
             </div>
-            <ul className="mt-1 max-h-24 space-y-0.5 overflow-hidden text-[11px] font-bold uppercase tracking-[.08em]">
-              {events.length === 0 && <li className="text-[#847d6e]">None yet · press T to test</li>}
+            <ul className="mt-1 max-h-16 space-y-0.5 overflow-hidden text-[9px] font-bold uppercase tracking-[.06em] xl:max-h-24 xl:text-[11px]">
+              {events.length === 0 && <li className="text-[#847d6e]">None yet · tap the printer button to test</li>}
               {events.map((e) => (
                 <li key={`${e.at}-${e.mint.tokenId}`} className="flex items-center gap-2">
-                  <Printer size={11} className={e.delivered === 'failed' ? 'text-[#a94228]' : 'text-[#3d5a40]'} />
+                  <Printer size={10} className={e.delivered === 'failed' ? 'text-[#a94228]' : 'text-[#3d5a40]'} />
                   <span className="text-[#625e52]">{new Date(e.at).toLocaleTimeString()}</span>
-                  <span>#{e.mint.tokenId} · {handleFor(e.mint)}</span>
-                  <span className={`ml-auto ${e.delivered === 'ok' ? 'text-[#3d5a40]' : e.delivered === 'failed' ? 'text-[#a94228]' : 'text-[#847d6e]'}`}>
-                    {e.delivered === 'ok' ? 'sent to printer' : e.delivered === 'failed' ? 'middleware unreachable' : 'display only'}
+                  <span className="truncate">#{e.mint.tokenId} · {handleFor(e.mint)}</span>
+                  <span className={`ml-auto whitespace-nowrap ${e.delivered === 'ok' ? 'text-[#3d5a40]' : e.delivered === 'failed' ? 'text-[#a94228]' : 'text-[#847d6e]'}`}>
+                    {e.delivered === 'ok' ? 'printed' : e.delivered === 'failed' ? 'unreachable' : 'display only'}
                   </span>
                 </li>
               ))}
@@ -421,31 +458,40 @@ function ExhibitDashboard() {
 
       {/* ── Webcam PIP ────────────────────────────────────────────────────── */}
       {camOn && (
-        <div className={`absolute ${pipClass} z-30 w-[22vw] min-w-[280px] overflow-hidden border-4 border-[#25251f] bg-black shadow-[0_20px_60px_rgba(0,0,0,.5)]`}>
+        <div className={`absolute ${pipClass} z-30 w-[24vw] min-w-[200px] max-w-[360px] overflow-hidden border-[3px] border-[#25251f] bg-black shadow-[0_16px_48px_rgba(0,0,0,.5)]`}>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <video ref={videoRef} autoPlay muted playsInline className="block aspect-video w-full object-cover" />
-          <div className="absolute left-0 top-0 flex items-center gap-1.5 bg-[#25251f]/85 px-2 py-1 text-[10px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-[#e65b2f]" /> Printer cam
+          <div className="absolute left-0 top-0 flex items-center gap-1.5 bg-[#25251f]/85 px-2 py-0.5 text-[9px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e65b2f]" /> Printer cam
           </div>
-          {camError && <p className="absolute inset-x-0 bottom-0 bg-[#a94228] px-2 py-1 text-[10px] font-bold uppercase text-white">{camError}</p>}
+          {camError && <p className="absolute inset-x-0 bottom-0 bg-[#a94228] px-2 py-0.5 text-[9px] font-bold uppercase text-white">{camError}</p>}
         </div>
       )}
-      <button onClick={() => setCamOn((v) => !v)} title="Toggle camera (C)" className="absolute bottom-6 left-1/2 z-30 -translate-x-1/2 border border-[#77705f] bg-[#d8d0bf]/80 p-2 text-[#625e52] opacity-40 hover:opacity-100">
-        {camOn ? <Camera size={14} /> : <CameraOff size={14} />}
-      </button>
-      <button onClick={() => void document.documentElement.requestFullscreen?.()} title="Fullscreen (F)" className="absolute right-6 top-24 z-30 border border-[#77705f] bg-[#d8d0bf]/80 p-2 text-[#625e52] opacity-40 hover:opacity-100">
-        <Maximize2 size={14} />
-      </button>
+
+      {/* ── Touch controls — a tablet has no keyboard ─────────────────────── */}
+      <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 opacity-60 hover:opacity-100">
+        <button onClick={() => setCamOn((v) => !v)} title="Toggle camera" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
+          {camOn ? <Camera size={14} /> : <CameraOff size={14} />}
+        </button>
+        <button onClick={() => { const m = featured ?? board?.mints[0]; if (m) firePrint(m); }} title="Test print event" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
+          <Printer size={14} />
+        </button>
+        {canFullscreen && (
+          <button onClick={() => void document.documentElement.requestFullscreen?.()} title="Fullscreen" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
+            <Maximize2 size={14} />
+          </button>
+        )}
+      </div>
 
       {/* ── Print overlay ─────────────────────────────────────────────────── */}
       {printing && (
-        <div className="pointer-events-none absolute inset-x-0 top-[5.5rem] z-40 flex justify-center">
-          <div className="flex items-center gap-5 border-4 border-[#e65b2f] bg-[#25251f] px-8 py-4 text-[#efe8d8] shadow-[0_0_80px_rgba(230,91,47,.6)]">
-            <Printer size={36} className="animate-pulse text-[#e65b2f]" />
-            <div>
-              <p className="text-[12px] font-bold uppercase tracking-[.3em] text-[#e65b2f]">Incoming transmission · printing</p>
-              <p className="text-2xl font-black tracking-[-0.03em]">T/#{printing.trayId.toUpperCase()} · FAX CHAIN #{printing.tokenId}</p>
-              <p className="text-[12px] font-bold uppercase tracking-[.12em] text-[#c7c0b0]">
+        <div className="pointer-events-none absolute inset-x-0 top-[4.25rem] z-40 flex justify-center px-3 xl:top-[5.5rem]">
+          <div className="flex max-w-full items-center gap-3 border-[3px] border-[#e65b2f] bg-[#25251f] px-4 py-2.5 text-[#efe8d8] shadow-[0_0_60px_rgba(230,91,47,.6)] xl:gap-5 xl:px-8 xl:py-4">
+            <Printer className="h-7 w-7 shrink-0 animate-pulse text-[#e65b2f] xl:h-9 xl:w-9" />
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#e65b2f] xl:text-[12px] xl:tracking-[.3em]">Incoming transmission · printing</p>
+              <p className="truncate text-base font-black tracking-[-0.03em] xl:text-2xl">T/#{printing.trayId.toUpperCase()} · FAX CHAIN #{printing.tokenId}</p>
+              <p className="truncate text-[9px] font-bold uppercase tracking-[.1em] text-[#c7c0b0] xl:text-[12px]">
                 {printing.minterEns || short(printing.minter)} · {collectionFor(printing)} · hop {printing.chainDepth ?? 1} · {tierForChainDepth(printing.chainDepth)}
               </p>
             </div>
@@ -453,15 +499,5 @@ function ExhibitDashboard() {
         </div>
       )}
     </main>
-  );
-}
-
-/// useSearchParams opts the tree into client-side rendering, and Next requires
-/// a Suspense boundary above it so the static shell can still prerender.
-export default function ExhibitPage() {
-  return (
-    <Suspense fallback={<main className="fixed inset-0 grid place-items-center bg-[#c8c0ae] text-[13px] font-bold uppercase tracking-[.2em] text-[#625e52]">Warming up the fax machine…</main>}>
-      <ExhibitDashboard />
-    </Suspense>
   );
 }

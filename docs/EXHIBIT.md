@@ -24,6 +24,28 @@ dashboard from the same origin as the trays is the only clean way to embed the f
 That also means the webcam works (getUserMedia needs HTTPS), and the leaderboard calls are
 same-origin so no CORS is involved on the read side.
 
+## Setting up the iPad (landscape, kiosk)
+
+The page is laid out for a landscape tablet: iPad 1024×768 through 1366×1024. It fits with
+no scrolling; portrait stacks the two columns as a fallback.
+
+1. **Open in Safari** at the URL below, allow the camera when prompted.
+2. **Share → Add to Home Screen.** Launching from that icon runs it as a standalone web app
+   with no Safari toolbar — this is the only full-screen mode on iPad, since Safari has no
+   Fullscreen API for page content. The status bar goes translucent-black to match.
+3. **Settings → Accessibility → Guided Access → on**, set a passcode. Open the Home Screen
+   app, triple-click the top button, tap **Start**. The iPad is now locked to the display:
+   no home gesture, no notifications, no accidental exits. Triple-click + passcode to end.
+4. **Disable Auto-Lock** (Settings → Display & Brightness → Auto-Lock → Never) and keep it on
+   power. Guided Access does not stop the screen sleeping.
+
+Camera permission granted in Safari carries over to the Home Screen app. If the PIP shows
+"camera API unavailable", the page was opened over plain http — it must be https.
+
+On an Android tablet the same URL works in Chrome; the on-page fullscreen button appears
+there (Android has the Fullscreen API), and Chrome's own "Add to Home screen" plus Android's
+screen-pinning give the equivalent kiosk.
+
 ## Opening it at the venue
 
 ```
@@ -38,11 +60,9 @@ https://nftfax.app/exhibit?middleware=http://localhost:8787/print&cam=1&pip=br
 | `pip=br\|bl\|tr\|tl` | `br` | Which corner the webcam sits in. |
 | `test=1` | off | Fire one print event for the latest mint on load — for soundcheck. |
 
-Keys: **F** fullscreen · **C** toggle camera · **T** fire a test print for the featured fax ·
-**Esc** dismiss the overlay.
-
-Press **F** then leave it. Chrome will ask for camera permission once; allow it, and it is
-remembered for the origin.
+Touch controls sit bottom-centre (camera toggle, **test print**, and fullscreen where the
+device supports it). With a keyboard attached: **F** fullscreen · **C** camera · **T** test
+print · **Esc** dismiss the overlay.
 
 ## The middleware contract
 
@@ -138,4 +158,4 @@ Both approaches can run at once — the dashboard POST and your own poll — if 
 2. Open the dashboard with `?middleware=…&test=1`. One print event fires for the latest mint.
 3. The "Print events" log bottom-right shows `sent to printer` (2xx), `middleware unreachable`
    (CORS or connection failure), or `display only` (no `middleware=` param).
-4. Press **T** to repeat as many times as the printer needs.
+4. Tap the printer button (or **T**) to repeat as many times as the printer needs.
