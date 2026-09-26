@@ -12,6 +12,7 @@
 /// surfaced (see rpc()'s retry logic and fetchLogsInRange()'s bounded
 /// concurrency below).
 
+import { TOKEN_TRAY_ID_OVERRIDES } from '@/app/lib/mint-overrides';
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
@@ -63,18 +64,7 @@ const COMMUNITY_PREFIXES: Record<number, string> = {
 interface LeaderboardEntry { collection: string; mints: number; maxTokenId: number; communities: number; }
 interface LeaderboardData { leaderboard: LeaderboardEntry[]; totalMints: number; uniqueMintersTotal: number; contractBalanceEth: string; mints: MintEntry[]; mintsTotal: number; page: number; pageSize: number; }
 
-/// Manual post-mint corrections, keyed by on-chain tokenId. The on-chain
-/// FaxMinted event's trayId is immutable once minted, but a bad pin (see
-/// docs on the InTray.tsx mint fix) can mean the wrong tray got embedded at
-/// mint time even though setTokenURI was later corrected. Overriding here
-/// keeps the leaderboard's preview/trayId/tier consistent with the actual
-/// corrected tokenURI instead of the stale on-chain event value.
-const TOKEN_TRAY_ID_OVERRIDES: Record<number, string> = {
-  11: '6be9f54538b5', // corrected via setTokenURI — see tx 0xf74179fc21c1a0618c3641531159b18a177a06794e7fe6e9d954d184e3bb9f0c
-  12: '9650d1a15f94', // on-chain trayId is the received fax; metadata should show the forwarded fax
-  13: 'c95d23ec2ed6', // on-chain trayId was the received fax (8f28a87fc438); corrected via setTokenURI to the forwarded fax
-  14: '7648cedba4d2', // on-chain trayId was the received fax (8702231b100c); corrected via setTokenURI to the forwarded fax
-};
+// Post-mint tray corrections are shared with the metadata route — see app/lib/mint-overrides.ts.
 
 /// In-process cache of decoded-ready raw logs, keyed by the highest block
 /// scanned so far. Persists across requests in this long-running server

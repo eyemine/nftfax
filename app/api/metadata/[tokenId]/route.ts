@@ -8,6 +8,7 @@
 /// setBaseURI("https://fax.nftmail.box/api/metadata/") is called on-chain,
 /// each token's URI resolves to this route.
 
+import { overrideTrayId } from '@/app/lib/mint-overrides';
 import { NextRequest, NextResponse } from 'next/server';
 import { BASE_FAX_COLLECTIBLE } from '../../../lib/contracts';
 import { decodeFaxMintedLog, decodeSourceTokenId, readLogCache } from '../../../lib/fax-stats';
@@ -331,7 +332,12 @@ export async function GET(
     return NextResponse.json({ error: 'Token does not exist' }, { status: 404 });
   }
 
-  const mintInfo = await findFaxMinted(tokenId);
+  const rawMintInfo = await findFaxMinted(tokenId);
+  // Apply the same post-mint tray corrections the leaderboard uses, so both
+  // describe the same fax for the handful of early tokens fixed via setTokenURI.
+  // Copy rather than mutate: rawMintInfo is memoized and should stay a faithful
+  // record of the chain.
+  const mintInfo = rawMintInfo ? { ...rawMintInfo, trayId: overrideTrayId(tokenId, rawMintInfo.trayId) } : null;
 
   const onChainTray = await getFaxData(mintInfo?.trayId ?? '');
 
