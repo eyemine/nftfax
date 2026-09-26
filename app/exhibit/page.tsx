@@ -82,6 +82,7 @@ interface Options {
   cam: boolean;
   pip: 'br' | 'bl' | 'tr' | 'tl';
   test: boolean;
+  facing: 'user' | 'environment';
 }
 
 // Contract enum: NONE=0, CHONK=1, DEADFELLAZ=2, POW=3, NORMIE=4.
@@ -89,7 +90,7 @@ const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfella
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
-const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: true, pip: 'br', test: false };
+const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: true, pip: 'br', test: false, facing: 'environment' };
 
 function short(addr: string): string { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 function handleFor(m: Mint): string {
@@ -113,6 +114,7 @@ function readOptions(): Options {
     cam: p.get('cam') !== '0',
     pip: pip === 'bl' || pip === 'tr' || pip === 'tl' ? pip : 'br',
     test: p.get('test') === '1',
+    facing: p.get('facing') === 'user' ? 'user' : 'environment',
   };
 }
 
@@ -121,19 +123,36 @@ function readOptions(): Options {
 /// Tray permalinks decay after eight days. The tray API is checked first so a
 /// decayed fax falls back to the immutable on-chain artwork instead of an
 /// iframe showing "not found" to a room full of people.
-function FeaturedFax({ mint, highlight }: { mint: Mint; highlight: boolean }) {
-  const [trayAlive, setTrayAlive] = useState<boolean | null>(null);
+function FeaturedFax({ mint, highlight, onResolved }: { mint: Mint; highlight: boolean; onResolved?: (trayId: string) => void }) {
+  // The tray to embed: the hop the MINTER sent. The on-chain trayId is that
+  // hop for current mints, but for older mints it is the RECEIVED fax, whose
+  // forwardedTrayId is the minter's remix. Decide by identity — if the minter
+  // is the tray's recipient, follow the forward; if the sender, show as-is
+  // (its forwardedTrayId would be the NEXT player's hop, not the minted one).
+  const [display, setDisplay] = useState<{ trayId: string; alive: boolean } | null>(null);
   useEffect(() => {
     let cancelled = false;
-    setTrayAlive(null);
+    setDisplay(null);
     void (async () => {
       try {
         const res = await fetch(`/api/tray/${mint.trayId}`, { cache: 'no-store' });
-        if (!cancelled) setTrayAlive(res.ok);
-      } catch { if (!cancelled) setTrayAlive(false); }
+        if (!res.ok) { if (!cancelled) setDisplay({ trayId: mint.trayId, alive: false }); return; }
+        const doc = await res.json() as { from?: string; to?: string; forwardedTrayId?: string };
+        const me = handleFor(mint).toLowerCase();
+        const isRecipient = doc.to?.toLowerCase() === me && doc.from?.toLowerCase() !== me;
+        const target = isRecipient && doc.forwardedTrayId ? doc.forwardedTrayId : mint.trayId;
+        let alive = true;
+        if (target !== mint.trayId) {
+          const r2 = await fetch(`/api/tray/${target}`, { cache: 'no-store' });
+          alive = r2.ok;
+        }
+        if (!cancelled) { setDisplay({ trayId: target, alive }); onResolved?.(target); }
+      } catch { if (!cancelled) setDisplay({ trayId: mint.trayId, alive: false }); }
     })();
     return () => { cancelled = true; };
-  }, [mint.trayId]);
+  }, [mint, onResolved]);
+  const trayAlive = display ? display.alive : null;
+  const displayId = display?.trayId ?? mint.trayId;
 
   const frame = highlight
     ? 'border-[#e65b2f] shadow-[0_0_0_5px_rgba(230,91,47,.35),0_0_50px_rgba(230,91,47,.5)]'
@@ -146,9 +165,9 @@ function FeaturedFax({ mint, highlight }: { mint: Mint; highlight: boolean }) {
         <img src={`/api/metadata/${mint.tokenId}/image`} alt={`FAX CHAIN #${mint.tokenId}`} className="h-full w-full object-contain" />
       ) : (
         <iframe
-          key={mint.trayId}
-          src={`/tray/${mint.trayId}`}
-          title={`T/#${mint.trayId.toUpperCase()}`}
+          key={displayId}
+          src={`/tray/${displayId}`}
+          title={`T/#${displayId.toUpperCase()}`}
           className="h-full w-full border-0 bg-[#c8c0ae]"
           sandbox="allow-same-origin allow-scripts"
         />
@@ -174,6 +193,8 @@ export default function ExhibitPage() {
   const [camOn, setCamOn] = useState(false);
   const [camError, setCamError] = useState('');
   const [canFullscreen, setCanFullscreen] = useState(false);
+  const [featuredTrayId, setFeaturedTrayId] = useState<string>('');
+  const [hydrated, setHydrated] = useState(false);
 
   const lastSeenTokenId = useRef<number | null>(null);
   const printTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -187,6 +208,9 @@ export default function ExhibitPage() {
     setOpts(o);
     setCamOn(o.cam);
     setCanFullscreen(typeof document.documentElement.requestFullscreen === 'function');
+    setHydrated(true);
+    // Tell the inline diagnostic (layout.tsx) the React bundle is alive.
+    document.getElementById('exhibit-diag-hyd')?.replaceChildren('hydrated');
   }, []);
 
   // ── Middleware hook ───────────────────────────────────────────────────────
@@ -286,7 +310,7 @@ export default function ExhibitPage() {
         // mediaDevices at all, and that must degrade to a message, not a crash.
         const md = navigator.mediaDevices;
         if (!md?.getUserMedia) throw new Error('camera API unavailable');
-        stream = await md.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+        stream = await md.getUserMedia({ video: { facingMode: opts.facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
         if (videoRef.current) videoRef.current.srcObject = stream;
         setCamError('');
       } catch (err) {
@@ -294,7 +318,7 @@ export default function ExhibitPage() {
       }
     })();
     return () => { stream?.getTracks().forEach((t) => t.stop()); };
-  }, [camOn]);
+  }, [camOn, opts.facing]);
 
   // ── Keys ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -368,10 +392,10 @@ export default function ExhibitPage() {
         <div className="grid min-h-0 grid-rows-[1fr_auto] gap-2">
           <div className="min-h-0">
             {featured ? (
-              <FeaturedFax mint={featured} highlight={!!printing && printing.tokenId === featured.tokenId} />
+              <FeaturedFax mint={featured} highlight={!!printing && printing.tokenId === featured.tokenId} onResolved={setFeaturedTrayId} />
             ) : (
               <div className="grid h-full place-items-center border-4 border-dashed border-[#8f8878] text-[12px] font-bold uppercase tracking-[.2em] text-[#625e52]">
-                {online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
+                {!hydrated ? 'Loading…' : online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
               </div>
             )}
           </div>
@@ -379,7 +403,7 @@ export default function ExhibitPage() {
             <div className="grid grid-cols-[1fr_auto] items-end gap-3 border-t-2 border-[#575244] pt-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission</p>
-                <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{featured.trayId.toUpperCase()}</p>
+                <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{(featuredTrayId || featured.trayId).toUpperCase()}</p>
                 <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[.1em] text-[#3d5a40] xl:text-[12px]">
                   {featured.minterEns || short(featured.minter)} · {handleFor(featured)} · {collectionFor(featured)}
                 </p>

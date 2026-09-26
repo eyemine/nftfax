@@ -95,6 +95,19 @@ async function getTotalMinted(): Promise<number> {
   return 0;
 }
 
+/// @fax handle prefix per contract Community enum (NONE=0, CHONK, DEADFELLAZ, POW, NORMIE).
+const COMMUNITY_PREFIX: Record<number, string> = { 1: 'chonk', 2: 'dfz', 3: 'atom', 4: 'normie' };
+
+/// The minter's @fax handle, recovered from the mint record. Non-Chonk source
+/// ids are composite on-chain (real id × 1e6 + a per-chain suffix) so the same
+/// NFT can mint once per chain; strip the suffix to get the real token id.
+function minterHandleFor(m: { community: number; sourceTokenId: number }): string | null {
+  const prefix = COMMUNITY_PREFIX[m.community];
+  if (!prefix) return null;
+  const real = m.community !== 1 && m.sourceTokenId >= 1_000_000 ? Math.floor(m.sourceTokenId / 1_000_000) : m.sourceTokenId;
+  return `${prefix}.${real}@fax`;
+}
+
 interface MintInfo {
   community: number;
   sourceTokenId: number;
@@ -286,17 +299,17 @@ async function findFaxMinted(tokenId: number): Promise<MintInfo | null> {
 
 /// Fetches the tray document to get the fax image (as base64 data URI) and
 /// chain depth (for tier classification used in the prize draw).
-async function getFaxData(trayId: string): Promise<{ image: string | null; chainDepth: number | null; forwardedTrayId?: string }> {
+async function getFaxData(trayId: string): Promise<{ image: string | null; chainDepth: number | null; forwardedTrayId?: string; from?: string; to?: string }> {
   if (!trayId) return { image: null, chainDepth: null };
   try {
     const res = await fetch(`https://nftmail.box/api/tray/${trayId}`, { cache: 'no-store' });
     if (!res.ok) return { image: null, chainDepth: null };
-    const doc = await res.json() as { dataBase64?: string; format?: string; chainDepth?: number; forwardedTrayId?: string };
+    const doc = await res.json() as { dataBase64?: string; format?: string; chainDepth?: number; forwardedTrayId?: string; from?: string; to?: string };
     const image = doc.dataBase64
       ? `data:${doc.format === 'png' ? 'image/png' : 'image/jpeg'};base64,${doc.dataBase64}`
       : null;
     const chainDepth = typeof doc.chainDepth === 'number' ? doc.chainDepth : null;
-    return { image, chainDepth, forwardedTrayId: doc.forwardedTrayId };
+    return { image, chainDepth, forwardedTrayId: doc.forwardedTrayId, from: doc.from, to: doc.to };
   } catch {
     return { image: null, chainDepth: null };
   }
@@ -320,21 +333,36 @@ export async function GET(
 
   const mintInfo = await findFaxMinted(tokenId);
 
-  const { image: rawFaxImage, chainDepth: receivedChainDepth, forwardedTrayId } = await getFaxData(mintInfo?.trayId ?? '');
+  const onChainTray = await getFaxData(mintInfo?.trayId ?? '');
 
-  // The on-chain trayId is the RECEIVED fax (ownership/provenance), but the
-  // artwork the collectible should represent is the FORWARDED fax (the
-  // player's own composited hop). If the tray document has a
-  // forwardedTrayId, fetch that tray's image and use it for display.
-  const displayTrayId = forwardedTrayId || mintInfo?.trayId || '';
-  let image = rawFaxImage ?? COLLECTION_IMAGE;
+  // The collectible represents the hop the MINTER sent — their own composited
+  // remix. Which tray that is depends on how the mint was made:
+  //
+  //   - Mints now target the minter's own hop directly (Sent tab, or the
+  //     forwarded hop from the in-tray). The on-chain tray IS the artwork, and
+  //     its forwardedTrayId — if any — is the NEXT player's onward forward.
+  //     Following it showed the wrong remix (token #20 displayed the recipient's
+  //     hop instead of the minter's).
+  //   - Older mints recorded the RECEIVED tray. There the minter's hop is that
+  //     tray's forwardedTrayId, or the received tray itself if it was minted
+  //     without forwarding.
+  //
+  // So: if the minter is the tray's sender, display it as-is; if the minter is
+  // its recipient, follow the forward. Decided by identity, not by the mere
+  // presence of a forward marker.
+  const minterHandle = mintInfo ? minterHandleFor(mintInfo) : null;
+  const same = (a?: string, b?: string | null) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+  const minterIsRecipient = same(onChainTray.to, minterHandle) && !same(onChainTray.from, minterHandle);
+  const followForward = minterIsRecipient && !!onChainTray.forwardedTrayId;
+  const displayTrayId = followForward ? (onChainTray.forwardedTrayId as string) : (mintInfo?.trayId || '');
+
+  let image = onChainTray.image ?? COLLECTION_IMAGE;
   // Depth must describe the SAME fax as the tray id / artwork above. Taking it
-  // from the received fax while everything else described the forwarded hop
-  // reported a tier one hop too shallow (e.g. token 14 showed depth 0 while the
-  // leaderboard showed 2) — and Tier gates prize-draw eligibility.
-  let chainDepth = receivedChainDepth;
-  if (forwardedTrayId) {
-    const fwdData = await getFaxData(forwardedTrayId);
+  // from a different hop than the image reported a tier one hop off — and Tier
+  // gates prize-draw eligibility.
+  let chainDepth = onChainTray.chainDepth;
+  if (followForward) {
+    const fwdData = await getFaxData(displayTrayId);
     if (fwdData.image) image = fwdData.image;
     if (fwdData.chainDepth != null) chainDepth = fwdData.chainDepth;
   }
