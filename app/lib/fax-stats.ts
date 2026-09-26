@@ -34,6 +34,8 @@ export interface MintEntry {
   chainDepth?: number;
   rootTrayId?: string;
   minterEns?: string;
+  /// The minter's hop — the tray whose bitmap is the collectible's artwork. See lib/mint-display.ts.
+  displayTrayId?: string;
 }
 
 /// DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite

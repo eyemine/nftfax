@@ -9,6 +9,7 @@
 /// each token's URI resolves to this route.
 
 import { overrideTrayId } from '@/app/lib/mint-overrides';
+import { minterHandleFor, resolveDisplayTrayId } from '@/app/lib/mint-display';
 import { NextRequest, NextResponse } from 'next/server';
 import { BASE_FAX_COLLECTIBLE } from '../../../lib/contracts';
 import { decodeFaxMintedLog, decodeSourceTokenId, readLogCache } from '../../../lib/fax-stats';
@@ -107,19 +108,6 @@ async function getTotalMinted(): Promise<number | null> {
   } catch { /* fall through */ }
   // Stale beats wrong: an old supply still proves every already-minted token exists.
   return supplyMemo?.value ?? null;
-}
-
-/// @fax handle prefix per contract Community enum (NONE=0, CHONK, DEADFELLAZ, POW, NORMIE).
-const COMMUNITY_PREFIX: Record<number, string> = { 1: 'chonk', 2: 'dfz', 3: 'atom', 4: 'normie' };
-
-/// The minter's @fax handle, recovered from the mint record. Non-Chonk source
-/// ids are composite on-chain (real id × 1e6 + a per-chain suffix) so the same
-/// NFT can mint once per chain; strip the suffix to get the real token id.
-function minterHandleFor(m: { community: number; sourceTokenId: number }): string | null {
-  const prefix = COMMUNITY_PREFIX[m.community];
-  if (!prefix) return null;
-  const real = m.community !== 1 && m.sourceTokenId >= 1_000_000 ? Math.floor(m.sourceTokenId / 1_000_000) : m.sourceTokenId;
-  return `${prefix}.${real}@fax`;
 }
 
 interface MintInfo {
@@ -373,11 +361,8 @@ export async function GET(
   // So: if the minter is the tray's sender, display it as-is; if the minter is
   // its recipient, follow the forward. Decided by identity, not by the mere
   // presence of a forward marker.
-  const minterHandle = mintInfo ? minterHandleFor(mintInfo) : null;
-  const same = (a?: string, b?: string | null) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
-  const minterIsRecipient = same(onChainTray.to, minterHandle) && !same(onChainTray.from, minterHandle);
-  const followForward = minterIsRecipient && !!onChainTray.forwardedTrayId;
-  const displayTrayId = followForward ? (onChainTray.forwardedTrayId as string) : (mintInfo?.trayId || '');
+  const displayTrayId = mintInfo ? resolveDisplayTrayId(mintInfo.trayId, minterHandleFor(mintInfo), onChainTray) : '';
+  const followForward = !!mintInfo && displayTrayId !== mintInfo.trayId;
 
   let image = onChainTray.image ?? COLLECTION_IMAGE;
   // Depth must describe the SAME fax as the tray id / artwork above. Taking it

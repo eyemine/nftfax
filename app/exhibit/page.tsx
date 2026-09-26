@@ -57,6 +57,8 @@ interface Mint {
   trayId: string;
   chainDepth?: number;
   rootTrayId?: string;
+  /// The minter's hop — resolved by the leaderboard. Artwork and iframe use this.
+  displayTrayId?: string;
 }
 
 interface Leaderboard {
@@ -161,25 +163,19 @@ function FeaturedFax({ mint, highlight, onResolved }: { mint: Mint; highlight: b
   // forwardedTrayId is the minter's remix. Decide by identity — if the minter
   // is the tray's recipient, follow the forward; if the sender, show as-is
   // (its forwardedTrayId would be the NEXT player's hop, not the minted one).
+  // The leaderboard resolves which tray is the minter's hop (displayTrayId);
+  // this only checks that its document still exists so a decayed fax can fall
+  // back to the immutable artwork instead of framing a 404.
   const [display, setDisplay] = useState<{ trayId: string; alive: boolean } | null>(null);
   useEffect(() => {
     let cancelled = false;
     setDisplay(null);
+    const target = mint.displayTrayId || mint.trayId;
     void (async () => {
       try {
-        const res = await fetch(`/api/tray/${mint.trayId}`, { cache: 'no-store' });
-        if (!res.ok) { if (!cancelled) setDisplay({ trayId: mint.trayId, alive: false }); return; }
-        const doc = await res.json() as { from?: string; to?: string; forwardedTrayId?: string };
-        const me = handleFor(mint).toLowerCase();
-        const isRecipient = doc.to?.toLowerCase() === me && doc.from?.toLowerCase() !== me;
-        const target = isRecipient && doc.forwardedTrayId ? doc.forwardedTrayId : mint.trayId;
-        let alive = true;
-        if (target !== mint.trayId) {
-          const r2 = await fetch(`/api/tray/${target}`, { cache: 'no-store' });
-          alive = r2.ok;
-        }
-        if (!cancelled) { setDisplay({ trayId: target, alive }); onResolved?.(target); }
-      } catch { if (!cancelled) setDisplay({ trayId: mint.trayId, alive: false }); }
+        const res = await fetch(`/api/tray/${target}`, { cache: 'no-store' });
+        if (!cancelled) { setDisplay({ trayId: target, alive: res.ok }); onResolved?.(target); }
+      } catch { if (!cancelled) setDisplay({ trayId: target, alive: false }); }
     })();
     return () => { cancelled = true; };
   }, [mint, onResolved]);
@@ -194,7 +190,7 @@ function FeaturedFax({ mint, highlight, onResolved }: { mint: Mint; highlight: b
     <div className={`relative h-full w-full overflow-hidden border-4 bg-[#25251f] transition-all duration-700 ${frame}`}>
       {trayAlive === false ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={`/api/metadata/${mint.tokenId}/image`} alt={`FAX CHAIN #${mint.tokenId}`} className="h-full w-full object-contain" />
+        <img src={`/api/tray/${displayId}/image`} alt={`FAX CHAIN #${mint.tokenId}`} className="h-full w-full object-contain" />
       ) : (
         <iframe
           key={displayId}
@@ -327,8 +323,8 @@ export default function ExhibitPage() {
       chainDepth: mint.chainDepth ?? null,
       tier: tierForChainDepth(mint.chainDepth),
       // The thermal printer wants pixels, not a web page.
-      imageUrl: `${origin}/api/metadata/${mint.tokenId}/image`,
-      trayUrl: `${origin}/tray/${mint.trayId}`,
+      imageUrl: `${origin}/api/tray/${mint.displayTrayId || mint.trayId}/image`,
+      trayUrl: `${origin}/tray/${mint.displayTrayId || mint.trayId}`,
     };
     try {
       const res = await fetch(opts.middleware, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -597,7 +593,10 @@ export default function ExhibitPage() {
                   >
                     {/* next/image resizes through sharp and caches on disk, so the
                         tablet pulls a small thumbnail instead of the ~700KB master. */}
-                    <Image src={`/api/metadata/${m.tokenId}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
+                    {/* Keyed by the DISPLAY tray, not the token: if the resolved hop
+                        ever changes, the URL changes with it, so neither the browser,
+                        Cloudflare nor next/image can pin a stale image for a day. */}
+                    <Image src={`/api/tray/${m.displayTrayId || m.trayId}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
                     <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
                       #{m.tokenId} · hop {m.chainDepth ?? 1}
                     </span>

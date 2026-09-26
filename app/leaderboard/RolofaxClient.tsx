@@ -37,6 +37,7 @@ interface MintEntry {
   chainDepth?: number;
   rootTrayId?: string;
   minterEns?: string;
+  displayTrayId?: string;
 }
 
 // Only fetches the tray image once the row scrolls into view — at 2200+
@@ -376,10 +377,12 @@ export default function RolofaxClient() {
                           #{mint.tokenId} <ExternalLink size={10} />
                         </a>
                       </td>
-                      <td className="p-3"><MintPreview trayId={mint.trayId} /></td>
+                      {/* The artwork is the minter's hop (displayTrayId), which for
+                          older mints differs from the received tray the event records. */}
+                      <td className="p-3"><MintPreview trayId={mint.displayTrayId || mint.trayId} /></td>
                       <td className="p-3 font-mono">
                         {mint.trayId ? (
-                          <a href={`https://nftmail.box/tray/${mint.trayId}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">{mint.trayId}</a>
+                          <a href={`https://nftmail.box/tray/${mint.displayTrayId || mint.trayId}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">{mint.displayTrayId || mint.trayId}</a>
                         ) : '—'}
                       </td>
                       <td className="p-3">{tierForDepth(Math.max(0, (mint.chainDepth ?? 1) - 1))}</td>

@@ -13,6 +13,7 @@
 /// concurrency below).
 
 import { TOKEN_TRAY_ID_OVERRIDES } from '@/app/lib/mint-overrides';
+import { minterHandleFor, resolveDisplayTrayId } from '@/app/lib/mint-display';
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from '../../../lib/contracts';
@@ -95,7 +96,7 @@ function persistCache(): void {
   }
 }
 
-async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string }> {
+async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string }> {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
@@ -105,10 +106,13 @@ async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; roo
       body: JSON.stringify({ action: 'getTrayDocument', id: trayId }),
     });
     if (!res.ok) return {};
-    const doc = await res.json().catch(() => null) as { chainDepth?: number; rootTrayId?: string } | null;
+    const doc = await res.json().catch(() => null) as { chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string } | null;
     return {
       chainDepth: typeof doc?.chainDepth === 'number' ? doc.chainDepth : undefined,
       rootTrayId: typeof doc?.rootTrayId === 'string' ? doc.rootTrayId : undefined,
+      from: typeof doc?.from === 'string' ? doc.from : undefined,
+      to: typeof doc?.to === 'string' ? doc.to : undefined,
+      forwardedTrayId: typeof doc?.forwardedTrayId === 'string' ? doc.forwardedTrayId : undefined,
     };
   } catch {
     return {};
@@ -345,9 +349,19 @@ export async function GET(req: NextRequest) {
     const metaByTrayId = new Map(uniqueTrayIds.map((id, i) => [id, metas[i]]));
     for (const mint of pageMints) {
       const meta = metaByTrayId.get(mint.trayId);
-      mint.chainDepth = meta?.chainDepth;
       mint.rootTrayId = meta?.rootTrayId;
       mint.minterEns = ensByAddress.get(mint.minter);
+      // The artwork is the minter's hop — see lib/mint-display.ts. Every
+      // consumer reads displayTrayId from here instead of re-deriving it.
+      mint.displayTrayId = resolveDisplayTrayId(mint.trayId, minterHandleFor(mint), meta ?? {});
+      mint.chainDepth = meta?.chainDepth;
+    }
+    // Depth must describe the displayed hop, not the received tray, when they
+    // differ — it drives the tier shown beside the artwork.
+    const redirected = pageMints.filter((m) => m.displayTrayId && m.displayTrayId !== m.trayId);
+    if (redirected.length) {
+      const hopMetas = await Promise.all(redirected.map((m) => fetchTrayMeta(m.displayTrayId as string)));
+      redirected.forEach((m, i) => { if (hopMetas[i]?.chainDepth != null) m.chainDepth = hopMetas[i].chainDepth; });
     }
 
     return NextResponse.json({ leaderboard, totalMints, uniqueMintersTotal, contractBalanceEth, mints: pageMints, mintsTotal: allMints.length, page, pageSize } as LeaderboardData, { headers: NO_STORE });
