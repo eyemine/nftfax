@@ -36,7 +36,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-function FaxContent({ doc }: { doc: TrayDocument }) {
+function FaxContent({ doc, embed = false }: { doc: TrayDocument; embed?: boolean }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -59,9 +59,9 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
   }, [doc.dataBase64, doc.format]);
 
   return (
-    <main className="min-h-screen bg-[#c8c0ae] px-4 py-6 md:px-8 md:py-10">
-      <div className="mx-auto max-w-5xl">
-        <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
+    <main className={embed ? 'min-h-screen bg-[#c8c0ae] p-2' : 'min-h-screen bg-[#c8c0ae] px-4 py-6 md:px-8 md:py-10'}>
+      <div className={embed ? '' : 'mx-auto max-w-5xl'}>
+        {!embed && <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LayersArrowDown size={20} /></div>
             <div>
@@ -70,7 +70,7 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
             </div>
           </div>
           <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
-        </header>
+        </header>}
 
         <SkinPanel className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
@@ -131,9 +131,9 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
           </div>
         </SkinPanel>
 
-        <footer className="mt-5 text-center text-[11px] font-bold uppercase tracking-[.14em] text-[#575347]">
+        {!embed && <footer className="mt-5 text-center text-[11px] font-bold uppercase tracking-[.14em] text-[#575347]">
           Powered by NFTmail.box / ERC-8004 identity
-        </footer>
+        </footer>}
       </div>
     </main>
   );
@@ -142,6 +142,13 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
 export default function TrayPage() {
   const params = useParams();
   const id = (params?.id as string) || '';
+  // ?embed=1 strips the site chrome (header, Office button, footer) so the
+  // transmission panel fills the frame. Used by /exhibit, which iframes this
+  // page on a gallery display where the surrounding navigation is noise. Read
+  // from the URL in an effect rather than useSearchParams to avoid the CSR
+  // bailout / Suspense fallback that blanked the exhibit on first load.
+  const [embed, setEmbed] = useState(false);
+  useEffect(() => { setEmbed(new URLSearchParams(window.location.search).get('embed') === '1'); }, []);
   const [doc, setDoc] = useState<TrayDocument | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -185,5 +192,5 @@ export default function TrayPage() {
     );
   }
 
-  return <FaxContent doc={doc} />;
+  return <FaxContent doc={doc} embed={embed} />;
 }

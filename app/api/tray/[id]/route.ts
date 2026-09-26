@@ -69,11 +69,39 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       body: JSON.stringify({ action: 'getTrayDocument', id, secret: WEBHOOK_SECRET }),
       cache: 'no-store',
     });
-    const data = await res.json();
+    const data = await res.json() as Record<string, unknown>;
+    // The worker's mint record is a convenience index and is incomplete for a
+    // few early mints (#1, #12, #16 had none under their display tray). The
+    // chain is the authority on whether a fax was minted, so when the worker
+    // says no, ask the on-chain mint list before letting the permalink show a
+    // permanent collectible as jammed and fading.
+    if (res.ok && !data.minted) {
+      const chain = await onChainMintForTray(_req, id);
+      if (chain) data.minted = { tokenId: chain.tokenId, tx: null, at: null, source: 'chain' };
+    }
     return NextResponse.json(data, { status: res.status, headers: NO_STORE });
   } catch {
     return NextResponse.json({ error: 'Lookup failed' }, { status: 502, headers: NO_STORE });
   }
+}
+
+/// trayId -> on-chain mint, from the leaderboard route (which already applies
+/// the post-mint tray overrides and caches decoded logs in-process). Memoised
+/// for a minute so a busy permalink does not re-fetch the whole list per view.
+const mintIndex: { at: number; byTray: Map<string, { tokenId: number }> } = { at: 0, byTray: new Map() };
+async function onChainMintForTray(req: NextRequest, trayId: string): Promise<{ tokenId: number } | null> {
+  if (Date.now() - mintIndex.at > 60_000) {
+    try {
+      const origin = `http://${req.nextUrl.hostname}:${req.nextUrl.port || process.env.PORT || 3000}`;
+      const r = await fetch(`${origin}/api/tray/leaderboard?pageSize=2222`, { cache: 'no-store' });
+      if (r.ok) {
+        const { mints = [] } = await r.json() as { mints?: { tokenId: number; trayId: string }[] };
+        mintIndex.byTray = new Map(mints.map((m) => [m.trayId.toLowerCase(), { tokenId: m.tokenId }]));
+        mintIndex.at = Date.now();
+      }
+    } catch { /* keep the previous index; a stale answer beats a wrong "not minted" */ }
+  }
+  return mintIndex.byTray.get(trayId.toLowerCase()) ?? null;
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

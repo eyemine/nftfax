@@ -187,7 +187,7 @@ function FeaturedFax({ mint, highlight, onResolved }: { mint: Mint; highlight: b
       ) : (
         <iframe
           key={displayId}
-          src={`/tray/${displayId}`}
+          src={`/tray/${displayId}?embed=1`}
           title={`T/#${displayId.toUpperCase()}`}
           className="h-full w-full border-0 bg-[#c8c0ae]"
           sandbox="allow-same-origin allow-scripts"
@@ -335,7 +335,7 @@ export default function ExhibitPage() {
     let cancelled = false;
     async function tick() {
       try {
-        const res = await fetch('/api/tray/leaderboard?pageSize=12', { cache: 'no-store' });
+        const res = await fetch('/api/tray/leaderboard?pageSize=48', { cache: 'no-store' });
         if (!res.ok) throw new Error(String(res.status));
         const data = await res.json() as Leaderboard;
         if (cancelled) return;
@@ -409,7 +409,9 @@ export default function ExhibitPage() {
   }, [board, featured, firePrint]);
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const recent = useMemo(() => (board?.mints ?? []).slice(0, 8), [board]);
+  // All fetched mints, newest first. The strip scrolls in rows of four, so
+  // earlier mints are reachable by swiping rather than lost off-screen.
+  const recent = useMemo(() => board?.mints ?? [], [board]);
   const perCollection = useMemo(() => {
     const out: Record<string, number> = {};
     for (const row of board?.leaderboard ?? []) out[norm(row.collection)] = (out[norm(row.collection)] || 0) + row.mints;
@@ -509,8 +511,10 @@ export default function ExhibitPage() {
 
           {/* Recent mints — every one is minted, so every frame is highlighted */}
           <div className="grid min-h-0 grid-rows-[auto_1fr] gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Recent mints · tap to feature</p>
-            <div className="grid min-h-0 grid-cols-4 grid-rows-2 gap-2">
+            <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">
+              Recent mints · tap to feature · {recent.length} shown, swipe for earlier
+            </p>
+            <div className="grid min-h-0 auto-rows-max grid-cols-4 gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
               {recent.map((m) => {
                 const isFeatured = featured?.tokenId === m.tokenId;
                 return (
@@ -518,7 +522,7 @@ export default function ExhibitPage() {
                     key={m.tokenId}
                     onClick={() => setFeatured(m)}
                     title={`FAX CHAIN #${m.tokenId} · ${handleFor(m)}`}
-                    className={`relative min-h-0 overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
+                    className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`/api/metadata/${m.tokenId}/image`} alt="" className="h-full w-full object-cover opacity-95" loading="lazy" />
