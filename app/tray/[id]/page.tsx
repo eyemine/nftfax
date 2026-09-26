@@ -72,7 +72,10 @@ function FaxContent({ doc, embed = false }: { doc: TrayDocument; embed?: boolean
           <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
         </header>}
 
-        <SkinPanel className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+        {/* Embed mode is the flat, paper-like rendering the exhibit frames: no
+            machine skin, no rounded shadowed panel, one column with the bitmap
+            dominant. The full page keeps the skeuomorphic console. */}
+        <SkinPanel className={embed ? 'overflow-hidden border border-[#8f8878] bg-[#eee8dc]' : 'machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]'} contentClassName={embed ? 'flex h-full flex-col' : undefined}>
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span>Public transmission T/#{doc.id.slice(0, 4).toUpperCase()}</span>
             <span className={isMinted ? 'text-[#26417d]' : jammed ? 'text-[#a94228]' : 'text-[#456049]'}>
@@ -80,7 +83,7 @@ function FaxContent({ doc, embed = false }: { doc: TrayDocument; embed?: boolean
             </span>
           </div>
 
-          <div className="grid gap-6 p-5 md:p-8 lg:grid-cols-[1fr_340px]">
+          <div className={embed ? 'grid gap-3 p-3' : 'grid gap-6 p-5 md:p-8 lg:grid-cols-[1fr_340px]'}>
             <div>
               {doc.coverNote && (
                 <div className="mb-4 border-l-4 border-[#8f8878] bg-[#e7e0d1] p-3">
@@ -88,7 +91,7 @@ function FaxContent({ doc, embed = false }: { doc: TrayDocument; embed?: boolean
                   <p className="text-[13px] text-[#3a362c]">{doc.coverNote}</p>
                 </div>
               )}
-              <div className="flex min-h-[360px] items-center justify-center overflow-hidden border border-[#918978] bg-[#e7e0d1] p-4">
+              <div className={embed ? 'flex items-center justify-center overflow-hidden bg-[#f4f1ea] p-2' : 'flex min-h-[360px] items-center justify-center overflow-hidden border border-[#918978] bg-[#e7e0d1] p-4'}>
               {doc.encrypted || doc.channel === 'private' ? (
                 <div className="grid place-items-center text-center text-[#8a836f]">
                   <Lock size={32} className="mb-2" />

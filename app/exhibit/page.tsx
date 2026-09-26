@@ -67,11 +67,21 @@ interface Leaderboard {
   leaderboard: { collection: string; mints: number; communities: number }[];
 }
 
+interface PublicFax {
+  id: string;
+  from: string;
+  to?: string;
+  chainDepth?: number;
+  createdAt?: number;
+}
+
 interface Telegraph {
   totalPublic?: number;
   uniqueSenders?: number;
   uniqueRecipients?: number;
   velocity24h?: number;
+  /// Most recently sent public faxes, newest first. Not necessarily minted.
+  recent?: PublicFax[];
 }
 
 interface PrintEvent {
@@ -261,6 +271,15 @@ function WhepPlayer({ url, onError }: { url: string; onError: (msg: string) => v
 export default function ExhibitPage() {
   const [opts, setOpts] = useState<Options>(DEFAULTS);
   const [board, setBoard] = useState<Leaderboard | null>(null);
+  /// Minted grid, accumulated across pages as the operator scrolls. The
+  /// collection caps at 2,222, so this must page rather than fetch everything:
+  /// the leaderboard route decodes logs per request and a 2,000-item response
+  /// would be both slow and pointless for a display that shows two rows.
+  const [mintPages, setMintPages] = useState<Mint[]>([]);
+  const [mintPage, setMintPage] = useState(1);
+  const [mintsExhausted, setMintsExhausted] = useState(false);
+  const loadingPage = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const [telegraph, setTelegraph] = useState<Telegraph | null>(null);
   const [online, setOnline] = useState(true);
   const [featured, setFeatured] = useState<Mint | null>(null);
@@ -336,12 +355,18 @@ export default function ExhibitPage() {
     let cancelled = false;
     async function tick() {
       try {
-        const res = await fetch('/api/tray/leaderboard?pageSize=48', { cache: 'no-store' });
+        const res = await fetch('/api/tray/leaderboard?pageSize=24', { cache: 'no-store' });
         if (!res.ok) throw new Error(String(res.status));
         const data = await res.json() as Leaderboard;
         if (cancelled) return;
         setOnline(true);
         setBoard(data);
+        // Merge: the poll's first page is always the freshest; keep anything
+        // older we already paged in, deduped by token id.
+        setMintPages((prev) => {
+          const seen = new Set(data.mints.map((m) => m.tokenId));
+          return [...data.mints, ...prev.filter((m) => !seen.has(m.tokenId))];
+        });
         const newest = data.mints[0];
         if (!newest) return;
         if (lastSeenTokenId.current === null) {
@@ -409,10 +434,38 @@ export default function ExhibitPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, [board, featured, firePrint]);
 
+  // ── Infinite scroll for the minted grid ───────────────────────────────────
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || mintsExhausted) return;
+    const io = new IntersectionObserver(async (entries) => {
+      if (!entries[0].isIntersecting || loadingPage.current) return;
+      loadingPage.current = true;
+      try {
+        const next = mintPage + 1;
+        const res = await fetch(`/api/tray/leaderboard?page=${next}&pageSize=24`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json() as Leaderboard;
+        if (data.mints.length === 0) { setMintsExhausted(true); return; }
+        setMintPages((prev) => {
+          const seen = new Set(prev.map((m) => m.tokenId));
+          return [...prev, ...data.mints.filter((m) => !seen.has(m.tokenId))];
+        });
+        setMintPage(next);
+      } finally {
+        loadingPage.current = false;
+      }
+    }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [mintPage, mintsExhausted]);
+
   // ── Derived ───────────────────────────────────────────────────────────────
-  // All fetched mints, newest first. The strip scrolls in rows of four, so
-  // earlier mints are reachable by swiping rather than lost off-screen.
-  const recent = useMemo(() => board?.mints ?? [], [board]);
+  const mintedGrid = mintPages;
+  // Latest public transmissions — what just went through the machine. Shown
+  // above the mints without a frame and without tap-to-feature: only a minted
+  // hop is a permanent exhibit; a public fax may still be mid-chain and decays.
+  const latestPublic = useMemo(() => (telegraph?.recent ?? []).slice(0, 6), [telegraph]);
   const perCollection = useMemo(() => {
     const out: Record<string, number> = {};
     for (const row of board?.leaderboard ?? []) out[norm(row.collection)] = (out[norm(row.collection)] || 0) + row.mints;
@@ -510,13 +563,30 @@ export default function ExhibitPage() {
             })}
           </div>
 
-          {/* Recent mints — every one is minted, so every frame is highlighted */}
-          <div className="grid min-h-0 grid-rows-[auto_1fr] gap-1">
-            <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">
-              Recent mints · tap to feature · {recent.length} shown, swipe for earlier
+          {/* One scroll area, two sections: latest public transmissions (no frame,
+              not tappable) above the minted collectibles (blue frame, tap to
+              feature). Three columns of larger tiles; the minted section pages
+              in as it scrolls, so it can reach the full 2,222 without loading
+              them up front. */}
+          <div className="min-h-0 overflow-y-auto pr-1 [scrollbar-width:thin]">
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmissions</p>
+            <div className="grid grid-cols-3 gap-2">
+              {latestPublic.map((f) => (
+                <div key={f.id} title={`T/#${f.id.toUpperCase()} · ${f.from} → ${f.to ?? '…'}`} className="relative aspect-[3/4] overflow-hidden bg-[#eee8dc]">
+                  <Image src={`/api/tray/${f.id}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover" loading="lazy" />
+                  <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
+                    {f.from.replace(/@fax$/, '')} · hop {f.chainDepth ?? 1}
+                  </span>
+                </div>
+              ))}
+              {latestPublic.length === 0 && <p className="col-span-3 text-[10px] font-bold uppercase text-[#847d6e]">No public transmissions yet</p>}
+            </div>
+
+            <p className="mb-1 mt-3 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">
+              Minted · tap to feature · {mintedGrid.length} of {board?.mintsTotal ?? '…'}
             </p>
-            <div className="grid min-h-0 auto-rows-max grid-cols-4 gap-2 overflow-y-auto pr-1 [scrollbar-width:thin]">
-              {recent.map((m) => {
+            <div className="grid grid-cols-3 gap-2">
+              {mintedGrid.map((m) => {
                 const isFeatured = featured?.tokenId === m.tokenId;
                 return (
                   <button
@@ -526,15 +596,18 @@ export default function ExhibitPage() {
                     className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
                   >
                     {/* next/image resizes through sharp and caches on disk, so the
-                        tablet pulls a ~20KB thumbnail instead of the ~700KB master,
-                        and the image route is hit once per size rather than per view. */}
-                    <Image src={`/api/metadata/${m.tokenId}/image`} alt="" fill sizes="(min-width: 1280px) 160px, 120px" className="object-cover opacity-95" loading="lazy" />
+                        tablet pulls a small thumbnail instead of the ~700KB master. */}
+                    <Image src={`/api/metadata/${m.tokenId}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
                     <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
                       #{m.tokenId} · hop {m.chainDepth ?? 1}
                     </span>
                   </button>
                 );
               })}
+            </div>
+            {/* Sentinel: when this scrolls into view, the next page loads. */}
+            <div ref={sentinelRef} className="h-6 text-center text-[9px] font-bold uppercase text-[#847d6e]">
+              {mintsExhausted ? (mintedGrid.length ? 'End of collection' : '') : mintedGrid.length ? 'Loading earlier…' : ''}
             </div>
           </div>
 
