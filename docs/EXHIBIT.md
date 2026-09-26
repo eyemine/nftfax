@@ -40,7 +40,7 @@ iPadOS should also work, but verify with the debug strip rather than assuming.
 
 ## Setting up an Android tablet (landscape, kiosk)
 
-1. **Open in Chrome**, allow the camera when prompted. Confirm `js: hydrated` with `?debug=1`.
+1. **Open in Chrome.** Confirm `js: hydrated` with `?debug=1`.
 2. **Tap the fullscreen button** (bottom-centre) — Android has the Fullscreen API. Or
    Chrome menu → **Add to Home screen** and launch from the icon for a chrome-less window.
 3. **Settings → Security → App pinning** (name varies by vendor: "Screen pinning", "Pin
@@ -49,7 +49,7 @@ iPadOS should also work, but verify with the debug strip rather than assuming.
 
 ## Setting up an iPad (only if the debug strip says hydrated)
 
-1. **Open in Safari** at the URL below, allow the camera when prompted.
+1. **Open in Safari** at the URL below.
 2. **Share → Add to Home Screen.** Launching from that icon runs it as a standalone web app
    with no Safari toolbar — this is the only full-screen mode on iPad, since Safari has no
    Fullscreen API for page content. The status bar goes translucent-black to match.
@@ -59,9 +59,6 @@ iPadOS should also work, but verify with the debug strip rather than assuming.
 4. **Disable Auto-Lock** (Settings → Display & Brightness → Auto-Lock → Never) and keep it on
    power. Guided Access does not stop the screen sleeping.
 
-Camera permission granted in Safari carries over to the Home Screen app. If the PIP shows
-"camera API unavailable", the page was opened over plain http — it must be https.
-
 On an Android tablet the same URL works in Chrome; the on-page fullscreen button appears
 there (Android has the Fullscreen API), and Chrome's own "Add to Home screen" plus Android's
 screen-pinning give the equivalent kiosk.
@@ -69,20 +66,75 @@ screen-pinning give the equivalent kiosk.
 ## Opening it at the venue
 
 ```
-https://nftfax.app/exhibit?middleware=http://localhost:8787/print&cam=1&pip=br
+https://nftfax.app/exhibit?middleware=http://localhost:8787/print&cam=whep:https://…/webRTC/play&pip=br
 ```
 
 | Param | Default | Meaning |
 |---|---|---|
 | `middleware=<url>` | none | POST every mint event here. Without it the dashboard is display-only. |
 | `poll=<s>` | 8 | Leaderboard poll interval. Do not go below ~5; the leaderboard route scans logs. |
-| `cam=0` | on | Disable the webcam PIP. |
-| `pip=br\|bl\|tr\|tl` | `br` | Which corner the webcam sits in. |
+| `cam=whep:<url>` | off | Printer cam via WebRTC/WHEP — **sub-second**. Cloudflare Stream Live or MediaMTX. |
+| `cam=<https url>` | off | Printer cam via any embeddable player in an iframe (YouTube, Twitch, Cloudflare iframe). 3–10 s latency. |
+| `cam=local` | off | This device's own camera. Only useful if the printer is beside the tablet — it is not. |
+| `pip=br\|bl\|tr\|tl` | `br` | Which corner the printer cam sits in. |
 | `test=1` | off | Fire one print event for the latest mint on load — for soundcheck. |
 
 Touch controls sit bottom-centre (camera toggle, **test print**, and fullscreen where the
 device supports it). With a keyboard attached: **F** fullscreen · **C** camera · **T** test
 print · **Esc** dismiss the overlay.
+
+## The printer cam is a remote stream
+
+The fax machine, printer and camera are with the operator. The display is in Marfa. So the
+"printer cam" is a **live stream from a camera at the machine to a browser at the venue**,
+not the tablet's camera. OBS captures it; the question is what carries it. Three routes, in
+order of recommendation:
+
+### 1. Cloudflare Stream Live — recommended
+
+Managed, sub-second WebRTC, works from any network, and DNS is already on Cloudflare.
+Cost is per minute streamed and delivered to one tablet: low single-digit dollars for a
+multi-day event.
+
+1. Cloudflare dashboard → **Stream → Live Inputs → Create**. Enable **WebRTC (WHIP)**.
+   Disable recording unless you want it (recording is what costs).
+2. Copy the **WHIP URL**. In OBS: **Settings → Stream → Service: WHIP**, paste it. Start
+   Streaming. Point the camera at the printer's paper exit.
+3. Copy the **WebRTC playback URL** (ends in `/webRTC/play`). Open the dashboard with
+   `cam=whep:<that url>`.
+
+If WebRTC is blocked on the venue network, fall back to the same input's **iframe embed
+URL** with `?autoplay=true&muted=true` appended, as `cam=<url>`. That is ~2–3 s latency
+over HLS and traverses anything.
+
+### 2. YouTube Live, unlisted — zero cost, zero infra
+
+YouTube Studio → **Go live → Stream**, latency **Ultra-low**, visibility **Unlisted**. OBS →
+Service: YouTube, paste the stream key. Embed URL:
+
+```
+cam=https://www.youtube.com/embed/<VIDEO_ID>?autoplay=1&mute=1&controls=0&rel=0
+```
+
+Expect 3–10 s of delay: the paper will move on screen several seconds after the "printing"
+overlay appears. Acceptable as a fallback, not ideal as the plan.
+
+### 3. Self-hosted MediaMTX on the Hetzner box — sub-second, free, more to go wrong
+
+A single Docker container that accepts WHIP from OBS and serves WHEP to the browser. It needs
+a UDP port range opened and an nginx block for `stream.nftfax.app`, and — the real risk —
+**WebRTC through venue Wi-Fi NAT frequently needs a TURN server**, which is another thing to
+run. Worth it only if you want sub-second and will not pay Cloudflare. Ask and I will set it
+up, but I would do a dry run from a hotel or café network first, not the venue on opening day.
+
+### Framing and sound
+
+- Frame tightly on the paper exit slot. The PIP is roughly 24% of screen width — a wide shot
+  reads as nothing.
+- Do not send audio in the stream. The handshake plays on the Bluetooth speaker at the
+  machine; a delayed second copy on the tablet would smear it.
+- Test the exact `cam=` URL from a phone on cellular before relying on it. If it plays
+  there, it will play at the venue.
 
 ## The middleware contract
 
@@ -168,8 +220,8 @@ Both approaches can run at once — the dashboard POST and your own poll — if 
   featured fax's tray is gone, the frame shows `/api/metadata/<id>/image` instead of a 404.
 - **Offline is visible.** If the leaderboard fails, the header badge turns red "offline" and
   the last good data stays on screen. It recovers on the next successful poll.
-- **The webcam is muted, autoplay, no audio track requested** — so it will not fight the
-  fax handshake on the speaker.
+- **The printer cam is muted.** Audio comes from the Bluetooth speaker at the machine, not from
+  the stream; a second copy arriving seconds late over the tablet would fight it.
 - **Nothing here spends credits or touches wallets.** It is read-only against public data.
 
 ## Running a soundcheck

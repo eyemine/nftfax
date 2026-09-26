@@ -30,8 +30,11 @@
 /// URL parameters
 ///   middleware=<url>   POST each mint event here (default: none)
 ///   poll=<seconds>     leaderboard poll interval (default 8)
-///   cam=0              disable the webcam PIP
-///   pip=br|bl|tr|tl    webcam corner (default br)
+///   cam=whep:<url>     printer cam via WebRTC/WHEP — sub-second (Cloudflare Stream, MediaMTX)
+///   cam=<https url>    printer cam via any embeddable player iframe (YouTube, Twitch, …)
+///   cam=local          this device's own camera (only useful if the printer is beside it)
+///   cam=0 / omitted    no printer cam
+///   pip=br|bl|tr|tl    printer-cam corner (default br)
 ///   test=1             fire a print event for the latest mint on load
 ///
 /// Keys (when a keyboard is attached): F fullscreen · C camera · T test · Esc
@@ -76,10 +79,19 @@ interface PrintEvent {
   delivered: 'none' | 'ok' | 'failed';
 }
 
+/// Where the printer-cam video comes from. The printer is with the operator;
+/// the display is at the venue, so the feed is almost always a remote stream
+/// rather than the tablet's own camera.
+type CamSource =
+  | { kind: 'off' }
+  | { kind: 'local' }                       // this device's camera (getUserMedia)
+  | { kind: 'whep'; url: string }           // WebRTC via WHEP — sub-second (Cloudflare Stream, MediaMTX)
+  | { kind: 'iframe'; url: string };        // any embeddable player (YouTube, Twitch, Cloudflare iframe)
+
 interface Options {
   middleware: string;
   pollMs: number;
-  cam: boolean;
+  cam: CamSource;
   pip: 'br' | 'bl' | 'tr' | 'tl';
   test: boolean;
   facing: 'user' | 'environment';
@@ -90,7 +102,7 @@ const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfella
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
-const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: true, pip: 'br', test: false, facing: 'environment' };
+const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: { kind: 'off' }, pip: 'br', test: false, facing: 'environment' };
 
 function short(addr: string): string { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 function handleFor(m: Mint): string {
@@ -105,13 +117,22 @@ function collectionFor(m: Mint): string {
 // compare on a normalised key: lowercase, alphanumerics only.
 const norm = (v: string) => v.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+function parseCam(raw: string | null): CamSource {
+  const v = (raw || '').trim();
+  if (!v || v === '0' || v === 'off') return { kind: 'off' };
+  if (v === '1' || v === 'local') return { kind: 'local' };
+  if (v.startsWith('whep:')) return { kind: 'whep', url: v.slice(5) };
+  if (/^https?:\/\//i.test(v)) return { kind: 'iframe', url: v };
+  return { kind: 'off' };
+}
+
 function readOptions(): Options {
   const p = new URLSearchParams(window.location.search);
   const pip = p.get('pip');
   return {
     middleware: p.get('middleware') || '',
     pollMs: Math.max(3, Number(p.get('poll') || 8)) * 1000,
-    cam: p.get('cam') !== '0',
+    cam: parseCam(p.get('cam')),
     pip: pip === 'bl' || pip === 'tr' || pip === 'tl' ? pip : 'br',
     test: p.get('test') === '1',
     facing: p.get('facing') === 'user' ? 'user' : 'environment',
@@ -180,6 +201,60 @@ function FeaturedFax({ mint, highlight, onResolved }: { mint: Mint; highlight: b
   );
 }
 
+// ── Remote stream via WHEP (WebRTC-HTTP Egress Protocol) ─────────────────────
+
+/// Plays a live WebRTC stream with sub-second latency. WHEP is the standard
+/// playback half of what OBS's WHIP output publishes; Cloudflare Stream Live
+/// and MediaMTX both serve it. Receive-only: one POST of our SDP offer, one
+/// answer back, then the media flows peer-to-peer (or via the provider's edge).
+/// Reconnects with backoff so a dropped stream at the fax machine does not
+/// leave a frozen frame on the gallery wall.
+function WhepPlayer({ url, onError }: { url: string; onError: (msg: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    let pc: RTCPeerConnection | null = null;
+    let stopped = false;
+    let attempt = 0;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+
+    async function connect() {
+      if (stopped) return;
+      try {
+        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+        pc.ontrack = (e) => { if (videoRef.current && e.streams[0]) videoRef.current.srcObject = e.streams[0]; };
+        pc.onconnectionstatechange = () => {
+          if (!pc) return;
+          if (pc.connectionState === 'connected') { attempt = 0; onError(''); }
+          if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected' || pc.connectionState === 'closed') scheduleRetry('stream dropped');
+        };
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: offer.sdp });
+        if (!res.ok) throw new Error(`WHEP ${res.status}`);
+        const answer = await res.text();
+        if (stopped || !pc) return;
+        await pc.setRemoteDescription({ type: 'answer', sdp: answer });
+      } catch (err) {
+        scheduleRetry(err instanceof Error ? err.message : 'connect failed');
+      }
+    }
+    function scheduleRetry(reason: string) {
+      if (stopped) return;
+      onError(`${reason} — reconnecting`);
+      pc?.close(); pc = null;
+      const wait = Math.min(15000, 1000 * 2 ** Math.min(attempt++, 4));
+      if (retry) clearTimeout(retry);
+      retry = setTimeout(connect, wait);
+    }
+    void connect();
+    return () => { stopped = true; if (retry) clearTimeout(retry); pc?.close(); };
+  }, [url, onError]);
+  // eslint-disable-next-line jsx-a11y/media-has-caption
+  return <video ref={videoRef} autoPlay muted playsInline className="block aspect-video w-full object-cover" />;
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ExhibitPage() {
@@ -191,6 +266,7 @@ export default function ExhibitPage() {
   const [printing, setPrinting] = useState<Mint | null>(null);
   const [events, setEvents] = useState<PrintEvent[]>([]);
   const [camOn, setCamOn] = useState(false);
+  const camKind = opts.cam.kind;
   const [camError, setCamError] = useState('');
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [featuredTrayId, setFeaturedTrayId] = useState<string>('');
@@ -206,7 +282,7 @@ export default function ExhibitPage() {
   useEffect(() => {
     const o = readOptions();
     setOpts(o);
-    setCamOn(o.cam);
+    setCamOn(o.cam.kind !== 'off');
     setCanFullscreen(typeof document.documentElement.requestFullscreen === 'function');
     setHydrated(true);
     // Tell the inline diagnostic (layout.tsx) the React bundle is alive.
@@ -302,7 +378,7 @@ export default function ExhibitPage() {
 
   // ── Webcam PIP ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!camOn) return;
+    if (!camOn || camKind !== 'local') return;
     let stream: MediaStream | null = null;
     void (async () => {
       try {
@@ -318,7 +394,7 @@ export default function ExhibitPage() {
       }
     })();
     return () => { stream?.getTracks().forEach((t) => t.stop()); };
-  }, [camOn, opts.facing]);
+  }, [camOn, camKind, opts.facing]);
 
   // ── Keys ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -481,10 +557,22 @@ export default function ExhibitPage() {
       </section>
 
       {/* ── Webcam PIP ────────────────────────────────────────────────────── */}
-      {camOn && (
+      {camOn && camKind !== 'off' && (
         <div className={`absolute ${pipClass} z-30 w-[24vw] min-w-[200px] max-w-[360px] overflow-hidden border-[3px] border-[#25251f] bg-black shadow-[0_16px_48px_rgba(0,0,0,.5)]`}>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video ref={videoRef} autoPlay muted playsInline className="block aspect-video w-full object-cover" />
+          {opts.cam.kind === 'whep' ? (
+            <WhepPlayer url={opts.cam.url} onError={setCamError} />
+          ) : opts.cam.kind === 'iframe' ? (
+            <iframe
+              src={opts.cam.url}
+              title="Printer cam"
+              className="block aspect-video w-full border-0"
+              allow="autoplay; encrypted-media; picture-in-picture"
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <video ref={videoRef} autoPlay muted playsInline className="block aspect-video w-full object-cover" />
+          )}
           <div className="absolute left-0 top-0 flex items-center gap-1.5 bg-[#25251f]/85 px-2 py-0.5 text-[9px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e65b2f]" /> Printer cam
           </div>
@@ -494,9 +582,11 @@ export default function ExhibitPage() {
 
       {/* ── Touch controls — a tablet has no keyboard ─────────────────────── */}
       <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 opacity-60 hover:opacity-100">
-        <button onClick={() => setCamOn((v) => !v)} title="Toggle camera" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
-          {camOn ? <Camera size={14} /> : <CameraOff size={14} />}
-        </button>
+        {camKind !== 'off' && (
+          <button onClick={() => setCamOn((v) => !v)} title="Toggle printer cam" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
+            {camOn ? <Camera size={14} /> : <CameraOff size={14} />}
+          </button>
+        )}
         <button onClick={() => { const m = featured ?? board?.mints[0]; if (m) firePrint(m); }} title="Test print event" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
           <Printer size={14} />
         </button>
