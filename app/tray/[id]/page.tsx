@@ -18,6 +18,7 @@ interface TrayDocument {
   createdAt: number;
   chainDepth?: number;
   chainTimerDuration?: number;
+  minted?: { tokenId: number | null; tx: string | null; at: number | null } | null;
   coverNote?: string;
 }
 
@@ -45,7 +46,13 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
 
   const jamMs = doc.chainTimerDuration || DEFAULT_JAM_MS;
   const elapsed = now - doc.createdAt;
-  const jammed = elapsed > jamMs;
+  // A minted fax is a permanent collectible on Base. The thermal-paper decay
+  // and the jam state describe an UNCLAIMED hop running out of time; applying
+  // them to a minted one showed every collected fax on the exhibition display
+  // as faded and "LINE JAMMED". Minted hops render at full contrast, forever.
+  const isMinted = !!doc.minted;
+  const jammed = !isMinted && elapsed > jamMs;
+  const contrast = isMinted ? 1 : contrastForElapsed(elapsed, jamMs);
   const src = useMemo(() => {
     if (!doc.dataBase64) return '';
     return `data:image/${doc.format || 'png'};base64,${doc.dataBase64}`;
@@ -68,7 +75,9 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
         <SkinPanel className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span>Public transmission T/#{doc.id.slice(0, 4).toUpperCase()}</span>
-            <span className={jammed ? 'text-[#a94228]' : 'text-[#456049]'}>{jammed ? 'LINE JAMMED' : 'LINE OPEN'}</span>
+            <span className={isMinted ? 'text-[#26417d]' : jammed ? 'text-[#a94228]' : 'text-[#456049]'}>
+              {isMinted ? `MINTED · FAX CHAIN${doc.minted?.tokenId != null ? ` #${doc.minted.tokenId}` : ''}` : jammed ? 'LINE JAMMED' : 'LINE OPEN'}
+            </span>
           </div>
 
           <div className="grid gap-6 p-5 md:p-8 lg:grid-cols-[1fr_340px]">
@@ -92,7 +101,7 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
                 </div>
               ) : src ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={src} alt={`Fax ${doc.id}`} className="max-h-full max-w-full object-contain grayscale" style={{ filter: `grayscale(1) contrast(${contrastForElapsed(elapsed, jamMs)})`, opacity: 0.4 + 0.6 * contrastForElapsed(elapsed, jamMs) }} />
+                <img src={src} alt={`Fax ${doc.id}`} className="max-h-full max-w-full object-contain grayscale" style={{ filter: `grayscale(1) contrast(${contrast})`, opacity: 0.4 + 0.6 * contrast }} />
               ) : (
                 <Loader2 className="animate-spin text-[#847d6e]" />
               )}
@@ -106,9 +115,18 @@ function FaxContent({ doc }: { doc: TrayDocument }) {
               {typeof doc.chainDepth === 'number' && (
                 <p className="border-b border-[#8f8878] pb-2">Chain link: {doc.chainDepth}</p>
               )}
-              <p className="pt-2 text-[11px] uppercase tracking-wider text-[#6e685a]">
-                Public faxes are thermal paper. This link decays after 72 hours unless saved.
-              </p>
+              {isMinted ? (
+                <p className="pt-2 text-[11px] uppercase tracking-wider text-[#26417d]">
+                  Minted to Base as a permanent collectible.
+                  {doc.minted?.tx && (
+                    <> <a href={`https://basescan.org/tx/${doc.minted.tx}`} target="_blank" rel="noreferrer" className="underline">View transaction</a></>
+                  )}
+                </p>
+              ) : (
+                <p className="pt-2 text-[11px] uppercase tracking-wider text-[#6e685a]">
+                  Public faxes are thermal paper. This link decays after 72 hours unless saved.
+                </p>
+              )}
             </div>
           </div>
         </SkinPanel>
