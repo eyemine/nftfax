@@ -36,6 +36,8 @@ export interface MintEntry {
   minterEns?: string;
   /// The minter's hop — the tray whose bitmap is the collectible's artwork. See lib/mint-display.ts.
   displayTrayId?: string;
+  /// Base transaction that minted it, from the FaxMinted log.
+  txHash?: string;
 }
 
 /// DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite
@@ -65,7 +67,7 @@ export function decodeFaxMintedLog(log: RpcLog): MintEntry {
   const stringLen = parseInt(data.slice(stringOffset, stringOffset + 64), 16);
   const trayIdHex = data.slice(stringOffset + 64, stringOffset + 64 + stringLen * 2);
   const trayId = Buffer.from(trayIdHex, 'hex').toString('utf8');
-  return { tokenId, minter, community, sourceTokenId, trayId };
+  return { tokenId, minter, community, sourceTokenId, trayId, txHash: log.transactionHash };
 }
 
 // ── Log cache (written by the leaderboard route) ─────────────────────────────

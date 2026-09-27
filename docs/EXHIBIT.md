@@ -136,6 +136,29 @@ up, but I would do a dry run from a hotel or café network first, not the venue 
 - Test the exact `cam=` URL from a phone on cellular before relying on it. If it plays
   there, it will play at the venue.
 
+## The operator's print button — an outgoing fax
+
+Bottom-centre: **[PIP] [PRINT] [fullscreen]**. The orange glowing **PRINT** button is the
+operator's pseudo-forward. It opens a modal:
+
+```
+OUTGOING TRANSMISSION · FAXING
+FROM: Marfa@fax
+TO:   LocalHost@fax
+RE:   T/#… · FAX CHAIN #N
+CC: COVER NOTE  (140 chars, optional)
+[CANCEL]  [SEND FAX]
+```
+
+On **SEND FAX** three things happen at once: the featured fax's header switches to
+*OUTGOING TRANSMISSION · FAXING* for the duration; **the fax handshake plays from the
+tablet** (Web Audio, synthesised — dial tone, DTMF, CNG, CED, V.21 chirps, page data,
+confirmation, ~9 s); and the middleware receives a `fax` event so the physical machine prints.
+
+The automatic mint print also plays the handshake once any tap has unlocked audio on the page
+(browsers require a gesture first). Untick "Play handshake on this device" in the modal to
+silence it, e.g. if the machine's own speaker is doing that job.
+
 ## The middleware contract
 
 The dashboard is an HTTPS page. Chrome and Firefox treat `http://localhost` as a secure
@@ -151,6 +174,10 @@ Access-Control-Allow-Headers: Content-Type
 ```
 
 Answer the `OPTIONS` preflight with 204 and those headers. Then on `POST /print` you receive:
+
+`event` is `"mint"` for an automatic print when a new mint lands, or `"fax"` when the operator
+presses PRINT. A `fax` event additionally carries `from`, `to` and an optional `coverNote`
+(≤140 chars) to print above the bitmap.
 
 ```json
 {

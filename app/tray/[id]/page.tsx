@@ -36,7 +36,67 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-function FaxContent({ doc, embed = false }: { doc: TrayDocument; embed?: boolean }) {
+
+/// The exhibition frame's rendering: a faithful copy of the nftmail.box public
+/// permalink (which cannot be iframed from here because of SAMEORIGIN), with
+/// exactly one addition — a TO: line under FROM:. Same near-black page, same
+/// 630px sheet of paper, same Courier, same dashed rules, same greyscale
+/// pixelated bitmap, same footer text.
+///
+/// Two states are surfaced on the header's right edge without changing the
+/// layout: MINTED · FAX CHAIN #N when the fax is a collectible, and OUTGOING
+/// TRANSMISSION · FAXING during a print event (?status=faxing). When minted,
+/// the footer gains a MINT TRANSACTION link.
+function EmbedFax({ doc, status, src, isMinted }: { doc: TrayDocument; status: string; src: string; isMinted: boolean }) {
+  const faxing = status === 'faxing';
+  const receivedAt = new Date(doc.createdAt).toLocaleString();
+  const statusText = faxing ? 'OUTGOING TRANSMISSION · FAXING'
+    : isMinted ? `MINTED · FAX CHAIN${doc.minted?.tokenId != null ? ` #${doc.minted.tokenId}` : ''}` : '';
+  return (
+    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', background: '#1a1a1a' }}>
+      <div style={{ maxWidth: 630, width: '100%', background: '#f4f1e8', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '20px 20px 28px', fontFamily: "'Courier New', Courier, monospace", color: '#2a2a2a' }}>
+        <div style={{ borderBottom: '2px dashed #999', paddingBottom: 10, marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11, letterSpacing: 1, color: '#666' }}>
+            <span>NFTfax · CLEARTEXT TRANSMISSION</span>
+            {statusText && (
+              <span style={{ color: faxing ? '#e65b2f' : '#26417d', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                {faxing && <span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 4, background: '#e65b2f', marginRight: 6, verticalAlign: 'middle', animation: 'faxpulse 1s infinite' }} />}
+                {statusText}
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 10, color: '#888', marginTop: 4 }}>FROM: {doc.from}</div>
+          {doc.to && <div style={{ fontSize: 10, color: '#888' }}>TO: {doc.to}</div>}
+          <div style={{ fontSize: 10, color: '#888' }}>T/#{doc.id.toUpperCase()} · {receivedAt}</div>
+        </div>
+
+        {doc.coverNote && (
+          <div style={{ borderLeft: '3px solid #999', background: '#e8e4d8', padding: '8px 12px', marginBottom: 14 }}>
+            <div style={{ fontSize: 9, letterSpacing: 1, color: '#888', marginBottom: 4 }}>COVER NOTE</div>
+            <div style={{ fontSize: 12, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{doc.coverNote}</div>
+          </div>
+        )}
+
+        {src ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt={`Public transmission from ${doc.from}`} style={{ width: '100%', display: 'block', filter: 'grayscale(1) contrast(1.1)', imageRendering: 'pixelated' }} />
+        ) : (
+          <div style={{ height: 240, display: 'grid', placeItems: 'center', color: '#999', fontSize: 11 }}>LOADING…</div>
+        )}
+
+        <div style={{ borderTop: '2px dashed #999', paddingTop: 8, marginTop: 14, fontSize: 9, color: '#999', textAlign: 'center' }}>
+          NFTfax · nftfax.app · public image, no scripts, no tracking
+          {isMinted && doc.minted?.tx && (
+            <> · <a href={`https://basescan.org/tx/${doc.minted.tx}`} target="_blank" rel="noreferrer" style={{ color: '#26417d', textDecoration: 'underline', fontWeight: 700 }}>MINT TRANSACTION</a></>
+          )}
+        </div>
+      </div>
+      <style>{`@keyframes faxpulse{0%,100%{opacity:1}50%{opacity:.25}}`}</style>
+    </main>
+  );
+}
+
+function FaxContent({ doc, embed = false, status = '' }: { doc: TrayDocument; embed?: boolean; status?: string }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -57,6 +117,8 @@ function FaxContent({ doc, embed = false }: { doc: TrayDocument; embed?: boolean
     if (!doc.dataBase64) return '';
     return `data:image/${doc.format || 'png'};base64,${doc.dataBase64}`;
   }, [doc.dataBase64, doc.format]);
+
+  if (embed) return <EmbedFax doc={doc} status={status} src={src} isMinted={isMinted} />;
 
   return (
     <main className={embed ? 'min-h-screen bg-[#c8c0ae] p-2' : 'min-h-screen bg-[#c8c0ae] px-4 py-6 md:px-8 md:py-10'}>
@@ -151,7 +213,12 @@ export default function TrayPage() {
   // from the URL in an effect rather than useSearchParams to avoid the CSR
   // bailout / Suspense fallback that blanked the exhibit on first load.
   const [embed, setEmbed] = useState(false);
-  useEffect(() => { setEmbed(new URLSearchParams(window.location.search).get('embed') === '1'); }, []);
+  const [status, setStatus] = useState('');
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setEmbed(q.get('embed') === '1');
+    setStatus(q.get('status') || '');
+  }, []);
   const [doc, setDoc] = useState<TrayDocument | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -195,5 +262,5 @@ export default function TrayPage() {
     );
   }
 
-  return <FaxContent doc={doc} embed={embed} />;
+  return <FaxContent doc={doc} embed={embed} status={status} />;
 }

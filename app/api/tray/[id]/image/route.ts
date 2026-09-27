@@ -29,7 +29,9 @@ function remember(id: string, img: CachedImage) {
 
 const HEADERS = (type: string) => ({
   'Content-Type': type,
-  'Cache-Control': 'public, max-age=86400, s-maxage=86400, immutable',
+  // One hour, NOT immutable: bitmaps have needed repair in place (f4085910ec1d),
+  // and a day-long immutable cache pinned the wrong image on every display.
+  'Cache-Control': 'public, max-age=3600, s-maxage=3600',
 });
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

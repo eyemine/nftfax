@@ -15,6 +15,7 @@ export const TOKEN_TRAY_ID_OVERRIDES: Record<number, string> = {
   12: '9650d1a15f94', // on-chain trayId is the received fax; corrected to the forwarded fax
   13: 'c95d23ec2ed6', // on-chain trayId was the received fax (8f28a87fc438); corrected to the forwarded fax
   14: '7648cedba4d2', // on-chain trayId was the received fax (8702231b100c); corrected to the forwarded fax
+  6: '7b82ecd8e8b6',  // operator-confirmed: the minted art is this tray, not the later forward the identity rule finds
 };
 
 export function overrideTrayId(tokenId: number, onChainTrayId: string): string {

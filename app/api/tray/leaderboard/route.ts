@@ -217,6 +217,7 @@ interface EnvioFaxMintedRow {
   community: string | number;
   sourceTokenId: string | number;
   trayId: string;
+  transactionHash?: string;
 }
 
 const ENVIO_PAGE = 1000;
@@ -240,7 +241,7 @@ async function fetchMintsFromEnvio(): Promise<MintEntry[] | null> {
               order_by: { blockNumber: asc }
               limit: $limit
               offset: $offset
-            ) { mintedTokenId to community sourceTokenId trayId }
+            ) { mintedTokenId to community sourceTokenId trayId transactionHash }
           }`,
           variables: { limit: ENVIO_PAGE, offset },
         }),
@@ -263,6 +264,7 @@ async function fetchMintsFromEnvio(): Promise<MintEntry[] | null> {
           community,
           sourceTokenId: decodeSourceTokenId(rawSource, community),
           trayId: String(row.trayId ?? ''),
+          txHash: row.transactionHash ? String(row.transactionHash) : undefined,
         });
       }
       if (rows.length < ENVIO_PAGE) return out;
@@ -358,7 +360,10 @@ export async function GET(req: NextRequest) {
       mint.minterEns = ensByAddress.get(mint.minter);
       // The artwork is the minter's hop — see lib/mint-display.ts. Every
       // consumer reads displayTrayId from here instead of re-deriving it.
-      mint.displayTrayId = resolveDisplayTrayId(mint.trayId, minterHandleFor(mint), meta ?? {});
+      // An explicit override PINS the display tray and skips the identity
+      // rule: the operator has confirmed which art the token carries.
+      mint.displayTrayId = TOKEN_TRAY_ID_OVERRIDES[mint.tokenId]
+        ?? resolveDisplayTrayId(mint.trayId, minterHandleFor(mint), meta ?? {});
       mint.chainDepth = meta?.chainDepth;
     }
     // Depth must describe the displayed hop, not the received tray, when they

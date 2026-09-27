@@ -77,7 +77,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // permanent collectible as jammed and fading.
     if (res.ok && !data.minted) {
       const chain = await onChainMintForTray(_req, id);
-      if (chain) data.minted = { tokenId: chain.tokenId, tx: null, at: null, source: 'chain' };
+      if (chain) data.minted = { tokenId: chain.tokenId, tx: chain.txHash ?? null, at: null, source: 'chain' };
     }
     return NextResponse.json(data, { status: res.status, headers: NO_STORE });
   } catch {
@@ -88,15 +88,25 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 /// trayId -> on-chain mint, from the leaderboard route (which already applies
 /// the post-mint tray overrides and caches decoded logs in-process). Memoised
 /// for a minute so a busy permalink does not re-fetch the whole list per view.
-const mintIndex: { at: number; byTray: Map<string, { tokenId: number }> } = { at: 0, byTray: new Map() };
-async function onChainMintForTray(req: NextRequest, trayId: string): Promise<{ tokenId: number } | null> {
+const mintIndex: { at: number; byTray: Map<string, { tokenId: number; txHash?: string }> } = { at: 0, byTray: new Map() };
+async function onChainMintForTray(req: NextRequest, trayId: string): Promise<{ tokenId: number; txHash?: string } | null> {
   if (Date.now() - mintIndex.at > 60_000) {
     try {
       const origin = `http://${req.nextUrl.hostname}:${req.nextUrl.port || process.env.PORT || 3000}`;
       const r = await fetch(`${origin}/api/tray/leaderboard?pageSize=2222`, { cache: 'no-store' });
       if (r.ok) {
-        const { mints = [] } = await r.json() as { mints?: { tokenId: number; trayId: string }[] };
-        mintIndex.byTray = new Map(mints.map((m) => [m.trayId.toLowerCase(), { tokenId: m.tokenId }]));
+        const { mints = [] } = await r.json() as { mints?: { tokenId: number; trayId: string; displayTrayId?: string; txHash?: string }[] };
+        // Index BOTH the event tray and the display tray: the permalink for a
+        // minter's forwarded hop (e.g. #2's 6e14680cd7be) is the minted artwork
+        // and must not read LINE JAMMED just because the event named the
+        // received tray.
+        const byTray = new Map<string, { tokenId: number; txHash?: string }>();
+        for (const m of mints) {
+          const v = { tokenId: m.tokenId, txHash: m.txHash };
+          byTray.set(m.trayId.toLowerCase(), v);
+          if (m.displayTrayId) byTray.set(m.displayTrayId.toLowerCase(), v);
+        }
+        mintIndex.byTray = byTray;
         mintIndex.at = Date.now();
       }
     } catch { /* keep the previous index; a stale answer beats a wrong "not minted" */ }

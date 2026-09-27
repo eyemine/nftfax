@@ -41,7 +41,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Camera, CameraOff, Maximize2, Printer, Radio, Wifi, WifiOff } from 'lucide-react';
+import { Camera, CameraOff, Maximize2, Printer, Radio, Send, Wifi, WifiOff, X } from 'lucide-react';
+import { playFaxHandshake, primeFaxAudio } from '../lib/fax-audio';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
@@ -157,7 +158,7 @@ function readOptions(): Options {
 /// Tray permalinks decay after eight days. The tray API is checked first so a
 /// decayed fax falls back to the immutable on-chain artwork instead of an
 /// iframe showing "not found" to a room full of people.
-function FeaturedFax({ mint, highlight, onResolved }: { mint: Mint; highlight: boolean; onResolved?: (trayId: string) => void }) {
+function FeaturedFax({ mint, highlight, faxing, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; onResolved?: (trayId: string) => void }) {
   // The tray to embed: the hop the MINTER sent. The on-chain trayId is that
   // hop for current mints, but for older mints it is the RECEIVED fax, whose
   // forwardedTrayId is the minter's remix. Decide by identity — if the minter
@@ -193,8 +194,8 @@ function FeaturedFax({ mint, highlight, onResolved }: { mint: Mint; highlight: b
         <img src={`/api/tray/${displayId}/image`} alt={`FAX CHAIN #${mint.tokenId}`} className="h-full w-full object-contain" />
       ) : (
         <iframe
-          key={displayId}
-          src={`/tray/${displayId}?embed=1`}
+          key={`${displayId}:${faxing ? 'faxing' : 'idle'}`}
+          src={`/tray/${displayId}?embed=1${faxing ? '&status=faxing' : ''}`}
           title={`T/#${displayId.toUpperCase()}`}
           className="h-full w-full border-0 bg-[#c8c0ae]"
           sandbox="allow-same-origin allow-scripts"
@@ -280,6 +281,13 @@ export default function ExhibitPage() {
   const [online, setOnline] = useState(true);
   const [featured, setFeatured] = useState<Mint | null>(null);
   const [printing, setPrinting] = useState<Mint | null>(null);
+  /// Manual "pseudo-forward": the operator faxes the featured transmission to
+  /// the physical machine. Distinct from the automatic mint print: it opens a
+  /// cover-note modal, plays the handshake HERE, and is labelled OUTGOING.
+  const [outgoing, setOutgoing] = useState<Mint | null>(null);   // modal open for this mint
+  const [faxingId, setFaxingId] = useState<number | null>(null); // header shows FAXING for this token
+  const [coverNote, setCoverNote] = useState('');
+  const [soundOn, setSoundOn] = useState(true);
   const [events, setEvents] = useState<PrintEvent[]>([]);
   const [camOn, setCamOn] = useState(false);
   const camKind = opts.cam.kind;
@@ -306,12 +314,12 @@ export default function ExhibitPage() {
   }, []);
 
   // ── Middleware hook ───────────────────────────────────────────────────────
-  const notifyMiddleware = useCallback(async (mint: Mint): Promise<'none' | 'ok' | 'failed'> => {
+  const notifyMiddleware = useCallback(async (mint: Mint, extra: { event: 'mint' | 'fax'; coverNote?: string; from?: string; to?: string } = { event: 'mint' }): Promise<'none' | 'ok' | 'failed'> => {
     if (!opts.middleware) return 'none';
     const origin = window.location.origin;
     const key = COMMUNITY_KEY[mint.community];
     const payload = {
-      event: 'mint',
+      ...extra,
       at: new Date().toISOString(),
       tokenId: mint.tokenId,
       trayId: mint.trayId,
@@ -339,12 +347,33 @@ export default function ExhibitPage() {
   const firePrint = useCallback((mint: Mint) => {
     setFeatured(mint);
     setPrinting(mint);
+    if (soundOn) playFaxHandshake();
     if (printTimer.current) clearTimeout(printTimer.current);
     printTimer.current = setTimeout(() => setPrinting(null), PRINT_OVERLAY_MS);
     void notifyMiddleware(mint).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
-  }, [notifyMiddleware]);
+  }, [notifyMiddleware, soundOn]);
+
+  // ── Outgoing transmission (operator-initiated) ────────────────────────────
+  const OUTGOING_FROM = 'Marfa@fax';
+  const OUTGOING_TO = 'LocalHost@fax';
+  const sendOutgoing = useCallback(() => {
+    const mint = outgoing;
+    if (!mint) return;
+    const note = coverNote.trim().slice(0, 140);
+    setOutgoing(null);
+    setCoverNote('');
+    setFeatured(mint);
+    setFaxingId(mint.tokenId);
+    // The sound comes from this page. Hold the FAXING header for as long as
+    // the handshake plays, then a beat, so the visual and the audio agree.
+    const ms = soundOn ? playFaxHandshake() : 0;
+    setTimeout(() => setFaxingId((cur) => (cur === mint.tokenId ? null : cur)), Math.max(ms, 6000) + 1500);
+    void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, to: OUTGOING_TO }).then((delivered) => {
+      setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
+    });
+  }, [outgoing, coverNote, soundOn, notifyMiddleware]);
 
   // ── Polling ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -520,7 +549,7 @@ export default function ExhibitPage() {
         <div className="grid min-h-0 grid-rows-[1fr_auto] gap-2">
           <div className="min-h-0">
             {featured ? (
-              <FeaturedFax mint={featured} highlight={!!printing && printing.tokenId === featured.tokenId} onResolved={setFeaturedTrayId} />
+              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} onResolved={setFeaturedTrayId} />
             ) : (
               <div className="grid h-full place-items-center border-4 border-dashed border-[#8f8878] text-[12px] font-bold uppercase tracking-[.2em] text-[#625e52]">
                 {!hydrated ? 'Loading…' : online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
@@ -660,14 +689,24 @@ export default function ExhibitPage() {
       )}
 
       {/* ── Touch controls — a tablet has no keyboard ─────────────────────── */}
-      <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1 opacity-60 hover:opacity-100">
-        {camKind !== 'off' && (
-          <button onClick={() => setCamOn((v) => !v)} title="Toggle printer cam" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
-            {camOn ? <Camera size={14} /> : <CameraOff size={14} />}
-          </button>
-        )}
-        <button onClick={() => { const m = featured ?? board?.mints[0]; if (m) firePrint(m); }} title="Test print event" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
-          <Printer size={14} />
+      <div className="absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 opacity-80 hover:opacity-100">
+        {/* PIP: always present so the affordance exists before a stream is
+            configured; without a source it explains rather than does nothing. */}
+        <button
+          onClick={() => { primeFaxAudio(); if (camKind === 'off') setCamError('no printer cam configured — add ?cam=whep:<url>'); else setCamOn((v) => !v); }}
+          title="Printer cam (PIP)"
+          className="border border-[#77705f] bg-[#d8d0bf]/90 p-2.5 text-[#625e52]"
+        >
+          {camOn && camKind !== 'off' ? <Camera size={16} /> : <CameraOff size={16} />}
+        </button>
+        {/* PRINT: the operator's pseudo-forward to the physical machine. Orange
+            with a glow — it is the one control a visitor should notice. */}
+        <button
+          onClick={() => { primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); } }}
+          title="Fax this transmission to the machine"
+          className="border-2 border-[#983b21] bg-[#e65b2f] p-2.5 text-white shadow-[0_0_18px_rgba(230,91,47,.75),0_0_40px_rgba(230,91,47,.35)] transition-shadow hover:shadow-[0_0_26px_rgba(230,91,47,.95),0_0_60px_rgba(230,91,47,.5)]"
+        >
+          <Printer size={18} />
         </button>
         {canFullscreen && (
           <button onClick={() => void document.documentElement.requestFullscreen?.()} title="Fullscreen" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
@@ -675,6 +714,44 @@ export default function ExhibitPage() {
           </button>
         )}
       </div>
+
+      {/* ── Outgoing transmission modal ───────────────────────────────────── */}
+      {outgoing && (
+        <div className="absolute inset-0 z-50 grid place-items-center bg-[#25251f]/80 p-4" onClick={() => setOutgoing(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md border-[3px] border-[#e65b2f] bg-[#f4f1e8] font-mono text-[#2a2a2a] shadow-[0_0_60px_rgba(230,91,47,.5)]">
+            <div className="flex items-center justify-between border-b-2 border-dashed border-[#999] px-4 py-3">
+              <span className="text-[11px] font-bold tracking-[.16em] text-[#e65b2f]">OUTGOING TRANSMISSION · FAXING</span>
+              <button onClick={() => setOutgoing(null)} className="text-[#666] hover:text-[#a94228]"><X size={16} /></button>
+            </div>
+            <div className="space-y-2 px-4 py-3 text-[11px]">
+              <p className="text-[#888]">FROM: <b className="text-[#2a2a2a]">{OUTGOING_FROM}</b></p>
+              <p className="text-[#888]">TO: <b className="text-[#2a2a2a]">{OUTGOING_TO}</b></p>
+              <p className="text-[#888]">RE: <b className="text-[#2a2a2a]">T/#{(featuredTrayId || outgoing.trayId).toUpperCase()} · FAX CHAIN #{outgoing.tokenId}</b></p>
+              <label className="block pt-2">
+                <span className="mb-1 block text-[9px] tracking-[.16em] text-[#888]">CC: COVER NOTE · {140 - coverNote.length} left</span>
+                <textarea
+                  value={coverNote}
+                  onChange={(e) => setCoverNote(e.target.value.slice(0, 140))}
+                  maxLength={140}
+                  rows={3}
+                  autoFocus
+                  placeholder="Optional. Printed above the fax."
+                  className="w-full resize-none border border-[#999] bg-[#e8e4d8] px-3 py-2 text-[12px] outline-none focus:border-[#e65b2f]"
+                />
+              </label>
+              <label className="flex items-center gap-2 pt-1 text-[10px] text-[#666]">
+                <input type="checkbox" checked={soundOn} onChange={(e) => setSoundOn(e.target.checked)} className="accent-[#e65b2f]" /> Play handshake on this device
+              </label>
+            </div>
+            <div className="flex gap-2 border-t-2 border-dashed border-[#999] px-4 py-3">
+              <button onClick={() => setOutgoing(null)} className="flex-1 border border-[#999] bg-[#e8e4d8] py-2.5 text-[11px] font-bold tracking-[.12em] text-[#666]">CANCEL</button>
+              <button onClick={sendOutgoing} className="flex flex-1 items-center justify-center gap-2 border-2 border-[#983b21] bg-[#e65b2f] py-2.5 text-[11px] font-black tracking-[.12em] text-white shadow-[0_0_18px_rgba(230,91,47,.7)]">
+                <Send size={13} /> SEND FAX
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Print overlay ─────────────────────────────────────────────────── */}
       {printing && (

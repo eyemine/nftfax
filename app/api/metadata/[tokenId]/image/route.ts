@@ -37,7 +37,9 @@ function remember(tokenId: number, img: CachedImage) {
 const HEADERS = (type: string) => ({
   'Content-Type': type,
   // Immutable once minted; let browsers and Cloudflare cache it.
-  'Cache-Control': 'public, max-age=86400, s-maxage=86400, immutable',
+  // One hour, NOT immutable: bitmaps have needed repair in place (f4085910ec1d),
+  // and a day-long immutable cache pinned the wrong image on every display.
+  'Cache-Control': 'public, max-age=3600, s-maxage=3600',
 });
 
 async function resolve(origin: string, tokenId: number): Promise<{ img?: CachedImage; redirect?: string; status: number }> {
