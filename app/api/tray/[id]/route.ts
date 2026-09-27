@@ -75,9 +75,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // chain is the authority on whether a fax was minted, so when the worker
     // says no, ask the on-chain mint list before letting the permalink show a
     // permanent collectible as jammed and fading.
-    if (res.ok && !data.minted) {
-      const chain = await onChainMintForTray(_req, id);
-      if (chain) data.minted = { tokenId: chain.tokenId, tx: chain.txHash ?? null, at: null, source: 'chain' };
+    if (res.ok) {
+      const minted = data.minted as { tokenId?: number | null; tx?: string | null; at?: number | null } | null | undefined;
+      if (!minted || minted.tokenId == null || !minted.tx) {
+        // Fill from the chain whatever the worker record lacks: early records
+        // predate the tokenId/tx fields, and a few faxes have no record at all.
+        const chain = await onChainMintForTray(_req, id);
+        if (chain) {
+          data.minted = {
+            tokenId: minted?.tokenId ?? chain.tokenId,
+            tx: minted?.tx ?? chain.txHash ?? null,
+            at: minted?.at ?? null,
+            source: minted ? 'worker+chain' : 'chain',
+          };
+        }
+      }
     }
     return NextResponse.json(data, { status: res.status, headers: NO_STORE });
   } catch {
