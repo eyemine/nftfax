@@ -142,16 +142,17 @@ Bottom-centre: **[PIP] [PRINT] [fullscreen]**. The orange glowing **PRINT** butt
 operator's pseudo-forward. It opens a modal:
 
 ```
-OUTGOING TRANSMISSION · FAXING
+CARBON COPY TRANSMISSION · FAX PRINT
 FROM: Marfa@fax
-TO:   LocalHost@fax
+CC:   LocalMachine@fax
 RE:   T/#… · FAX CHAIN #N
 CC: COVER NOTE  (140 chars, optional)
 [CANCEL]  [SEND FAX]
 ```
 
 On **SEND FAX** three things happen at once: the featured fax's header switches to
-*OUTGOING TRANSMISSION · FAXING* for the duration; **the fax handshake plays from the
+*OUTGOING TRANSMISSION* and the cover note appears on the sheet as *CC: COVER NOTE* for the
+duration; **the fax handshake plays from the
 tablet** (Web Audio, synthesised — dial tone, DTMF, CNG, CED, V.21 chirps, page data,
 confirmation, ~9 s); and the middleware receives a `fax` event so the physical machine prints.
 
@@ -176,7 +177,7 @@ Access-Control-Allow-Headers: Content-Type
 Answer the `OPTIONS` preflight with 204 and those headers. Then on `POST /print` you receive:
 
 `event` is `"mint"` for an automatic print when a new mint lands, or `"fax"` when the operator
-presses PRINT. A `fax` event additionally carries `from`, `to` and an optional `coverNote`
+presses PRINT. A `fax` event additionally carries `from`, `cc` and an optional `coverNote`
 (≤140 chars) to print above the bitmap.
 
 ```json

@@ -41,7 +41,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Camera, CameraOff, Maximize2, Printer, Radio, Send, Wifi, WifiOff, X } from 'lucide-react';
+import { Camera, CameraOff, ExternalLink, Maximize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
 import { playFaxHandshake, primeFaxAudio } from '../lib/fax-audio';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
@@ -60,6 +60,10 @@ interface Mint {
   rootTrayId?: string;
   /// The minter's hop — resolved by the leaderboard. Artwork and iframe use this.
   displayTrayId?: string;
+  /// Base transaction that minted it.
+  txHash?: string;
+  /// Bumps when the display tray's bitmap is repaired in place; busts image caches.
+  imageVersion?: number;
 }
 
 interface Leaderboard {
@@ -158,49 +162,38 @@ function readOptions(): Options {
 /// Tray permalinks decay after eight days. The tray API is checked first so a
 /// decayed fax falls back to the immutable on-chain artwork instead of an
 /// iframe showing "not found" to a room full of people.
-function FeaturedFax({ mint, highlight, faxing, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; onResolved?: (trayId: string) => void }) {
-  // The tray to embed: the hop the MINTER sent. The on-chain trayId is that
-  // hop for current mints, but for older mints it is the RECEIVED fax, whose
-  // forwardedTrayId is the minter's remix. Decide by identity — if the minter
-  // is the tray's recipient, follow the forward; if the sender, show as-is
-  // (its forwardedTrayId would be the NEXT player's hop, not the minted one).
-  // The leaderboard resolves which tray is the minter's hop (displayTrayId);
-  // this only checks that its document still exists so a decayed fax can fall
-  // back to the immutable artwork instead of framing a 404.
-  const [display, setDisplay] = useState<{ trayId: string; alive: boolean } | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    setDisplay(null);
-    const target = mint.displayTrayId || mint.trayId;
-    void (async () => {
-      try {
-        const res = await fetch(`/api/tray/${target}`, { cache: 'no-store' });
-        if (!cancelled) { setDisplay({ trayId: target, alive: res.ok }); onResolved?.(target); }
-      } catch { if (!cancelled) setDisplay({ trayId: target, alive: false }); }
-    })();
-    return () => { cancelled = true; };
-  }, [mint, onResolved]);
-  const trayAlive = display ? display.alive : null;
-  const displayId = display?.trayId ?? mint.trayId;
+function FeaturedFax({ mint, highlight, faxing, cc, zoom, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; cc?: string; zoom: number; onResolved?: (trayId: string) => void }) {
+  // ONE round trip. This used to fetch the full tray document (~600KB) to
+  // check the tray still existed before letting the iframe fetch the same
+  // document again - roughly six seconds to feature a fax. The embed page now
+  // owns the not-found case: it is handed the token's immutable artwork as a
+  // fallback and renders that on the paper if the public copy has decayed.
+  const displayId = mint.displayTrayId || mint.trayId;
+  useEffect(() => { onResolved?.(displayId); }, [displayId, onResolved]);
+
+  const params = new URLSearchParams({ embed: '1', fallback: `/api/metadata/${mint.tokenId}/image` });
+  if (faxing) { params.set('status', 'faxing'); if (cc) params.set('cc', cc); }
 
   const frame = highlight
     ? 'border-[#e65b2f] shadow-[0_0_0_5px_rgba(230,91,47,.35),0_0_50px_rgba(230,91,47,.5)]'
     : 'border-[#3d6fd6] shadow-[0_0_0_3px_rgba(61,111,214,.3)]';
 
   return (
-    <div className={`relative h-full w-full overflow-hidden border-4 bg-[#25251f] transition-all duration-700 ${frame}`}>
-      {trayAlive === false ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={`/api/tray/${displayId}/image`} alt={`FAX CHAIN #${mint.tokenId}`} className="h-full w-full object-contain" />
-      ) : (
-        <iframe
-          key={`${displayId}:${faxing ? 'faxing' : 'idle'}`}
-          src={`/tray/${displayId}?embed=1${faxing ? '&status=faxing' : ''}`}
-          title={`T/#${displayId.toUpperCase()}`}
-          className="h-full w-full border-0 bg-[#c8c0ae]"
-          sandbox="allow-same-origin allow-scripts"
-        />
-      )}
+    <div className={`relative h-full w-full border-4 bg-[#1a1a1a] transition-all duration-700 ${frame}`}>
+      {/* The scroll container is the zoom viewport. The iframe is scaled by
+          sizing its wrapper and made pointer-transparent so touch-drag pans the
+          container natively; nothing inside the embed needs to be tappable. */}
+      <div className="h-full w-full overflow-auto [scrollbar-width:thin]">
+        <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}>
+          <iframe
+            key={`${displayId}:${faxing ? 'faxing' : 'idle'}`}
+            src={`/tray/${displayId}?${params.toString()}`}
+            title={`T/#${displayId.toUpperCase()}`}
+            className="pointer-events-none h-full w-full border-0 bg-[#1a1a1a]"
+            sandbox="allow-same-origin allow-scripts"
+          />
+        </div>
+      </div>
       <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-2 bg-[#25251f]/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
         <span className={`h-2 w-2 rounded-full ${highlight ? 'animate-pulse bg-[#e65b2f]' : 'bg-[#7fa178]'}`} />
         Minted · FAX CHAIN #{mint.tokenId}
@@ -288,6 +281,8 @@ export default function ExhibitPage() {
   const [faxingId, setFaxingId] = useState<number | null>(null); // header shows FAXING for this token
   const [coverNote, setCoverNote] = useState('');
   const [soundOn, setSoundOn] = useState(true);
+  /// Zoom for the featured fax: 1 = fit, up to 3x; pan by dragging.
+  const [zoom, setZoom] = useState(1);
   const [events, setEvents] = useState<PrintEvent[]>([]);
   const [camOn, setCamOn] = useState(false);
   const camKind = opts.cam.kind;
@@ -314,7 +309,7 @@ export default function ExhibitPage() {
   }, []);
 
   // ── Middleware hook ───────────────────────────────────────────────────────
-  const notifyMiddleware = useCallback(async (mint: Mint, extra: { event: 'mint' | 'fax'; coverNote?: string; from?: string; to?: string } = { event: 'mint' }): Promise<'none' | 'ok' | 'failed'> => {
+  const notifyMiddleware = useCallback(async (mint: Mint, extra: { event: 'mint' | 'fax'; coverNote?: string; from?: string; cc?: string } = { event: 'mint' }): Promise<'none' | 'ok' | 'failed'> => {
     if (!opts.middleware) return 'none';
     const origin = window.location.origin;
     const key = COMMUNITY_KEY[mint.community];
@@ -331,7 +326,7 @@ export default function ExhibitPage() {
       chainDepth: mint.chainDepth ?? null,
       tier: tierForChainDepth(mint.chainDepth),
       // The thermal printer wants pixels, not a web page.
-      imageUrl: `${origin}/api/tray/${mint.displayTrayId || mint.trayId}/image`,
+      imageUrl: `${origin}/api/tray/${mint.displayTrayId || mint.trayId}/image${mint.imageVersion ? `?v=${mint.imageVersion}` : ''}`,
       trayUrl: `${origin}/tray/${mint.displayTrayId || mint.trayId}`,
     };
     try {
@@ -357,20 +352,22 @@ export default function ExhibitPage() {
 
   // ── Outgoing transmission (operator-initiated) ────────────────────────────
   const OUTGOING_FROM = 'Marfa@fax';
-  const OUTGOING_TO = 'LocalHost@fax';
+  const OUTGOING_CC = 'LocalMachine@fax';
+  const [liveCc, setLiveCc] = useState('');
   const sendOutgoing = useCallback(() => {
     const mint = outgoing;
     if (!mint) return;
     const note = coverNote.trim().slice(0, 140);
     setOutgoing(null);
     setCoverNote('');
+    setLiveCc(note);
     setFeatured(mint);
     setFaxingId(mint.tokenId);
     // The sound comes from this page. Hold the FAXING header for as long as
     // the handshake plays, then a beat, so the visual and the audio agree.
     const ms = soundOn ? playFaxHandshake() : 0;
-    setTimeout(() => setFaxingId((cur) => (cur === mint.tokenId ? null : cur)), Math.max(ms, 6000) + 1500);
-    void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, to: OUTGOING_TO }).then((delivered) => {
+    setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); }, Math.max(ms, 6000) + 1500);
+    void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, cc: OUTGOING_CC }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
   }, [outgoing, coverNote, soundOn, notifyMiddleware]);
@@ -508,9 +505,12 @@ export default function ExhibitPage() {
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
       <header className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b-2 border-[#575244] bg-[#b5ad9d] px-4 py-2 xl:gap-6 xl:px-8 xl:py-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8] xl:h-14 xl:w-14"><Radio className="h-5 w-5 xl:h-7 xl:w-7" /></div>
+          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] p-1 xl:h-14 xl:w-14 xl:p-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/og/nftfax-square.png" alt="NFTFAX" className="h-full w-full object-contain" />
+          </div>
           <div>
-            <h1 className="text-xl font-black leading-none tracking-[-0.06em] xl:text-3xl">FAX CHAIN<span className="text-[#e65b2f]">.</span></h1>
+            <h1 className="text-xl font-black leading-none tracking-[-0.06em] xl:text-3xl">NFTFAX<span className="text-[#e65b2f]">™</span> MACHINE</h1>
             <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[.25em] text-[#625e52] xl:text-[12px] xl:tracking-[.3em]">nftfax.app · live · Marfa</p>
           </div>
         </div>
@@ -549,7 +549,7 @@ export default function ExhibitPage() {
         <div className="grid min-h-0 grid-rows-[1fr_auto] gap-2">
           <div className="min-h-0">
             {featured ? (
-              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} onResolved={setFeaturedTrayId} />
+              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} cc={liveCc} zoom={zoom} onResolved={setFeaturedTrayId} />
             ) : (
               <div className="grid h-full place-items-center border-4 border-dashed border-[#8f8878] text-[12px] font-bold uppercase tracking-[.2em] text-[#625e52]">
                 {!hydrated ? 'Loading…' : online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
@@ -563,12 +563,31 @@ export default function ExhibitPage() {
                 <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{(featuredTrayId || featured.trayId).toUpperCase()}</p>
                 <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[.1em] text-[#3d5a40] xl:text-[12px]">
                   {featured.minterEns || short(featured.minter)} · {handleFor(featured)} · {collectionFor(featured)}
+                  {featured.txHash && (
+                    // A popup, not a tab: the tablet is pinned to this app and a new tab
+                    // would be a dead end. The operator closes the window to return.
+                    <button
+                      onClick={() => window.open(`https://basescan.org/tx/${featured.txHash}`, 'nftfax-mint-tx', 'popup=yes,width=980,height=760,noopener')}
+                      className="ml-2 inline-flex items-center gap-1 text-[#26417d] underline"
+                    >
+                      Mint transaction <ExternalLink size={10} />
+                    </button>
+                  )}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
-                <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{featured.chainDepth ?? 1}</p>
-                <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#625e52] xl:text-[11px]">{tierForChainDepth(featured.chainDepth)}</p>
+              <div className="flex items-end gap-3">
+                {/* Zoom: the embed is pointer-transparent, so pinch does not reach it;
+                    these steps scale the frame and drag pans it. */}
+                <div className="flex items-center gap-1 border border-[#77705f] bg-[#d8d0bf]">
+                  <button onClick={() => setZoom((z) => Math.max(1, +(z - 0.5).toFixed(1)))} title="Zoom out" className="p-1.5 text-[#625e52] disabled:opacity-30" disabled={zoom <= 1}><Minus size={13} /></button>
+                  <span className="min-w-[3ch] text-center text-[10px] font-bold text-[#625e52]">{Math.round(zoom * 100)}%</span>
+                  <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.5).toFixed(1)))} title="Zoom in" className="p-1.5 text-[#625e52] disabled:opacity-30" disabled={zoom >= 3}><Plus size={13} /></button>
+                </div>
+                <div className="text-right">
+                  <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
+                  <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{featured.chainDepth ?? 1}</p>
+                  <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#625e52] xl:text-[11px]">{tierForChainDepth(featured.chainDepth)}</p>
+                </div>
               </div>
             </div>
           )}
@@ -616,7 +635,7 @@ export default function ExhibitPage() {
                 return (
                   <button
                     key={m.tokenId}
-                    onClick={() => setFeatured(m)}
+                    onClick={() => { setFeatured(m); setZoom(1); }}
                     title={`FAX CHAIN #${m.tokenId} · ${handleFor(m)}`}
                     className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
                   >
@@ -625,7 +644,7 @@ export default function ExhibitPage() {
                     {/* Keyed by the DISPLAY tray, not the token: if the resolved hop
                         ever changes, the URL changes with it, so neither the browser,
                         Cloudflare nor next/image can pin a stale image for a day. */}
-                    <Image src={`/api/tray/${m.displayTrayId || m.trayId}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
+                    <Image src={`/api/tray/${m.displayTrayId || m.trayId}/image${m.imageVersion ? `?v=${m.imageVersion}` : ''}`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
                     <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
                       #{m.tokenId} · hop {m.chainDepth ?? 1}
                     </span>
@@ -720,12 +739,12 @@ export default function ExhibitPage() {
         <div className="absolute inset-0 z-50 grid place-items-center bg-[#25251f]/80 p-4" onClick={() => setOutgoing(null)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md border-[3px] border-[#e65b2f] bg-[#f4f1e8] font-mono text-[#2a2a2a] shadow-[0_0_60px_rgba(230,91,47,.5)]">
             <div className="flex items-center justify-between border-b-2 border-dashed border-[#999] px-4 py-3">
-              <span className="text-[11px] font-bold tracking-[.16em] text-[#e65b2f]">OUTGOING TRANSMISSION · FAXING</span>
+              <span className="text-[11px] font-bold tracking-[.16em] text-[#e65b2f]">CARBON COPY TRANSMISSION · FAX PRINT</span>
               <button onClick={() => setOutgoing(null)} className="text-[#666] hover:text-[#a94228]"><X size={16} /></button>
             </div>
             <div className="space-y-2 px-4 py-3 text-[11px]">
               <p className="text-[#888]">FROM: <b className="text-[#2a2a2a]">{OUTGOING_FROM}</b></p>
-              <p className="text-[#888]">TO: <b className="text-[#2a2a2a]">{OUTGOING_TO}</b></p>
+              <p className="text-[#888]">CC: <b className="text-[#2a2a2a]">{OUTGOING_CC}</b></p>
               <p className="text-[#888]">RE: <b className="text-[#2a2a2a]">T/#{(featuredTrayId || outgoing.trayId).toUpperCase()} · FAX CHAIN #{outgoing.tokenId}</b></p>
               <label className="block pt-2">
                 <span className="mb-1 block text-[9px] tracking-[.16em] text-[#888]">CC: COVER NOTE · {140 - coverNote.length} left</span>

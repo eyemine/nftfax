@@ -38,6 +38,8 @@ export interface MintEntry {
   displayTrayId?: string;
   /// Base transaction that minted it, from the FaxMinted log.
   txHash?: string;
+  /// Bumps when the display tray's bitmap is repaired in place; busts image caches.
+  imageVersion?: number;
 }
 
 /// DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite

@@ -47,10 +47,10 @@ function formatDate(ts: number): string {
 /// layout: MINTED · FAX CHAIN #N when the fax is a collectible, and OUTGOING
 /// TRANSMISSION · FAXING during a print event (?status=faxing). When minted,
 /// the footer gains a MINT TRANSACTION link.
-function EmbedFax({ doc, status, src, isMinted }: { doc: TrayDocument; status: string; src: string; isMinted: boolean }) {
+function EmbedFax({ doc, status, src, isMinted, cc }: { doc: TrayDocument; status: string; src: string; isMinted: boolean; cc?: string }) {
   const faxing = status === 'faxing';
   const receivedAt = new Date(doc.createdAt).toLocaleString();
-  const statusText = faxing ? 'OUTGOING TRANSMISSION · FAXING'
+  const statusText = faxing ? 'OUTGOING TRANSMISSION'
     : isMinted ? `MINTED · FAX CHAIN${doc.minted?.tokenId != null ? ` #${doc.minted.tokenId}` : ''}` : '';
   return (
     <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', background: '#1a1a1a' }}>
@@ -76,6 +76,15 @@ function EmbedFax({ doc, status, src, isMinted }: { doc: TrayDocument; status: s
             <div style={{ fontSize: 12, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{doc.coverNote}</div>
           </div>
         )}
+        {/* The operator's carbon-copy note, passed in from the exhibit during an
+            outgoing transmission. Rendered like a cover note but in the accent
+            colour so it reads as the live addition it is. */}
+        {faxing && cc && (
+          <div style={{ borderLeft: '3px solid #e65b2f', background: '#f6e3d9', padding: '8px 12px', marginBottom: 14 }}>
+            <div style={{ fontSize: 9, letterSpacing: 1, color: '#a94228', marginBottom: 4 }}>CC: COVER NOTE</div>
+            <div style={{ fontSize: 12, color: '#2a2a2a', whiteSpace: 'pre-wrap' }}>{cc}</div>
+          </div>
+        )}
 
         {src ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -86,9 +95,6 @@ function EmbedFax({ doc, status, src, isMinted }: { doc: TrayDocument; status: s
 
         <div style={{ borderTop: '2px dashed #999', paddingTop: 8, marginTop: 14, fontSize: 9, color: '#999', textAlign: 'center' }}>
           NFTfax · nftfax.app · public image, no scripts, no tracking
-          {isMinted && doc.minted?.tx && (
-            <> · <a href={`https://basescan.org/tx/${doc.minted.tx}`} target="_blank" rel="noreferrer" style={{ color: '#26417d', textDecoration: 'underline', fontWeight: 700 }}>MINT TRANSACTION</a></>
-          )}
         </div>
       </div>
       <style>{`@keyframes faxpulse{0%,100%{opacity:1}50%{opacity:.25}}`}</style>
@@ -96,7 +102,7 @@ function EmbedFax({ doc, status, src, isMinted }: { doc: TrayDocument; status: s
   );
 }
 
-function FaxContent({ doc, embed = false, status = '' }: { doc: TrayDocument; embed?: boolean; status?: string }) {
+function FaxContent({ doc, embed = false, status = '', cc = '' }: { doc: TrayDocument; embed?: boolean; status?: string; cc?: string }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -118,7 +124,7 @@ function FaxContent({ doc, embed = false, status = '' }: { doc: TrayDocument; em
     return `data:image/${doc.format || 'png'};base64,${doc.dataBase64}`;
   }, [doc.dataBase64, doc.format]);
 
-  if (embed) return <EmbedFax doc={doc} status={status} src={src} isMinted={isMinted} />;
+  if (embed) return <EmbedFax doc={doc} status={status} src={src} isMinted={isMinted} cc={cc} />;
 
   return (
     <main className={embed ? 'min-h-screen bg-[#c8c0ae] p-2' : 'min-h-screen bg-[#c8c0ae] px-4 py-6 md:px-8 md:py-10'}>
@@ -214,10 +220,17 @@ export default function TrayPage() {
   // bailout / Suspense fallback that blanked the exhibit on first load.
   const [embed, setEmbed] = useState(false);
   const [status, setStatus] = useState('');
+  const [cc, setCc] = useState('');
+  const [fallback, setFallback] = useState('');
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     setEmbed(q.get('embed') === '1');
     setStatus(q.get('status') || '');
+    setCc((q.get('cc') || '').slice(0, 140));
+    // Same-origin image to show if this tray has decayed; the exhibit passes
+    // the token's immutable artwork so a gallery frame never shows "not found".
+    const fb = q.get('fallback') || '';
+    setFallback(/^\/api\//.test(fb) ? fb : '');
   }, []);
   const [doc, setDoc] = useState<TrayDocument | null>(null);
   const [error, setError] = useState('');
@@ -241,10 +254,36 @@ export default function TrayPage() {
     return () => { cancelled = true; };
   }, [id]);
 
+  if (loading && embed) {
+    return (
+      <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#1a1a1a', fontFamily: "'Courier New', Courier, monospace" }}>
+        <p style={{ fontSize: 11, letterSpacing: 2, color: '#888' }}>LOADING TRANSMISSION…</p>
+      </main>
+    );
+  }
+  if ((error || !doc) && embed) {
+    return (
+      <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', background: '#1a1a1a' }}>
+        <div style={{ maxWidth: 630, width: '100%', background: '#f4f1e8', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '20px 20px 28px', fontFamily: "'Courier New', Courier, monospace", color: '#2a2a2a' }}>
+          <div style={{ borderBottom: '2px dashed #999', paddingBottom: 10, marginBottom: 14, fontSize: 11, letterSpacing: 1, color: '#666' }}>
+            NFTfax · CLEARTEXT TRANSMISSION <span style={{ color: '#26417d', fontWeight: 700 }}>· MINTED · ARCHIVED</span>
+            <div style={{ fontSize: 10, color: '#888', marginTop: 4 }}>T/#{id.toUpperCase()} · public copy expired, artwork from the collectible</div>
+          </div>
+          {fallback ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={fallback} alt="Minted artwork" style={{ width: '100%', display: 'block', filter: 'grayscale(1) contrast(1.1)', imageRendering: 'pixelated' }} />
+          ) : (
+            <div style={{ height: 240, display: 'grid', placeItems: 'center', color: '#999', fontSize: 11 }}>TRANSMISSION NOT FOUND</div>
+          )}
+          <div style={{ borderTop: '2px dashed #999', paddingTop: 8, marginTop: 14, fontSize: 9, color: '#999', textAlign: 'center' }}>NFTfax · nftfax.app · public image, no scripts, no tracking</div>
+        </div>
+      </main>
+    );
+  }
   if (loading) {
     return (
       <div className="grid min-h-screen place-items-center bg-[#c8c0ae]">
-        <div className="text-center"><Loader2 className="mx-auto animate-spin text-[#847d6e]" size={32} /><p className="mt-3 text-[12px] font-bold uppercase text-[#6e685a]">Receiving transmission…</p></div>
+        <div className="text-center"><Loader2 className="mx-auto animate-spin text-[#847d6e]" size={32} /><p className="mt-3 text-[12px] font-bold uppercase text-[#6e685a]">Loading transmission…</p></div>
       </div>
     );
   }
@@ -262,5 +301,5 @@ export default function TrayPage() {
     );
   }
 
-  return <FaxContent doc={doc} embed={embed} status={status} />;
+  return <FaxContent doc={doc} embed={embed} status={status} cc={cc} />;
 }

@@ -97,7 +97,7 @@ function persistCache(): void {
   }
 }
 
-async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string }> {
+async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string; bitmapRepairedAt?: number }> {
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
@@ -111,13 +111,14 @@ async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; roo
       body: JSON.stringify({ action: 'getTrayDocument', id: trayId, secret: WEBHOOK_SECRET }),
     });
     if (!res.ok) return {};
-    const doc = await res.json().catch(() => null) as { chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string } | null;
+    const doc = await res.json().catch(() => null) as { chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string; bitmapRepairedAt?: number } | null;
     return {
       chainDepth: typeof doc?.chainDepth === 'number' ? doc.chainDepth : undefined,
       rootTrayId: typeof doc?.rootTrayId === 'string' ? doc.rootTrayId : undefined,
       from: typeof doc?.from === 'string' ? doc.from : undefined,
       to: typeof doc?.to === 'string' ? doc.to : undefined,
       forwardedTrayId: typeof doc?.forwardedTrayId === 'string' ? doc.forwardedTrayId : undefined,
+      bitmapRepairedAt: typeof doc?.bitmapRepairedAt === 'number' ? doc.bitmapRepairedAt : undefined,
     };
   } catch {
     return {};
@@ -371,7 +372,15 @@ export async function GET(req: NextRequest) {
     const redirected = pageMints.filter((m) => m.displayTrayId && m.displayTrayId !== m.trayId);
     if (redirected.length) {
       const hopMetas = await Promise.all(redirected.map((m) => fetchTrayMeta(m.displayTrayId as string)));
-      redirected.forEach((m, i) => { if (hopMetas[i]?.chainDepth != null) m.chainDepth = hopMetas[i].chainDepth; });
+      redirected.forEach((m, i) => {
+        if (hopMetas[i]?.chainDepth != null) m.chainDepth = hopMetas[i].chainDepth;
+        m.imageVersion = hopMetas[i]?.bitmapRepairedAt;
+      });
+    }
+    // A bitmap repaired in place keeps its URL; the version makes browsers,
+    // Cloudflare and next/image treat it as a new image.
+    for (const m of pageMints) {
+      if (m.imageVersion == null) m.imageVersion = metaByTrayId.get(m.displayTrayId || m.trayId)?.bitmapRepairedAt;
     }
 
     return NextResponse.json({ leaderboard, totalMints, uniqueMintersTotal, contractBalanceEth, mints: pageMints, mintsTotal: allMints.length, page, pageSize } as LeaderboardData, { headers: NO_STORE });
