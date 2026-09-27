@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="96"
+   height="96"
+   viewBox="0 0 24 24"
+   fill="none"
+   stroke="currentColor"
+   stroke-width="2.25"
+   stroke-linecap="round"
+   stroke-linejoin="round"
+   class="lucide lucide-layers-arrow-down-icon lucide-layers-arrow-down"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="FaxChainLogo.svg"
+   inkscape:version="1.4.2 (ebf0e940, 2025-05-08)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs5" />
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="2"
+     inkscape:cx="7.75"
+     inkscape:cy="46.75"
+     inkscape:window-width="1696"
+     inkscape:window-height="900"
+     inkscape:window-x="71"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg5" />
+  <rect
+     style="fill:#24251f;stroke:none;stroke-width:0.5625;fill-opacity:1"
+     id="rect1"
+     width="24.25"
+     height="24.125"
+     x="-0.125"
+     y="-0.125" />
+  <path
+     id="path5"
+     style="baseline-shift:baseline;display:inline;overflow:visible;vector-effect:none;fill:#ebebeb;stroke:none;stroke-linecap:butt;stroke-linejoin:miter;enable-background:accumulate;stop-color:#000000;stop-opacity:1;opacity:1;fill-opacity:1"
+     d="m 14.21875,17.273437 a 0.897475,0.897475 0 0 0 -0.630859,0.273438 l -1.710938,1.765625 -1.71289,-1.765625 a 0.897475,0.897475 0 0 0 -1.2675786,-0.01953 0.897475,0.897475 0 0 0 -0.019531,1.269531 l 2.3554686,2.429687 a 0.89756475,0.89756475 0 0 0 1.289062,0 l 2.355469,-2.429687 a 0.897475,0.897475 0 0 0 -0.01953,-1.269531 0.897475,0.897475 0 0 0 -0.638672,-0.253907 z M 11.876953,7.5507812 A 0.897475,0.897475 0 0 0 10.978516,8.4492188 V 20.601562 A 0.897475,0.897475 0 0 0 11.876953,21.5 0.897475,0.897475 0 0 0 12.773438,20.601562 V 8.4492188 A 0.897475,0.897475 0 0 0 11.876953,7.5507812 Z M 10.84375,3.7304688 4.1230469,6.8847656 c -0.00139,6.301e-4 -0.00252,0.00132 -0.00391,0.00195 -1.2833367,0.5859871 -1.282207,2.5341462 0.00391,3.1171874 l 4.2304687,1.988282 A 0.897475,0.897475 0 0 0 9.546875,11.560547 0.897475,0.897475 0 0 0 9.1171875,10.367188 L 5.0273437,8.4453125 11.605469,5.3554687 a 0.89756475,0.89756475 0 0 0 0.002,0 c 0.174555,-0.082005 0.364582,-0.082232 0.539062,0 l 6.597657,3.0976563 -4.083985,1.914063 a 0.897475,0.897475 0 0 0 -0.43164,1.193359 0.897475,0.897475 0 0 0 1.193359,0.431641 l 4.224609,-1.980469 c 1.287504,-0.5836715 1.287504,-2.5335165 0,-3.1171878 L 12.912109,3.7304688 c -0.653472,-0.3079791 -1.414507,-0.3071765 -2.068359,0 z m 8.880859,7.8710942 a 0.897475,0.897475 0 0 0 -0.867187,0.845703 l -3.958984,1.855468 a 0.897475,0.897475 0 0 0 -0.431641,1.19336 0.897475,0.897475 0 0 0 1.195312,0.43164 l 3.982422,-1.867187 c 0.611406,-0.283497 0.98946,-0.904384 0.984375,-1.568359 a 0.897475,0.897475 0 0 0 -0.904297,-0.890625 z m -15.6992184,0 A 0.897475,0.897475 0 0 0 3.125,12.498047 c -0.00157,0.654134 0.3677393,1.262829 0.9667969,1.548828 a 0.89756475,0.89756475 0 0 0 0.00586,0.002 L 8.097657,15.925828 A 0.897475,0.897475 0 0 0 9.2910156,15.494141 0.897475,0.897475 0 0 0 8.859375,14.300781 L 4.8652344,12.427734 c 0.04225,0.02017 0.054738,0.05301 0.054687,0.07422 a 0.897475,0.897475 0 0 0 -0.8945313,-0.90039 z" />
+</svg>

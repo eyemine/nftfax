@@ -162,7 +162,7 @@ function readOptions(): Options {
 /// Tray permalinks decay after eight days. The tray API is checked first so a
 /// decayed fax falls back to the immutable on-chain artwork instead of an
 /// iframe showing "not found" to a room full of people.
-function FeaturedFax({ mint, highlight, faxing, cc, zoom, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; cc?: string; zoom: number; onResolved?: (trayId: string) => void }) {
+function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; cc?: string; zoom: number; onZoom: (z: number) => void; onResolved?: (trayId: string) => void }) {
   // ONE round trip. This used to fetch the full tray document (~600KB) to
   // check the tray still existed before letting the iframe fetch the same
   // document again - roughly six seconds to feature a fax. The embed page now
@@ -197,6 +197,15 @@ function FeaturedFax({ mint, highlight, faxing, cc, zoom, onResolved }: { mint: 
       <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-2 bg-[#25251f]/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
         <span className={`h-2 w-2 rounded-full ${highlight ? 'animate-pulse bg-[#e65b2f]' : 'bg-[#7fa178]'}`} />
         Minted · FAX CHAIN #{mint.tokenId}
+      </div>
+      {/* Zoom, on the frame itself (top-right, opposite the badge) — it used to sit
+          in the caption row underneath, where the bottom-centre controls covered it.
+          The embed is pointer-transparent so pinch never reaches it; these steps
+          scale the frame and a drag pans it. */}
+      <div className="absolute right-0 top-0 flex items-center gap-1 bg-[#25251f]/90 px-1.5 py-1 text-[#efe8d8]">
+        <button onClick={() => onZoom(Math.max(1, +(zoom - 0.5).toFixed(1)))} title="Zoom out" className="p-1 disabled:opacity-30" disabled={zoom <= 1}><Minus size={14} /></button>
+        <span className="min-w-[4ch] text-center text-[10px] font-bold">{Math.round(zoom * 100)}%</span>
+        <button onClick={() => onZoom(Math.min(3, +(zoom + 0.5).toFixed(1)))} title="Zoom in" className="p-1 disabled:opacity-30" disabled={zoom >= 3}><Plus size={14} /></button>
       </div>
     </div>
   );
@@ -505,12 +514,14 @@ export default function ExhibitPage() {
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
       <header className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b-2 border-[#575244] bg-[#b5ad9d] px-4 py-2 xl:gap-6 xl:px-8 xl:py-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-sm bg-[#25251f] p-1 xl:h-14 xl:w-14 xl:p-1.5">
+          {/* The FAX CHAIN mark ships with its own dark tile (#24251f) baked into
+              the SVG, so it fills the box edge to edge with no padding. */}
+          <div className="h-10 w-10 overflow-hidden rounded-sm bg-[#24251f] xl:h-14 xl:w-14">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/og/nftfax-square.png" alt="NFTFAX" className="h-full w-full object-contain" />
+            <img src="/logos/faxchain.svg" alt="FAX CHAIN" className="h-full w-full" />
           </div>
           <div>
-            <h1 className="text-xl font-black leading-none tracking-[-0.06em] xl:text-3xl">NFTFAX<span className="text-[#e65b2f]">™</span> MACHINE</h1>
+            <h1 className="text-xl font-black leading-none tracking-[-0.06em] xl:text-3xl">NFTFAX MACHINE<span className="text-[#e65b2f]">™</span></h1>
             <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[.25em] text-[#625e52] xl:text-[12px] xl:tracking-[.3em]">nftfax.app · live · Marfa</p>
           </div>
         </div>
@@ -549,7 +560,7 @@ export default function ExhibitPage() {
         <div className="grid min-h-0 grid-rows-[1fr_auto] gap-2">
           <div className="min-h-0">
             {featured ? (
-              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} cc={liveCc} zoom={zoom} onResolved={setFeaturedTrayId} />
+              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} cc={liveCc} zoom={zoom} onZoom={setZoom} onResolved={setFeaturedTrayId} />
             ) : (
               <div className="grid h-full place-items-center border-4 border-dashed border-[#8f8878] text-[12px] font-bold uppercase tracking-[.2em] text-[#625e52]">
                 {!hydrated ? 'Loading…' : online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
@@ -576,13 +587,6 @@ export default function ExhibitPage() {
                 </p>
               </div>
               <div className="flex items-end gap-3">
-                {/* Zoom: the embed is pointer-transparent, so pinch does not reach it;
-                    these steps scale the frame and drag pans it. */}
-                <div className="flex items-center gap-1 border border-[#77705f] bg-[#d8d0bf]">
-                  <button onClick={() => setZoom((z) => Math.max(1, +(z - 0.5).toFixed(1)))} title="Zoom out" className="p-1.5 text-[#625e52] disabled:opacity-30" disabled={zoom <= 1}><Minus size={13} /></button>
-                  <span className="min-w-[3ch] text-center text-[10px] font-bold text-[#625e52]">{Math.round(zoom * 100)}%</span>
-                  <button onClick={() => setZoom((z) => Math.min(3, +(z + 0.5).toFixed(1)))} title="Zoom in" className="p-1.5 text-[#625e52] disabled:opacity-30" disabled={zoom >= 3}><Plus size={13} /></button>
-                </div>
                 <div className="text-right">
                   <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
                   <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{featured.chainDepth ?? 1}</p>
