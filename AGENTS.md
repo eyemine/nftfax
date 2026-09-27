@@ -7,10 +7,12 @@
 - There is a stale, out-of-date Netlify project at `https://app.netlify.com/projects/nftfax-office-core/overview` (for `fax.nftmail.box`) that must be ignored and not referenced.
 - Pushing to `main` builds the production image in GitHub Actions and publishes it to
   `ghcr.io/eyemine/nftfax:latest` (`.github/workflows/build-image.yml`). It does **not**
-  deploy. After the workflow is green, deploy to Hetzner with:
+  deploy. **Wait for the run whose `head_sha` is your commit** — the most recent run in the
+  list may be the previous one, still "completed", for a few seconds after you push; pulling
+  then deploys the old image. After that run is green, deploy to Hetzner with:
   1. `ssh root@46.225.158.75`
   2. `cd /opt/nftfax && git pull` (for the compose file and docs; the image is already built)
-  3. `docker compose pull && docker compose up -d`
+  3. `docker compose pull && docker compose up -d --force-recreate`
   4. Verify with `docker logs nftfax-nftfax-1 --tail 20`
 - **Never run `docker compose up --build` on the server.** The 8 GB host runs the live
   containers; an on-box `next build` OOM-killed dockerd on 2026-09-22 and took nftmail.box
