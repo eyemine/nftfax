@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Loader2, Lock, LayersArrowDown, X } from 'lucide-react';
 import Link from 'next/link';
@@ -49,12 +49,28 @@ function formatDate(ts: number): string {
 /// the footer gains a MINT TRANSACTION link.
 function EmbedFax({ doc, status, src, isMinted, cc }: { doc: TrayDocument; status: string; src: string; isMinted: boolean; cc?: string }) {
   const faxing = status === 'faxing';
+  // Tell the parent how tall the sheet is so it can size the iframe to the
+  // content and scroll it natively. An iframe cannot be scrolled from outside,
+  // and this one is pointer-transparent so its own scrollbar is unusable; the
+  // parent's scroll container has to own the scrolling.
+  const sheetRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = sheetRef.current;
+    if (!el || window.parent === window) return;
+    const report = () => window.parent.postMessage({ type: 'nftfax-embed-size', id: doc.id, height: el.scrollHeight }, window.location.origin);
+    report();
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    const img = el.querySelector('img');
+    img?.addEventListener('load', report);
+    return () => { ro.disconnect(); img?.removeEventListener('load', report); };
+  }, [doc.id, src]);
   const receivedAt = new Date(doc.createdAt).toLocaleString();
   const statusText = faxing ? 'OUTGOING TRANSMISSION'
     : isMinted ? `MINTED · FAX CHAIN${doc.minted?.tokenId != null ? ` #${doc.minted.tokenId}` : ''}` : '';
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', background: '#1a1a1a' }}>
-      <div style={{ maxWidth: 630, width: '100%', background: '#f4f1e8', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '20px 20px 28px', fontFamily: "'Courier New', Courier, monospace", color: '#2a2a2a' }}>
+    <main ref={sheetRef} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '5% 5% 5%', background: '#1a1a1a' }}>
+      <div style={{ width: '100%', background: '#f4f1e8', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', padding: '20px 20px 28px', fontFamily: "'Courier New', Courier, monospace", color: '#2a2a2a' }}>
         <div style={{ borderBottom: '2px dashed #999', paddingBottom: 10, marginBottom: 14 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, fontSize: 11, letterSpacing: 1, color: '#666' }}>
             <span>NFTfax · CLEARTEXT TRANSMISSION</span>

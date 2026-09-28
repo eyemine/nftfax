@@ -171,57 +171,127 @@ function readOptions(): Options {
 /// Tray permalinks decay after eight days. The tray API is checked first so a
 /// decayed fax falls back to the immutable on-chain artwork instead of an
 /// iframe showing "not found" to a room full of people.
-function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; cc?: string; zoom: number; onZoom: (z: number) => void; onResolved?: (trayId: string) => void }) {
-  // ONE round trip. This used to fetch the full tray document (~600KB) to
-  // check the tray still existed before letting the iframe fetch the same
-  // document again - roughly six seconds to feature a fax. The embed page now
-  // owns the not-found case: it is handed the token's immutable artwork as a
-  // fallback and renders that on the paper if the public copy has decayed.
+/// Pixel dissolve, drawn on a canvas over the frame. Random blocks fill in
+/// then clear — the look of a thermal fax burning out. Runs once per `trigger`
+/// change; the caller fires it when the handshake finishes.
+function DissolveOverlay({ trigger }: { trigger: number }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (!trigger) return;
+    const c = ref.current; if (!c) return;
+    const ctx = c.getContext('2d'); if (!ctx) return;
+    const parent = c.parentElement;
+    const W = c.width = parent?.clientWidth || 600;
+    const H = c.height = parent?.clientHeight || 800;
+    const B = 10;                                   // block size
+    const cols = Math.ceil(W / B), rows = Math.ceil(H / B);
+    const order = Array.from({ length: cols * rows }, (_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const IN = 900, HOLD = 250, OUT = 900;         // ms
+    const t0 = performance.now();
+    let raf = 0;
+    const draw = (now: number) => {
+      const t = now - t0;
+      ctx.clearRect(0, 0, W, H);
+      let covered: number;
+      if (t < IN) covered = t / IN;
+      else if (t < IN + HOLD) covered = 1;
+      else if (t < IN + HOLD + OUT) covered = 1 - (t - IN - HOLD) / OUT;
+      else { ctx.clearRect(0, 0, W, H); return; }
+      const n = Math.floor(order.length * covered);
+      ctx.fillStyle = '#1a1a1a';
+      for (let k = 0; k < n; k++) { const i = order[k]; ctx.fillRect((i % cols) * B, Math.floor(i / cols) * B, B, B); }
+      // A scatter of paper-coloured "sparkle" blocks at the moving edge.
+      ctx.fillStyle = '#f4f1e8';
+      for (let k = n; k < Math.min(order.length, n + cols); k++) { if (Math.random() < 0.25) { const i = order[k]; ctx.fillRect((i % cols) * B, Math.floor(i / cols) * B, B, B); } }
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(raf);
+  }, [trigger]);
+  return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-20 h-full w-full" />;
+}
+
+function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, dissolve, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; cc?: string; zoom: number; onZoom: (z: number) => void; dissolve: number; onResolved?: (trayId: string) => void }) {
+  // ONE round trip. The embed page owns the not-found case and is handed the
+  // token's immutable artwork as a fallback, so there is no pre-check fetch.
   const displayId = mint.displayTrayId || mint.trayId;
   useEffect(() => { onResolved?.(displayId); }, [displayId, onResolved]);
 
   const params = new URLSearchParams({ embed: '1', fallback: `/api/metadata/${mint.tokenId}/image` });
   if (faxing) { params.set('status', 'faxing'); if (cc) params.set('cc', cc); }
 
+  // The embed reports its sheet height (postMessage). The iframe is sized to
+  // that height so it never scrolls internally - it cannot be scrolled from
+  // outside and is pointer-transparent - and the CONTAINER scrolls instead.
+  const viewport = useRef<HTMLDivElement>(null);
+  const [contentH, setContentH] = useState<number>(0);
+  const [viewH, setViewH] = useState<number>(0);
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const d = e.data as { type?: string; id?: string; height?: number };
+      if (d?.type === 'nftfax-embed-size' && d.id === displayId && typeof d.height === 'number') setContentH(d.height);
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [displayId]);
+  useEffect(() => {
+    const el = viewport.current; if (!el) return;
+    const ro = new ResizeObserver(() => setViewH(el.clientHeight));
+    ro.observe(el); setViewH(el.clientHeight);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => { setContentH(0); }, [displayId]);
+
+  // "Fit" = the whole sheet visible in the frame (zoom may be < 1).
+  const fit = contentH && viewH ? Math.min(1, viewH / contentH) : 1;
+  const atFit = Math.abs(zoom - fit) < 0.01;
+
+  // Tap toggles fit <-> 100%; a drag pans. The iframe is pointer-transparent,
+  // so both land on the container; distinguish by movement.
+  const down = useRef<{ x: number; y: number } | null>(null);
+  const onPointerDown = (e: React.PointerEvent) => { down.current = { x: e.clientX, y: e.clientY }; };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = down.current; down.current = null;
+    if (!d || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 8) return;
+    onZoom(atFit ? 1 : fit);
+  };
+
   const frame = highlight
     ? 'border-[#e65b2f] shadow-[0_0_0_5px_rgba(230,91,47,.35),0_0_50px_rgba(230,91,47,.5)]'
     : 'border-[#3d6fd6] shadow-[0_0_0_3px_rgba(61,111,214,.3)]';
 
+  const h = contentH || viewH || 800;
   return (
     <div className={`relative h-full w-full border-4 bg-[#1a1a1a] transition-all duration-700 ${frame}`}>
-      {/* The scroll container is the zoom viewport. The iframe is scaled by
-          sizing its wrapper and made pointer-transparent so touch-drag pans the
-          container natively; nothing inside the embed needs to be tappable. */}
-      <div className="h-full w-full overflow-auto [scrollbar-width:thin]">
-        {/* Zoom is a TRANSFORM, not a resize. Sizing the iframe up only widened
-            its layout viewport: the 630px sheet stayed 630px and re-centred in a
-            wider frame, so the image slid right and never got bigger. Here the
-            iframe keeps the container's size as its viewport and is scaled from
-            the top-left; the wrapper is enlarged by the same factor so the
-            container scrolls (drag = pan). */}
-        <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%`, position: 'relative' }}>
+      <div ref={viewport} className="h-full w-full cursor-zoom-in overflow-auto [scrollbar-width:thin]" onPointerDown={onPointerDown} onPointerUp={onPointerUp} style={{ touchAction: 'pan-x pan-y' }}>
+        {/* Wrapper = scaled content size, so the container scrolls exactly as far
+            as the zoomed sheet extends. The iframe keeps the container width as
+            its layout viewport (so the 90%-wide sheet is truly full width) and
+            is scaled from the top-left. */}
+        <div style={{ width: `${zoom * 100}%`, height: h * zoom, position: 'relative' }}>
           <iframe
             key={`${displayId}:${faxing ? 'faxing' : 'idle'}`}
             src={`/tray/${displayId}?${params.toString()}`}
             title={`T/#${displayId.toUpperCase()}`}
+            scrolling="no"
             className="pointer-events-none absolute left-0 top-0 border-0 bg-[#1a1a1a]"
-            style={{ width: `${100 / zoom}%`, height: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: '0 0' }}
+            style={{ width: `${100 / zoom}%`, height: h, transform: `scale(${zoom})`, transformOrigin: '0 0' }}
             sandbox="allow-same-origin allow-scripts"
           />
         </div>
       </div>
+      <DissolveOverlay trigger={dissolve} />
       <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-2 bg-[#25251f]/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
         <span className={`h-2 w-2 rounded-full ${highlight ? 'animate-pulse bg-[#e65b2f]' : 'bg-[#7fa178]'}`} />
         Minted · FAX CHAIN #{mint.tokenId}
       </div>
-      {/* Zoom, on the frame itself (top-right, opposite the badge) — it used to sit
-          in the caption row underneath, where the bottom-centre controls covered it.
-          The embed is pointer-transparent so pinch never reaches it; these steps
-          scale the frame and a drag pans it. */}
-      <div className="absolute right-0 top-0 flex items-center gap-1 bg-[#25251f]/90 px-1.5 py-1 text-[#efe8d8]">
-        <button onClick={() => onZoom(Math.max(1, +(zoom - 0.5).toFixed(1)))} title="Zoom out" className="p-1 disabled:opacity-30" disabled={zoom <= 1}><Minus size={14} /></button>
-        <span className="min-w-[4ch] text-center text-[10px] font-bold">{Math.round(zoom * 100)}%</span>
-        <button onClick={() => onZoom(Math.min(3, +(zoom + 0.5).toFixed(1)))} title="Zoom in" className="p-1 disabled:opacity-30" disabled={zoom >= 3}><Plus size={14} /></button>
+      {/* Zoom for detail, up to 3x; the % button snaps back to fit. */}
+      <div className="absolute right-0 top-0 z-30 flex items-center gap-1 bg-[#25251f]/90 px-1.5 py-1 text-[#efe8d8]">
+        <button onClick={() => onZoom(Math.max(fit, +(zoom - 0.5).toFixed(2)))} title="Zoom out" className="p-1 disabled:opacity-30" disabled={zoom <= fit + 0.01}><Minus size={14} /></button>
+        <button onClick={() => onZoom(atFit ? 1 : fit)} title={atFit ? 'Actual size' : 'Fit to window'} className="min-w-[4ch] text-center text-[10px] font-bold underline-offset-2 hover:underline">{atFit ? 'FIT' : `${Math.round(zoom * 100)}%`}</button>
+        <button onClick={() => onZoom(Math.min(3, +(zoom + 0.5).toFixed(2)))} title="Zoom in" className="p-1 disabled:opacity-30" disabled={zoom >= 3}><Plus size={14} /></button>
       </div>
     </div>
   );
@@ -308,6 +378,8 @@ export default function ExhibitPage() {
   const [soundOn, setSoundOn] = useState(true);
   /// Zoom for the featured fax: 1 = fit, up to 3x; pan by dragging.
   const [zoom, setZoom] = useState(1);
+  /// Increments when a transmission finishes; the frame runs its dissolve once per value.
+  const [dissolve, setDissolve] = useState(0);
   const [events, setEvents] = useState<PrintEvent[]>([]);
   const [camOn, setCamOn] = useState(false);
   const camKind = opts.cam.kind;
@@ -393,7 +465,7 @@ export default function ExhibitPage() {
     // The sound comes from this page. Hold the FAXING header for as long as
     // the handshake plays, then a beat, so the visual and the audio agree.
     const ms = soundOn ? playFaxHandshake() : 0;
-    printTimer.current = setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); setPrinting(null); }, Math.max(ms, 6000) + 1500);
+    printTimer.current = setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); setPrinting(null); setDissolve((n) => n + 1); }, Math.max(ms, 6000) + 1500);
     void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, cc: OUTGOING_CC }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
@@ -580,7 +652,7 @@ export default function ExhibitPage() {
         <div className="grid min-h-0 grid-rows-[1fr_auto] gap-2">
           <div className="min-h-0">
             {featured ? (
-              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} cc={liveCc} zoom={zoom} onZoom={setZoom} onResolved={setFeaturedTrayId} />
+              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} cc={liveCc} zoom={zoom} onZoom={setZoom} dissolve={dissolve} onResolved={setFeaturedTrayId} />
             ) : (
               <div className="grid h-full place-items-center border-4 border-dashed border-[#8f8878] text-[12px] font-bold uppercase tracking-[.2em] text-[#625e52]">
                 {!hydrated ? 'Loading…' : online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
@@ -588,7 +660,7 @@ export default function ExhibitPage() {
             )}
           </div>
           {featured && (
-            <div className="grid grid-cols-[1fr_auto_auto] items-end gap-4 border-t-2 border-[#575244] pt-2">
+            <div className="grid grid-cols-[1fr_auto] items-stretch gap-4 border-t-2 border-[#575244] pt-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission</p>
                 <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{(featuredTrayId || featured.trayId).toUpperCase()}</p>
@@ -596,21 +668,22 @@ export default function ExhibitPage() {
                   {featured.minterEns || short(featured.minter)} · {handleFor(featured)} · {collectionFor(featured)}
                 </p>
               </div>
-              {/* Base link, centred in the panel. A popup, not a tab: the tablet is
+              {/* Right column: the Base link sits on the heading's baseline, right-
+                  aligned, with Hop beneath it. A popup, not a tab: the tablet is
                   pinned to this app and a new tab would be a dead end. */}
-              <div className="flex justify-center">
-                {featured.txHash && (
+              <div className="flex flex-col items-end justify-between self-stretch">
+                {featured.txHash ? (
                   <button
                     onClick={() => window.open(`https://basescan.org/tx/${featured.txHash}`, 'nftfax-mint-tx', 'popup=yes,width=980,height=760,noopener')}
-                    className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-[.12em] text-[#3d5840] underline xl:text-[12px]"
+                    className="inline-flex items-center gap-1 whitespace-nowrap text-[9px] font-bold uppercase tracking-[.2em] text-[#3d5840] underline xl:text-[11px]"
                   >
-                    View Mint Tx on Base <ExternalLink size={11} />
+                    View Mint Tx on Base <ExternalLink size={10} />
                   </button>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
-                <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{hopsOf(featured)}</p>
+                ) : <span />}
+                <div className="text-right">
+                  <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
+                  <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{hopsOf(featured)}</p>
+                </div>
               </div>
             </div>
           )}
@@ -797,7 +870,7 @@ export default function ExhibitPage() {
 
       {/* ── Print overlay ─────────────────────────────────────────────────── */}
       {printing && (
-        <div className="pointer-events-none absolute inset-x-0 top-[4.25rem] z-40 flex justify-center px-3 xl:top-[5.5rem]">
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center px-3">
           <div className="flex max-w-full items-center gap-3 border-[3px] border-[#e65b2f] bg-[#25251f] px-4 py-2.5 text-[#efe8d8] shadow-[0_0_60px_rgba(230,91,47,.6)] xl:gap-5 xl:px-8 xl:py-4">
             <Printer className="h-7 w-7 shrink-0 animate-pulse text-[#e65b2f] xl:h-9 xl:w-9" />
             <div className="min-w-0">
