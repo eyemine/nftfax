@@ -112,6 +112,10 @@ interface Options {
   cam: CamSource;
   pip: 'br' | 'bl' | 'tr' | 'tl';
   test: boolean;
+  /// Automatic print on every new mint. Off by default: the venue operator
+  /// drives the machine with the PRINT button; unattended prints were firing
+  /// during setup and printing before the cover-note modal was even opened.
+  auto: boolean;
   facing: 'user' | 'environment';
 }
 
@@ -120,9 +124,13 @@ const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfella
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
-const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: { kind: 'off' }, pip: 'br', test: false, facing: 'environment' };
+const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment' };
 
 function short(addr: string): string { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
+/// chainDepth is the fax's POSITION in the chain (the origin send is 1). Hops
+/// are forwards, so hop = position − 1. Shown as the single orange numeral;
+/// the tier name is not repeated beside it.
+function hopsOf(m: { chainDepth?: number }): number { return Math.max(0, (m.chainDepth ?? 1) - 1); }
 function handleFor(m: Mint): string {
   const key = COMMUNITY_KEY[m.community];
   return key ? `${PREFIX[key]}.${m.sourceTokenId}@fax` : `#${m.sourceTokenId}`;
@@ -153,6 +161,7 @@ function readOptions(): Options {
     cam: parseCam(p.get('cam')),
     pip: pip === 'bl' || pip === 'tr' || pip === 'tl' ? pip : 'br',
     test: p.get('test') === '1',
+    auto: p.get('auto') === '1',
     facing: p.get('facing') === 'user' ? 'user' : 'environment',
   };
 }
@@ -184,12 +193,19 @@ function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, onResolved }: 
           sizing its wrapper and made pointer-transparent so touch-drag pans the
           container natively; nothing inside the embed needs to be tappable. */}
       <div className="h-full w-full overflow-auto [scrollbar-width:thin]">
-        <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%` }}>
+        {/* Zoom is a TRANSFORM, not a resize. Sizing the iframe up only widened
+            its layout viewport: the 630px sheet stayed 630px and re-centred in a
+            wider frame, so the image slid right and never got bigger. Here the
+            iframe keeps the container's size as its viewport and is scaled from
+            the top-left; the wrapper is enlarged by the same factor so the
+            container scrolls (drag = pan). */}
+        <div style={{ width: `${zoom * 100}%`, height: `${zoom * 100}%`, position: 'relative' }}>
           <iframe
             key={`${displayId}:${faxing ? 'faxing' : 'idle'}`}
             src={`/tray/${displayId}?${params.toString()}`}
             title={`T/#${displayId.toUpperCase()}`}
-            className="pointer-events-none h-full w-full border-0 bg-[#1a1a1a]"
+            className="pointer-events-none absolute left-0 top-0 border-0 bg-[#1a1a1a]"
+            style={{ width: `${100 / zoom}%`, height: `${100 / zoom}%`, transform: `scale(${zoom})`, transformOrigin: '0 0' }}
             sandbox="allow-same-origin allow-scripts"
           />
         </div>
@@ -372,10 +388,12 @@ export default function ExhibitPage() {
     setLiveCc(note);
     setFeatured(mint);
     setFaxingId(mint.tokenId);
+    setPrinting(mint);
+    if (printTimer.current) clearTimeout(printTimer.current);
     // The sound comes from this page. Hold the FAXING header for as long as
     // the handshake plays, then a beat, so the visual and the audio agree.
     const ms = soundOn ? playFaxHandshake() : 0;
-    setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); }, Math.max(ms, 6000) + 1500);
+    printTimer.current = setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); setPrinting(null); }, Math.max(ms, 6000) + 1500);
     void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, cc: OUTGOING_CC }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
@@ -409,7 +427,9 @@ export default function ExhibitPage() {
           // Fire for every mint we missed, oldest first, so a burst prints all.
           const fresh = data.mints.filter((m) => m.tokenId > (lastSeenTokenId.current as number)).reverse();
           lastSeenTokenId.current = newest.tokenId;
-          fresh.forEach((m, i) => setTimeout(() => firePrint(m), i * 4000));
+          // New mints always come to the front. They only PRINT when ?auto=1.
+          if (opts.auto) fresh.forEach((m, i) => setTimeout(() => firePrint(m), i * 4000));
+          else { setFeatured(fresh[fresh.length - 1]); setZoom(1); }
         }
       } catch (err) {
         if (!cancelled) { setOnline(false); console.warn('[exhibit] poll failed', err); }
@@ -418,7 +438,7 @@ export default function ExhibitPage() {
     void tick();
     const id = setInterval(tick, opts.pollMs);
     return () => { cancelled = true; clearInterval(id); };
-  }, [opts.pollMs, opts.test, firePrint]);
+  }, [opts.pollMs, opts.test, opts.auto, firePrint]);
 
   useEffect(() => {
     let cancelled = false;
@@ -568,30 +588,29 @@ export default function ExhibitPage() {
             )}
           </div>
           {featured && (
-            <div className="grid grid-cols-[1fr_auto] items-end gap-3 border-t-2 border-[#575244] pt-2">
+            <div className="grid grid-cols-[1fr_auto_auto] items-end gap-4 border-t-2 border-[#575244] pt-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission</p>
                 <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{(featuredTrayId || featured.trayId).toUpperCase()}</p>
                 <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[.1em] text-[#3d5a40] xl:text-[12px]">
                   {featured.minterEns || short(featured.minter)} · {handleFor(featured)} · {collectionFor(featured)}
-                  {featured.txHash && (
-                    // A popup, not a tab: the tablet is pinned to this app and a new tab
-                    // would be a dead end. The operator closes the window to return.
-                    <button
-                      onClick={() => window.open(`https://basescan.org/tx/${featured.txHash}`, 'nftfax-mint-tx', 'popup=yes,width=980,height=760,noopener')}
-                      className="ml-2 inline-flex items-center gap-1 text-[#26417d] underline"
-                    >
-                      Mint transaction <ExternalLink size={10} />
-                    </button>
-                  )}
                 </p>
               </div>
-              <div className="flex items-end gap-3">
-                <div className="text-right">
-                  <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
-                  <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{featured.chainDepth ?? 1}</p>
-                  <p className="text-[9px] font-bold uppercase tracking-[.1em] text-[#625e52] xl:text-[11px]">{tierForChainDepth(featured.chainDepth)}</p>
-                </div>
+              {/* Base link, centred in the panel. A popup, not a tab: the tablet is
+                  pinned to this app and a new tab would be a dead end. */}
+              <div className="flex justify-center">
+                {featured.txHash && (
+                  <button
+                    onClick={() => window.open(`https://basescan.org/tx/${featured.txHash}`, 'nftfax-mint-tx', 'popup=yes,width=980,height=760,noopener')}
+                    className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-bold uppercase tracking-[.12em] text-[#3d5840] underline xl:text-[12px]"
+                  >
+                    View Mint Tx on Base <ExternalLink size={11} />
+                  </button>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
+                <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{hopsOf(featured)}</p>
               </div>
             </div>
           )}
@@ -623,7 +642,7 @@ export default function ExhibitPage() {
                 <div key={f.id} title={`T/#${f.id.toUpperCase()} · ${f.from} → ${f.to ?? '…'}`} className="relative aspect-[3/4] overflow-hidden bg-[#eee8dc]">
                   <Image src={`/api/tray/${f.id}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover" loading="lazy" />
                   <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
-                    {f.from.replace(/@fax$/, '')} · hop {f.chainDepth ?? 1}
+                    {f.from.replace(/@fax$/, '')} · hop {hopsOf(f)}
                   </span>
                 </div>
               ))}
@@ -650,7 +669,7 @@ export default function ExhibitPage() {
                         Cloudflare nor next/image can pin a stale image for a day. */}
                     <Image src={`/api/tray/${m.displayTrayId || m.trayId}/image${m.imageVersion ? `?v=${m.imageVersion}` : ''}`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
                     <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
-                      #{m.tokenId} · hop {m.chainDepth ?? 1}
+                      #{m.tokenId} · hop {hopsOf(m)}
                     </span>
                   </button>
                 );
@@ -782,10 +801,10 @@ export default function ExhibitPage() {
           <div className="flex max-w-full items-center gap-3 border-[3px] border-[#e65b2f] bg-[#25251f] px-4 py-2.5 text-[#efe8d8] shadow-[0_0_60px_rgba(230,91,47,.6)] xl:gap-5 xl:px-8 xl:py-4">
             <Printer className="h-7 w-7 shrink-0 animate-pulse text-[#e65b2f] xl:h-9 xl:w-9" />
             <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#e65b2f] xl:text-[12px] xl:tracking-[.3em]">Incoming transmission · printing</p>
+              <p className="text-[9px] font-bold uppercase tracking-[.25em] text-[#e65b2f] xl:text-[12px] xl:tracking-[.3em]">NFTFAX Transmission</p>
               <p className="truncate text-base font-black tracking-[-0.03em] xl:text-2xl">T/#{printing.trayId.toUpperCase()} · FAX CHAIN #{printing.tokenId}</p>
               <p className="truncate text-[9px] font-bold uppercase tracking-[.1em] text-[#c7c0b0] xl:text-[12px]">
-                {printing.minterEns || short(printing.minter)} · {collectionFor(printing)} · hop {printing.chainDepth ?? 1} · {tierForChainDepth(printing.chainDepth)}
+                {printing.minterEns || short(printing.minter)} · {collectionFor(printing)} · hop {hopsOf(printing)}
               </p>
             </div>
           </div>

@@ -12,7 +12,7 @@ Polls the public leaderboard. On each **new FAX CHAIN mint** it:
 3. **POSTs a JSON event to your middleware** (if `?middleware=` is set), which drives the
    Bluetooth printer and the handshake audio.
 
-Prints fire for **mints only**. Sends are not public data (they live in private trays), so the
+With `?auto=1`, prints fire for **new mints**. By default nothing prints unattended; the operator uses the PRINT button. Sends are not public data (they live in private trays), so the
 only feed of chain activity a venue display can legitimately read is the on-chain mint log.
 
 ## Why it is a route on nftfax.app and not a local HTML file
@@ -78,6 +78,7 @@ https://nftfax.app/exhibit?middleware=http://localhost:8787/print&cam=whep:https
 | `cam=local` | off | This device's own camera. Only useful if the printer is beside the tablet — it is not. |
 | `pip=br\|bl\|tr\|tl` | `br` | Which corner the printer cam sits in. |
 | `test=1` | off | Fire one print event for the latest mint on load — for soundcheck. |
+| `auto=1` | off | Print automatically on every new mint. **Off by default**: new mints still come to the front, but only the PRINT button sends anything to the machine. |
 
 Touch controls sit bottom-centre (camera toggle, **test print**, and fullscreen where the
 device supports it). With a keyboard attached: **F** fullscreen · **C** camera · **T** test
