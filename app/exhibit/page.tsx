@@ -244,8 +244,10 @@ function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, dissolve, onRe
   }, []);
   useEffect(() => { setContentH(0); }, [displayId]);
 
-  // "Fit" = the whole sheet visible in the frame (zoom may be < 1).
-  const fit = contentH && viewH ? Math.min(1, viewH / contentH) : 1;
+  // "Fit" = the whole sheet visible in the frame (zoom may be < 1). Two pixels
+  // of slack: at exactly viewH a sub-pixel rounding error can make the wrapper
+  // one pixel too tall and summon a scrollbar.
+  const fit = contentH && viewH ? Math.min(1, (viewH - 2) / contentH) : 1;
   const atFit = Math.abs(zoom - fit) < 0.01;
 
   // Tap toggles fit <-> 100%; a drag pans. The iframe is pointer-transparent,
@@ -265,7 +267,18 @@ function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, dissolve, onRe
   const h = contentH || viewH || 800;
   return (
     <div className={`relative h-full w-full border-4 bg-[#1a1a1a] transition-all duration-700 ${frame}`}>
-      <div ref={viewport} className="h-full w-full cursor-zoom-in overflow-auto [scrollbar-width:thin]" onPointerDown={onPointerDown} onPointerUp={onPointerUp} style={{ touchAction: 'pan-x pan-y' }}>
+      {/* scrollbar-gutter: stable reserves the scrollbar's width whether or not
+          it is showing. Without it, FIT flickered: the bar appearing narrowed the
+          container, the 90%-wide sheet reflowed shorter, the embed reported a
+          smaller height, the bar vanished, the width grew back, and round again.
+          At FIT nothing can overflow, so scrolling is simply off. */}
+      <div
+        ref={viewport}
+        className={`h-full w-full cursor-zoom-in [scrollbar-width:thin] ${atFit ? 'overflow-hidden' : 'overflow-auto'}`}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
+        style={{ touchAction: 'pan-x pan-y', scrollbarGutter: 'stable' }}
+      >
         {/* Wrapper = scaled content size, so the container scrolls exactly as far
             as the zoomed sheet extends. The iframe keeps the container width as
             its layout viewport (so the 90%-wide sheet is truly full width) and
