@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Trophy, Dices, Backpack as BackpackIcon, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
+import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Link as LinkIcon, Dices, Backpack as BackpackIcon, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
@@ -248,13 +248,13 @@ export default function HomeClient() {
             href="/leaderboard"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
-            <Trophy size={14} /> <span className="hidden sm:inline">Leaderboard</span>
+            <LinkIcon size={14} /> <span className="hidden sm:inline">Fax Chain Log</span>
           </Link>
           <Link
             href="/draw"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
           >
-            <Dices size={14} /> <span className="hidden sm:inline">Prize Draw</span>
+            <Dices size={14} /> <span className="hidden sm:inline">Prize Pool<span className="text-[#a94228]">*</span></span>
           </Link>
         </div>
         <Link

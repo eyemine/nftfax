@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { Loader2, Dices, CheckCircle2, Clock, Trophy, ArrowLeft, ShieldAlert, Check } from 'lucide-react';
+import { Loader2, Dices, CheckCircle2, Clock, Cctv, ArrowLeft, ShieldAlert, Check } from 'lucide-react';
 import {
   FAX_CONTRACT,
   FAX_CONTRACT_DEPLOYED,
@@ -226,9 +226,9 @@ export default function DrawClient() {
       <div className="mx-auto max-w-3xl">
         <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Dices size={20} /></div>
+            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Dices size={25} /></div>
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">PRIZE DRAW<span className="text-[#e65b2f]">™</span></h1>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">PRIZE POOL<span className="text-[#a94228]">*</span></h1>
               <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Commit / reveal on a Base block hash</p>
             </div>
           </div>
@@ -257,7 +257,7 @@ export default function DrawClient() {
             {/* Pool status & draw lock */}
             <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
               <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-                Prize winners — {supplyReached ? `${MAX_SUPPLY.toLocaleString()} mints · ${formatEth(totalPoolWei)} pool` : `${totalMinted.toLocaleString()} / ${MAX_SUPPLY.toLocaleString()} mints · ${formatEth(remainingPoolWei)} pool`}
+                Prize winners · {supplyReached ? `${formatEth(totalPoolWei)} pool · ${MAX_SUPPLY.toLocaleString()} mints` : `${formatEth(remainingPoolWei)} pool · ${totalMinted.toLocaleString()} / ${MAX_SUPPLY.toLocaleString()} mints`}
               </div>
               <div className="p-5 space-y-3 text-sm text-[#3e3b34]">
                 {!supplyReached ? (
@@ -352,7 +352,7 @@ export default function DrawClient() {
             {(
               <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
                 <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em] flex items-center gap-2">
-                  <Trophy size={14} /> {supplyReached ? 'Winners by tier' : 'Prize table — one winner per tier'}
+                  <Cctv size={14} /> {supplyReached ? 'Winners by tier' : <>Prize table — 10 winners, one per tier, <span className="text-[#a94228]">*</span>one tier no prize</>}
                 </div>
                 {!supplyReached && (
                   <p className="border-b border-[#8f8878] bg-[#c1b9a7] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-[#6e685a]">

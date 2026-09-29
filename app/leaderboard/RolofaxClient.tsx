@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Info, Trophy, ExternalLink, Search, RefreshCw } from 'lucide-react';
+import { Loader2, Info, Link as LinkIcon, ExternalLink, Search, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
 
 interface ChainEntry {
@@ -81,14 +81,14 @@ function MintPreview({ trayId }: { trayId: string }) {
 
   if (!trayId) return <span className="text-[#847d6e]">—</span>;
   return (
-    <div ref={elRef} className="grid h-10 w-10 place-items-center">
+    <div ref={elRef} className="grid h-20 w-20 place-items-center">
       {failed ? (
         <span className="text-[10px] text-[#847d6e]">N/A</span>
       ) : src ? (
         <img
           src={src}
           alt={`Fax ${trayId}`}
-          className="h-10 w-10 object-cover border border-[#847d6e]"
+          className="h-20 w-20 object-cover border border-[#847d6e]"
           loading="lazy"
         />
       ) : (
@@ -149,6 +149,13 @@ const MINTS_PAGE_SIZE = 20;
 
 export default function RolofaxClient() {
   const [data, setData] = useState<RolofaxData | null>(null);
+  /// Sort for the chain log table. Depth and Sent default descending (biggest /
+  /// newest first); text columns ascending. Clicking the active column flips it.
+  type ChainSortKey = 'id' | 'from' | 'to' | 'chainDepth' | 'createdAt';
+  const [chainSort, setChainSort] = useState<{ key: ChainSortKey; dir: 'asc' | 'desc' }>({ key: 'chainDepth', dir: 'desc' });
+  const toggleChainSort = (key: ChainSortKey) => setChainSort((cur) => cur.key === key
+    ? { key, dir: cur.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: key === 'chainDepth' || key === 'createdAt' ? 'desc' : 'asc' });
   const [leaderboard, setLeaderboard] = useState<LeaderboardData>({ leaderboard: [], totalMints: 0, uniqueMintersTotal: 0, contractBalanceEth: '0', mints: [], mintsTotal: 0, page: 1, pageSize: MINTS_PAGE_SIZE });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -210,9 +217,9 @@ export default function RolofaxClient() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-5 flex items-center justify-between border-b border-[#575244] pb-4">
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Trophy size={20} /></div>
+            <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><LinkIcon size={20} /></div>
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">LEADERBOARD<span className="text-[#e65b2f]">™</span></h1>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">FAX CHAIN LOG</h1>
               <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Leaderboard & chain log</p>
             </div>
           </div>
@@ -255,11 +262,14 @@ export default function RolofaxClient() {
                 <table className="w-full border-collapse text-left text-[12px]">
                   <thead className="sticky top-0 bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                     <tr>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">Fax ID</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">From</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">To</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">Depth</th>
-                      <th className="border-b border-[#8f8878] p-3 font-bold">Sent</th>
+                      {([['id', 'Fax ID'], ['from', 'From'], ['to', 'To'], ['chainDepth', 'Depth'], ['createdAt', 'Sent']] as [ChainSortKey, string][]).map(([key, label]) => (
+                        <th key={key} className="border-b border-[#8f8878] p-0 font-bold">
+                          <button onClick={() => toggleChainSort(key)} className={`flex w-full items-center gap-1 p-3 text-left hover:bg-[#c8c0ae] ${chainSort.key === key ? 'text-[#25251f]' : ''}`} aria-sort={chainSort.key === key ? (chainSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                            {label}
+                            {chainSort.key === key ? (chainSort.dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                          </button>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
@@ -269,7 +279,12 @@ export default function RolofaxClient() {
                         if (!map.has(key)) map.set(key, entry);
                         return map;
                       }, new Map<string, ChainEntry>()).values() ?? []
-                    ).map((entry) => (
+                    ).sort((a, b) => {
+                        const k = chainSort.key;
+                        const av = a[k], bv = b[k];
+                        const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
+                        return chainSort.dir === 'asc' ? cmp : -cmp;
+                      }).map((entry) => (
                       <tr key={entry.id} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
                         <td className="p-3 font-mono text-[11px]">
                           <a href={`https://nftmail.box/tray/${entry.id}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">T/#{entry.id}</a>
@@ -289,7 +304,7 @@ export default function RolofaxClient() {
 
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
+            <span className="flex items-center gap-2"><LinkIcon size={14} /> Mint leaderboard by collection</span>
             <div className="flex items-center gap-3">
               <span className="text-[#615c50]">
                 {leaderboard.totalMints ?? 0} mints ·{' '}

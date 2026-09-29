@@ -1,7 +1,7 @@
 import RolofaxClient from './RolofaxClient';
 
 export const metadata = {
-  title: 'Rolofax Leaderboard',
+  title: 'Fax Chain Log',
   description:
     'Live NFTFAX standings: minted FAX CHAIN collectibles, chain depth reached, and the most active @fax identities across every community.',
   alternates: { canonical: '/leaderboard' },
