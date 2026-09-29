@@ -41,7 +41,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Camera, CameraOff, ExternalLink, Maximize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
+import { Cctv, ExternalLink, Maximize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
 import { playFaxHandshake, primeFaxAudio } from '../lib/fax-audio';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
@@ -825,7 +825,8 @@ export default function ExhibitPage() {
           title="Printer cam (PIP)"
           className="border border-[#77705f] bg-[#d8d0bf]/90 p-2.5 text-[#625e52]"
         >
-          {camOn && camKind !== 'off' ? <Camera size={16} /> : <CameraOff size={16} />}
+          {/* cctv, dimmed when the feed is off, rather than a camera/camera-off pair. */}
+          <Cctv size={16} className={camOn && camKind !== 'off' ? '' : 'opacity-40'} />
         </button>
         {/* PRINT: the operator's pseudo-forward to the physical machine. Orange
             with a glow — it is the one control a visitor should notice. */}

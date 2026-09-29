@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Info, Link as LinkIcon, ExternalLink, Search, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Loader2, Info, Link as LinkIcon, Trophy, ExternalLink, Search, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import Link from 'next/link';
 
 interface ChainEntry {
@@ -238,7 +238,7 @@ export default function RolofaxClient() {
 
         {data && (
           <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Network summary</div>
+            <div className="flex items-center gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]"><LinkIcon size={14} /> Network summary</div>
             <div className="grid grid-cols-2 gap-px border-b border-[#8f8878] bg-[#8f8878] md:grid-cols-5">
               {[
                 ['Public faxes', data.totalPublic ?? 0],
@@ -304,7 +304,7 @@ export default function RolofaxClient() {
 
         <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            <span className="flex items-center gap-2"><LinkIcon size={14} /> Mint leaderboard by collection</span>
+            <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
             <div className="flex items-center gap-3">
               <span className="text-[#615c50]">
                 {leaderboard.totalMints ?? 0} mints ·{' '}

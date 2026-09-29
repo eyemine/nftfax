@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { Loader2, Dices, CheckCircle2, Clock, Cctv, ArrowLeft, ShieldAlert, Check } from 'lucide-react';
+import { Loader2, Dices, CheckCircle2, Clock, Trophy, ArrowLeft, ShieldAlert, Check } from 'lucide-react';
 import {
   FAX_CONTRACT,
   FAX_CONTRACT_DEPLOYED,
@@ -352,7 +352,7 @@ export default function DrawClient() {
             {(
               <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae] mb-4">
                 <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em] flex items-center gap-2">
-                  <Cctv size={14} /> {supplyReached ? 'Winners by tier' : <>Prize table — 10 winners, one per tier, <span className="text-[#a94228]">*</span>one tier no prize</>}
+                  <Trophy size={14} /> {supplyReached ? 'Winners by tier' : 'Prize table — 10 winners, one per tier, one tier no prize'}
                 </div>
                 {!supplyReached && (
                   <p className="border-b border-[#8f8878] bg-[#c1b9a7] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-[#6e685a]">
