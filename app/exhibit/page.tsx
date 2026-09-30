@@ -108,6 +108,9 @@ type CamSource =
 
 interface Options {
   middleware: string;
+  /// Set when `?key=` selects the nftfax.app print queue (the printer is on
+  /// another continent and polls for jobs). Enables the daemon-status readout.
+  queueKey: string;
   pollMs: number;
   cam: CamSource;
   pip: 'br' | 'bl' | 'tr' | 'tl';
@@ -124,7 +127,7 @@ const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfella
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
-const DEFAULTS: Options = { middleware: '', pollMs: 8000, cam: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment' };
+const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment' };
 
 function short(addr: string): string { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 /// chainDepth is the fax's POSITION in the chain (the origin send is 1). Hops
@@ -155,8 +158,12 @@ function parseCam(raw: string | null): CamSource {
 function readOptions(): Options {
   const p = new URLSearchParams(window.location.search);
   const pip = p.get('pip');
+  // `?key=K` alone means: use the built-in queue on this origin. The physical
+  // machine's daemon polls it with the same key, so no venue networking exists.
+  const key = p.get('key') || '';
   return {
-    middleware: p.get('middleware') || '',
+    middleware: p.get('middleware') || (key ? `${window.location.origin}/api/exhibit/print?key=${encodeURIComponent(key)}` : ''),
+    queueKey: key,
     pollMs: Math.max(3, Number(p.get('poll') || 8)) * 1000,
     cam: parseCam(p.get('cam')),
     pip: pip === 'bl' || pip === 'tr' || pip === 'tl' ? pip : 'br',
@@ -391,6 +398,21 @@ export default function ExhibitPage() {
   const [soundOn, setSoundOn] = useState(true);
   /// Zoom for the featured fax: 1 = fit, up to 3x; pan by dragging.
   const [zoom, setZoom] = useState(1);
+  /// Remote printer daemon status, from the queue. Null when not using the queue.
+  const [printer, setPrinter] = useState<{ daemonOnline: boolean; pending: number; printed: number; lastError: string | null; daemonInfo: string | null } | null>(null);
+  useEffect(() => {
+    if (!opts.queueKey) return;
+    let stop = false;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/exhibit/print?key=${encodeURIComponent(opts.queueKey)}&status=1`, { cache: 'no-store' });
+        if (r.ok && !stop) setPrinter(await r.json());
+      } catch { /* leave the last reading */ }
+    };
+    tick();
+    const t = setInterval(tick, 10_000);
+    return () => { stop = true; clearInterval(t); };
+  }, [opts.queueKey]);
   /// Increments when a transmission finishes; the frame runs its dissolve once per value.
   const [dissolve, setDissolve] = useState(0);
   const [events, setEvents] = useState<PrintEvent[]>([]);
@@ -772,7 +794,11 @@ export default function ExhibitPage() {
             <div className="flex items-center justify-between gap-2">
               <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Print events</p>
               <p className="truncate text-[8px] font-bold uppercase tracking-[.1em] text-[#847d6e] xl:text-[10px]">
-                {opts.middleware ? `→ ${opts.middleware.replace(/^https?:\/\//, '')}` : 'no middleware · display only'}
+                {opts.queueKey
+                  ? printer
+                    ? <><span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${printer.daemonOnline ? 'bg-[#3d5a40]' : 'bg-[#a94228]'}`} />{printer.daemonOnline ? `Machine online${printer.daemonInfo ? ` · ${printer.daemonInfo}` : ''}` : 'Machine offline'}{printer.pending ? ` · ${printer.pending} queued` : ''}{printer.lastError ? ` · ${printer.lastError}` : ''}</>
+                    : 'Queue · checking machine…'
+                  : opts.middleware ? `→ ${opts.middleware.replace(/^https?:\/\//, '')}` : 'no middleware · display only'}
               </p>
             </div>
             <ul className="mt-1 max-h-16 space-y-0.5 overflow-hidden text-[9px] font-bold uppercase tracking-[.06em] xl:max-h-24 xl:text-[11px]">

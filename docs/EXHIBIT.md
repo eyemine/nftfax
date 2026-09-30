@@ -66,12 +66,13 @@ screen-pinning give the equivalent kiosk.
 ## Opening it at the venue
 
 ```
-https://nftfax.app/exhibit?middleware=http://localhost:8787/print&cam=whep:https://…/webRTC/play&pip=br
+https://nftfax.app/exhibit?key=<EXHIBIT_PRINT_KEY>&cam=whep:https://…/webRTC/play&pip=br
 ```
 
 | Param | Default | Meaning |
 |---|---|---|
-| `middleware=<url>` | none | POST every mint event here. Without it the dashboard is display-only. |
+| `key=<secret>` | none | Use the built-in print queue on nftfax.app; the printer daemon polls it with the same key. **This is the Marfa setup.** |
+| `middleware=<url>` | none | Instead of the queue, POST every event to your own local daemon. Without either, the dashboard is display-only. |
 | `poll=<s>` | 8 | Leaderboard poll interval. Do not go below ~5; the leaderboard route scans logs. |
 | `cam=whep:<url>` | off | Printer cam via WebRTC/WHEP — **sub-second**. Cloudflare Stream Live or MediaMTX. |
 | `cam=<https url>` | off | Printer cam via any embeddable player in an iframe (YouTube, Twitch, Cloudflare iframe). 3–10 s latency. |
@@ -161,7 +162,55 @@ The automatic mint print also plays the handshake once any tap has unlocked audi
 (browsers require a gesture first). Untick "Play handshake on this device" in the modal to
 silence it, e.g. if the machine's own speaker is doing that job.
 
-## The middleware contract
+## The printer is in Australia: the built-in queue
+
+The tablet in Marfa and the BYP800 on a Mac in Australia cannot reach each other directly, and
+the venue network is not ours to configure. So the display does not POST to a local middleware
+at all — it POSTs to a **queue on nftfax.app**, and a daemon beside the printer long-polls it.
+The Mac never accepts an inbound connection and needs no public IP or tunnel.
+
+```
+https://nftfax.app/exhibit?key=<EXHIBIT_PRINT_KEY>&cam=whep:…
+```
+
+`?key=` alone selects the queue (`/api/exhibit/print`) and turns on the **Machine online /
+offline** readout in the print-events footer, fed by the daemon's heartbeat. The key is
+`EXHIBIT_PRINT_KEY` in the server's `.env`; the same value goes to the daemon.
+
+### The daemon (on the Mac with the printer)
+
+```
+set -a; source ~/.config/nftfax/exhibit-printer.env; set +a
+node scripts/exhibit-printer.mjs
+```
+
+It leases jobs from the queue, composes each into an **A4 sheet at 203 dpi** (header with
+FROM / TO / T# / FAX CHAIN #, the CC cover note, the bitmap scaled nearest-neighbour and
+thresholded, footer with the minter and permalink), and hands it to CUPS with
+`lp -d BYP800 -o media=A4 -o fit-to-page`. Failures are acked back and retried up to three
+times; the error shows on the tablet's footer.
+
+- `DRY=1` renders to `/tmp` without printing. `ONCE=1 DRY=1` renders one synthetic fax and exits —
+  use it for layout work.
+- `PRINTER=` overrides the CUPS queue name.
+- Keep the Mac from sleeping (`caffeinate -s node scripts/exhibit-printer.mjs`, or Energy Saver).
+
+### The BYP800 / MV-B530 itself
+
+Over Bluetooth this printer speaks a proprietary "cat printer" protocol, not ESC/POS — the
+generic CUPS drivers will not talk to it. Two paths work:
+
+- **USB-C + the vendor's macOS driver** (Intel and ARM builds at `print.frogtosea.com`, per the
+  manual). The printer appears as a normal CUPS queue named **BYP800**. This is what the daemon
+  assumes, and it is the reliable choice for a multi-day show.
+- **Bluetooth via [TiMini-Print](https://github.com/dejniel/timini-print)** — open-source,
+  MV-B530 is on its supported list, `python3 timiniprint.py --bluetooth MV-B530 file.png`. Set
+  `PRINTER` to a script that calls it if USB is impossible. BLE drops are then your risk.
+
+The head is 1728 dots/line (A4 at 203 dpi); the sheet is rendered at 1654 × 2339 with a 90 px
+margin so nothing sits on the edge.
+
+## The middleware contract (alternative: your own local daemon)
 
 The dashboard is an HTTPS page. Chrome and Firefox treat `http://localhost` as a secure
 context, so the POST is permitted — **but your server must answer CORS**, or the browser drops
