@@ -17,6 +17,7 @@ services:
       - GNOSIS_RPC_URL=${GNOSIS_RPC_URL:-https://rpc.gnosischain.com}
       - ALCHEMY_API_KEY=${ALCHEMY_API_KEY:-}
       - ENVIO_GRAPHQL_URL=${ENVIO_GRAPHQL_URL:-}
+      - EXHIBIT_PRINT_KEY=${EXHIBIT_PRINT_KEY:-}
     ports:
       - "3002:3000"
     volumes:
