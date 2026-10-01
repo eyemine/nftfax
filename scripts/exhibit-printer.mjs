@@ -13,7 +13,7 @@
 //   DRY=1        render to /tmp, do not print
 //   ONCE=<json>  render one synthetic job and exit (for layout work)
 //   DARKNESS=1|2|3  head heat (driver "Darkness"); default 1 - 2 printed too dark
-//   TRAIL_MM=<n>  blank paper after the footer, default 10
+//   TRAIL_MM=<n>  blank paper after the footer, default 10 (the Marfa machine runs 30)
 //   LIGHTEN=<0..1>  how far to lift black toward white before dithering the
 //                bitmap (0 = solid black areas, 0.25 default = ~75% ink texture)
 //   KEEPALIVE_MIN=<n>  feed a sliver of paper every n idle minutes so the printer's
