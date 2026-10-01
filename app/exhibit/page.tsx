@@ -820,7 +820,7 @@ export default function ExhibitPage() {
 
       {/* ── Webcam PIP ────────────────────────────────────────────────────── */}
       {camOn && camKind !== 'off' && (
-        <div className={`absolute ${pipClass} z-30 w-[24vw] min-w-[200px] max-w-[360px] overflow-hidden border-[3px] border-[#25251f] bg-black shadow-[0_16px_48px_rgba(0,0,0,.5)]`}>
+        <div className={`absolute ${pipClass} z-30 w-[48vw] min-w-[400px] max-w-[720px] overflow-hidden border-[3px] border-[#25251f] bg-black shadow-[0_16px_48px_rgba(0,0,0,.5)]`}>
           {opts.cam.kind === 'whep' ? (
             <WhepPlayer url={opts.cam.url} onError={setCamError} />
           ) : opts.cam.kind === 'iframe' ? (
@@ -871,8 +871,10 @@ export default function ExhibitPage() {
       </div>
 
       {/* ── Outgoing transmission modal ───────────────────────────────────── */}
+      {/* Top-anchored, not centred: on the tablet the on-screen keyboard rises
+          over the lower half of the screen and would cover SEND FAX. */}
       {outgoing && (
-        <div className="absolute inset-0 z-50 grid place-items-center bg-[#25251f]/80 p-4" onClick={() => setOutgoing(null)}>
+        <div className="absolute inset-0 z-50 flex items-start justify-center bg-[#25251f]/80 p-4 pt-[4vh]" onClick={() => setOutgoing(null)}>
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md border-[3px] border-[#e65b2f] bg-[#f4f1e8] font-mono text-[#2a2a2a] shadow-[0_0_60px_rgba(230,91,47,.5)]">
             <div className="flex items-center justify-between border-b-2 border-dashed border-[#999] px-4 py-3">
               <span className="text-[11px] font-bold tracking-[.16em] text-[#e65b2f]">CARBON COPY TRANSMISSION · FAX PRINT</span>
