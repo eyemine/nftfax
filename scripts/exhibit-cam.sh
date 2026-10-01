@@ -27,15 +27,33 @@ KBPS="${CAM_KBPS:-2500}"
 RELAY="${CAM_RELAY:-46.225.158.75}"
 URL="rtsp://publisher:${CAM_PUBLISH_PASS}@${RELAY}:8554/printer"
 
+# A print job on the same USB 2 hub can starve the camera; the capture then
+# stalls and ffmpeg sits forever producing nothing, while the relay drops the
+# stream and every viewer gets 404. -rw_timeout / -timeout make ffmpeg give up on
+# a dead input or socket, and the progress watchdog below kills it if the frame
+# counter stops advancing for 15 s. The loop then reconnects.
 while true; do
   echo "$(date '+%H:%M:%S') publishing ${DEV} ${SIZE}@${FPS} → ${RELAY}/printer"
-  ffmpeg -hide_banner -loglevel warning \
+  PROG=$(mktemp -t nftfax-cam-progress)
+  ffmpeg -hide_banner -loglevel warning -nostats -progress "$PROG" \
     -f avfoundation -framerate "$FPS" -video_size "$SIZE" -pixel_format "${CAM_PIXFMT:-uyvy422}" -i "${DEV}:none" \
     -an \
     -c:v h264_videotoolbox -realtime 1 -profile:v main -bf 0 \
     -b:v "${KBPS}k" -maxrate "${KBPS}k" -bufsize "$((KBPS * 2))k" \
     -g 30 -pix_fmt yuv420p \
-    -f rtsp -rtsp_transport tcp "$URL"
-  echo "$(date '+%H:%M:%S') ffmpeg exited ($?) — reconnecting in 3 s"
+    -rw_timeout 10000000 \
+    -f rtsp -rtsp_transport tcp "$URL" &
+  FF=$!
+  LAST=""; STALL=0
+  while kill -0 "$FF" 2>/dev/null; do
+    sleep 5
+    CUR=$(grep -E "^frame=" "$PROG" 2>/dev/null | tail -1)
+    if [ -n "$CUR" ] && [ "$CUR" = "$LAST" ]; then STALL=$((STALL + 5)); else STALL=0; fi
+    LAST="$CUR"
+    if [ "$STALL" -ge 15 ]; then echo "$(date '+%H:%M:%S') capture stalled (${CUR:-no frames}) — restarting ffmpeg"; kill "$FF" 2>/dev/null; sleep 1; kill -9 "$FF" 2>/dev/null; break; fi
+  done
+  wait "$FF" 2>/dev/null; RC=$?
+  rm -f "$PROG"
+  echo "$(date '+%H:%M:%S') ffmpeg exited ($RC) — reconnecting in 3 s"
   sleep 3
 done

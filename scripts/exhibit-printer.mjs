@@ -143,21 +143,26 @@ export async function renderSheet(job) {
     `${ORIGIN.replace(/^https?:\/\//, '')}/tray/${job.trayId}    Printed ${new Date().toISOString().replace('T', ' ').slice(0, 16)} UTC`,
   ], { size: 28 }));
 
-  return sharp({ create: { width: W, height: H, channels: 3, background: '#fff' } })
+  // The sheet is as tall as its content, not a fixed A4: a thermal roll has no
+  // page bottom, and a full A4 canvas was pushing out 20 cm of blank paper.
+  const sheetH = Math.min(H, y + M);
+  const png = await sharp({ create: { width: W, height: sheetH, channels: 3, background: '#fff' } })
     .composite(layers)
     .greyscale()
     .threshold(128)
     .png({ palette: true, colours: 2 })
     .toBuffer();
+  return { png, heightMm: Math.round((sheetH / 203) * 25.4) };
 }
 
-async function printPng(png, label) {
+async function printPng({ png, heightMm }, label) {
   const dir = await mkdtemp(join(tmpdir(), 'nftfax-print-'));
   const file = join(dir, `${label}.png`);
   await writeFile(file, png);
-  if (DRY) { log('DRY — rendered', file); return file; }
-  // fit-to-page keeps the sheet on A4 whatever the driver's default; media A4 so it does not pick letter.
-  await run('lp', ['-d', PRINTER, '-o', 'media=A4', '-o', 'fit-to-page', '-t', label, file]);
+  if (DRY) { log(`DRY — rendered ${file} (210x${heightMm}mm)`); return file; }
+  // Custom page = exactly the content height; MediaTracking=0 (continuous, no
+  // gap search) and PostAction=0 stop the driver feeding on after the page.
+  await run('lp', ['-d', PRINTER, '-o', `media=Custom.210x${heightMm}mm`, '-o', 'MediaTracking=0', '-o', 'PostAction=0', '-o', 'fit-to-page', '-t', label, file]);
   lastPrintAt = Date.now();
   return file;
 }
@@ -192,8 +197,8 @@ async function loop() {
           continue;
         }
         try {
-          const png = await renderSheet(job);
-          const file = await printPng(png, label);
+          const sheet = await renderSheet(job);
+          const file = await printPng(sheet, label);
           log(`  printed → ${file}`);
           await ack(job.id, true);
         } catch (e) {
@@ -211,8 +216,8 @@ async function loop() {
 
 if (process.env.ONCE) {
   const job = { event: 'fax', at: new Date().toISOString(), tokenId: 21, trayId: 'd4172ce5fced', handle: 'atom.648@fax', collection: 'POW NFT', chainDepth: 3, minterEns: 'rgbanksy.eth', from: 'Marfa@fax', cc: 'LocalMachine@fax', coverNote: 'Greetings from Marfa. This fax crossed the Pacific to reach you.', imageUrl: `${ORIGIN}/api/tray/d4172ce5fced/image`, id: 'test', ...JSON.parse(process.env.ONCE === '1' ? '{}' : process.env.ONCE) };
-  const png = await renderSheet(job);
-  console.log(await printPng(png, 'nftfax-test'));
+  const sheet = await renderSheet(job);
+  console.log(await printPng(sheet, 'nftfax-test'));
 } else {
   loop();
 }

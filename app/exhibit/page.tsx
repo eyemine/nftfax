@@ -360,7 +360,7 @@ function WhepPlayer({ url, onError }: { url: string; onError: (msg: string) => v
     }
     function scheduleRetry(reason: string) {
       if (stopped) return;
-      onError(`${reason} — reconnecting`);
+      onError(/404/.test(reason) ? 'camera offline at the machine — reconnecting' : `${reason} — reconnecting`);
       pc?.close(); pc = null;
       const wait = Math.min(15000, 1000 * 2 ** Math.min(attempt++, 4));
       if (retry) clearTimeout(retry);
@@ -853,8 +853,10 @@ export default function ExhibitPage() {
           title="Printer cam (PIP)"
           className="border border-[#77705f] bg-[#d8d0bf]/90 p-2.5 text-[#625e52]"
         >
-          {/* cctv, dimmed when the feed is off, rather than a camera/camera-off pair. */}
-          <Cctv size={16} className={camOn && camKind !== 'off' ? '' : 'opacity-40'} />
+          {/* Three states: faded = no camera stream (none configured, or the feed
+              is down); orange = a stream exists but the operator hid the PIP;
+              solid = PIP showing live video. */}
+          <Cctv size={16} className={camKind === 'off' || (camOn && camError) ? 'opacity-40' : camOn ? '' : 'text-[#e65b2f]'} />
         </button>
         {/* PRINT: the operator's pseudo-forward to the physical machine. Orange
             with a glow — it is the one control a visitor should notice. */}
