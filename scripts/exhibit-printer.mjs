@@ -14,6 +14,8 @@
 //   ONCE=<json>  render one synthetic job and exit (for layout work)
 //   DARKNESS=1|2|3  head heat (driver "Darkness"); default 1 - 2 printed too dark
 //   TRAIL_MM=<n>  blank paper after the footer, default 10
+//   LIGHTEN=<0..1>  how far to lift black toward white before dithering the
+//                bitmap (0 = solid black areas, 0.25 default = ~75% ink texture)
 //   KEEPALIVE_MIN=<n>  feed a sliver of paper every n idle minutes so the printer's
 //                auto-shutdown timer never fires (0 = off; default 0). Prefer
 //                disabling auto power-off in the printer's own app if it offers it.
@@ -43,6 +45,7 @@ const INFO = `${hostname().split('.')[0]} · ${PRINTER}`;
 const KEEPALIVE_MIN = Number(process.env.KEEPALIVE_MIN || 0);
 const DARKNESS = process.env.DARKNESS || '1';
 const TRAIL_PX = Math.round((Number(process.env.TRAIL_MM || 10) / 25.4) * 203);
+const LIGHTEN = Math.min(0.9, Math.max(0, Number(process.env.LIGHTEN ?? 0.25)));
 let lastPrintAt = Date.now();
 
 /// Is the printer physically present and accepting? CUPS marks a vanished USB
@@ -98,6 +101,30 @@ function rule() {
   return { buf, h: 6 };
 }
 
+/// Floyd-Steinberg error diffusion of an 8-bit greyscale buffer to pure 0/255,
+/// against a FIXED black/white target. (libimagequant's palette dither builds
+/// its palette from the image, so a lifted grey just became a palette entry.)
+function floydSteinberg(src, w, h) {
+  const px = Float32Array.from(src);
+  const out = Buffer.alloc(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      const old = px[i];
+      const nu = old < 128 ? 0 : 255;
+      out[i] = nu;
+      const err = old - nu;
+      if (x + 1 < w) px[i + 1] += err * 7 / 16;
+      if (y + 1 < h) {
+        if (x > 0) px[i + w - 1] += err * 3 / 16;
+        px[i + w] += err * 5 / 16;
+        if (x + 1 < w) px[i + w + 1] += err * 1 / 16;
+      }
+    }
+  }
+  return out;
+}
+
 /// Compose one job into a 1-bit PNG. Returns the PNG buffer.
 export async function renderSheet(job) {
   const isFax = job.event === 'fax';
@@ -126,8 +153,11 @@ export async function renderSheet(job) {
     gap(10); put(rule()); gap(18);
   }
 
-  // The bitmap. Nearest-neighbour so the fax pixels stay crisp; greyscale then
-  // threshold — the head only knows black and white anyway.
+  // The bitmap. Nearest-neighbour so the fax pixels stay crisp. The source is
+  // near pure black/white, and solid black on thermal paper prints heavy, so
+  // black is lifted toward grey (LIGHTEN) and the result Floyd-Steinberg
+  // dithered to 1-bit: dense areas become a fine ink texture - lighter, and
+  // more like a real fax - while the head still only sees black and white.
   const res = await fetch(job.imageUrl, { headers: { 'User-Agent': 'nftfax-exhibit-printer' } });
   if (!res.ok) throw new Error(`image ${res.status} ${job.imageUrl}`);
   const src = sharp(Buffer.from(await res.arrayBuffer())).flatten({ background: '#fff' });
@@ -136,7 +166,10 @@ export async function renderSheet(job) {
   const availW = W - 2 * M, availH = H - y - footerH - M;
   const scale = Math.min(availW / meta.width, availH / meta.height);
   const bw = Math.floor(meta.width * scale), bh = Math.floor(meta.height * scale);
-  const bitmap = await src.resize(bw, bh, { kernel: 'nearest' }).greyscale().threshold(160).png().toBuffer();
+  const grey = await src.resize(bw, bh, { kernel: 'nearest' }).greyscale()
+    .linear(1 - LIGHTEN, 255 * LIGHTEN)                 // black -> LIGHTEN*255 grey, white stays white
+    .raw().toBuffer();
+  const bitmap = await sharp(floydSteinberg(grey, bw, bh), { raw: { width: bw, height: bh, channels: 1 } }).png().toBuffer();
   layers.push({ input: bitmap, top: y, left: Math.round((W - bw) / 2) });
   y += bh + 24;
 
@@ -151,12 +184,11 @@ export async function renderSheet(job) {
   // page bottom, and a full A4 canvas was pushing out 20 cm of blank paper.
   // TRAIL_PX (default 1 cm) of blank follows the footer for the tear.
   const sheetH = Math.min(H, y + TRAIL_PX);
-  const png = await sharp({ create: { width: W, height: sheetH, channels: 3, background: '#fff' } })
-    .composite(layers)
-    .greyscale()
-    .threshold(128)
-    .png({ palette: true, colours: 2 })
-    .toBuffer();
+  // Two passes: sharp applies composite AFTER threshold within one pipeline,
+  // so a single chain thresholds the blank canvas and leaves the layers grey.
+  const composed = await sharp({ create: { width: W, height: sheetH, channels: 3, background: '#fff' } })
+    .composite(layers).png().toBuffer();
+  const png = await sharp(composed).greyscale().threshold(128).png({ compressionLevel: 9 }).toBuffer();
   return { png, heightMm: Math.round((sheetH / 203) * 25.4) };
 }
 
