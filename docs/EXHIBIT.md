@@ -195,6 +195,47 @@ times; the error shows on the tablet's footer.
 - `PRINTER=` overrides the CUPS queue name.
 - Keep the Mac from sleeping (`caffeinate -s node scripts/exhibit-printer.mjs`, or Energy Saver).
 
+### Running unattended (launchd)
+
+Both daemons are installed as user LaunchAgents on the Mac beside the printer, so they start at
+login, restart within 5 s if they die, and keep the Mac awake (`caffeinate -s`):
+
+```
+~/Library/LaunchAgents/app.nftfax.exhibit-printer.plist   node scripts/exhibit-printer.mjs
+~/Library/LaunchAgents/app.nftfax.exhibit-cam.plist       scripts/exhibit-cam.sh
+~/Library/Logs/nftfax/{exhibit-printer,exhibit-cam}.log
+~/.config/nftfax/exhibit-printer.env                      EXHIBIT_PRINT_KEY, PRINTER, CAM_* (mode 600)
+```
+
+```
+launchctl list | grep app.nftfax                       # running? (pid, last exit code)
+launchctl kickstart -k gui/$(id -u)/app.nftfax.exhibit-cam      # restart one
+launchctl bootout gui/$(id -u)/app.nftfax.exhibit-printer       # stop one
+tail -f ~/Library/Logs/nftfax/exhibit-printer.log
+```
+
+Also set *System Settings → Energy → Prevent automatic sleeping when the display is off*, keep
+the Mac on mains power, and **log in** after any reboot — LaunchAgents start at login, not boot.
+From Marfa, the tablet footer tells you the state: *Machine online* means the printer daemon
+polled within the last minute; the camera PIP going dark means the publisher or the relay.
+
+### If the printer goes quiet
+
+The BYP800 **drops off USB entirely** when it sleeps or the cable comes loose; CUPS then shows
+`printer-state-reasons=offline-report`. The daemon checks presence before each job, holds the job,
+and the tablet shows *Printer asleep or unplugged — press its power button*. The job prints the
+moment the printer is back. `KEEPALIVE_MIN=8` in the env file feeds ~3 mm of paper every 8 idle
+minutes to defeat an auto-shutdown timer; if the printer's Bluetooth app has an auto-power-off
+setting, turn it off there instead.
+
+### The camera relay (Hetzner)
+
+`/opt/mediamtx` on the production host: MediaMTX 1.15 in Docker, RTSP publish on 8554 (password,
+TCP), WebRTC ICE on 8189 tcp+udp, WHEP proxied by nginx at `https://nftfax.app/cam/`. Those three
+ports must be open in the **Hetzner Cloud Firewall** (console), not just ufw — ufw alone was the
+cause of a day's confusion. `docker logs mediamtx` shows publishers and viewers connecting. The
+camera through a USB 2 hub delivers ~15 fps at 720p; plug it straight into the Mac for 30.
+
 ### The BYP800 / MV-B530 itself
 
 Over Bluetooth this printer speaks a proprietary "cat printer" protocol, not ESC/POS — the
