@@ -12,6 +12,8 @@
 //   PRINTER      CUPS queue name                 default BYP800
 //   DRY=1        render to /tmp, do not print
 //   ONCE=<json>  render one synthetic job and exit (for layout work)
+//   DARKNESS=1|2|3  head heat (driver "Darkness"); default 1 - 2 printed too dark
+//   TRAIL_MM=<n>  blank paper after the footer, default 10
 //   KEEPALIVE_MIN=<n>  feed a sliver of paper every n idle minutes so the printer's
 //                auto-shutdown timer never fires (0 = off; default 0). Prefer
 //                disabling auto power-off in the printer's own app if it offers it.
@@ -39,6 +41,8 @@ const W = 1654, H = 2339;                     // A4 @ 203 dpi
 const M = 90;                                  // margin
 const INFO = `${hostname().split('.')[0]} · ${PRINTER}`;
 const KEEPALIVE_MIN = Number(process.env.KEEPALIVE_MIN || 0);
+const DARKNESS = process.env.DARKNESS || '1';
+const TRAIL_PX = Math.round((Number(process.env.TRAIL_MM || 10) / 25.4) * 203);
 let lastPrintAt = Date.now();
 
 /// Is the printer physically present and accepting? CUPS marks a vanished USB
@@ -145,7 +149,8 @@ export async function renderSheet(job) {
 
   // The sheet is as tall as its content, not a fixed A4: a thermal roll has no
   // page bottom, and a full A4 canvas was pushing out 20 cm of blank paper.
-  const sheetH = Math.min(H, y + M);
+  // TRAIL_PX (default 1 cm) of blank follows the footer for the tear.
+  const sheetH = Math.min(H, y + TRAIL_PX);
   const png = await sharp({ create: { width: W, height: sheetH, channels: 3, background: '#fff' } })
     .composite(layers)
     .greyscale()
@@ -162,7 +167,7 @@ async function printPng({ png, heightMm }, label) {
   if (DRY) { log(`DRY — rendered ${file} (210x${heightMm}mm)`); return file; }
   // Custom page = exactly the content height; MediaTracking=0 (continuous, no
   // gap search) and PostAction=0 stop the driver feeding on after the page.
-  await run('lp', ['-d', PRINTER, '-o', `media=Custom.210x${heightMm}mm`, '-o', 'MediaTracking=0', '-o', 'PostAction=0', '-o', 'fit-to-page', '-t', label, file]);
+  await run('lp', ['-d', PRINTER, '-o', `media=Custom.210x${heightMm}mm`, '-o', 'MediaTracking=0', '-o', 'PostAction=0', '-o', `Darkness=${DARKNESS}`, '-o', 'fit-to-page', '-t', label, file]);
   lastPrintAt = Date.now();
   return file;
 }
