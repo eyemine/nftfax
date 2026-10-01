@@ -165,7 +165,9 @@ function readOptions(): Options {
     middleware: p.get('middleware') || (key ? `${window.location.origin}/api/exhibit/print?key=${encodeURIComponent(key)}` : ''),
     queueKey: key,
     pollMs: Math.max(3, Number(p.get('poll') || 8)) * 1000,
-    cam: parseCam(p.get('cam')),
+    // The printer cam defaults to the relay: it is a public gallery feed, and
+    // the bare /exhibit URL should show the machine. `cam=off` hides it.
+    cam: parseCam(p.get('cam') ?? 'whep:https://nftfax.app/cam/printer/whep'),
     pip: pip === 'bl' || pip === 'tr' || pip === 'tl' ? pip : 'br',
     test: p.get('test') === '1',
     auto: p.get('auto') === '1',

@@ -47,12 +47,18 @@ export async function POST(req: NextRequest) {
   if (!body) return NextResponse.json({ error: 'bad json' }, { status: 400 });
 
   // Daemon acknowledging a leased job.
-  const ack = body.ack as { id?: string; ok?: boolean; error?: string } | undefined;
+  const ack = body.ack as { id?: string; ok?: boolean; error?: string; retry?: boolean } | undefined;
   if (ack?.id) {
     Q.daemonSeenAt = Date.now();
     const job = Q.jobs.get(ack.id);
     if (!job) return NextResponse.json({ ok: true, note: 'unknown job' });
     if (ack.ok) { Q.jobs.delete(ack.id); Q.printed++; Q.lastError = null; }
+    else if (ack.retry) {
+      // Transient on the machine's side (printer asleep, paper out): surface the
+      // reason on the tablet, put the job back, and do not count the attempt.
+      Q.lastError = String(ack.error || 'printer busy').slice(0, 200);
+      job.leasedAt = null; job.attempts = Math.max(0, job.attempts - 1);
+    }
     else {
       Q.lastError = String(ack.error || 'print failed').slice(0, 200);
       if (job.attempts >= MAX_ATTEMPTS) { Q.jobs.delete(ack.id); Q.failed++; }

@@ -12,6 +12,13 @@
 //   PRINTER      CUPS queue name                 default BYP800
 //   DRY=1        render to /tmp, do not print
 //   ONCE=<json>  render one synthetic job and exit (for layout work)
+//   KEEPALIVE_MIN=<n>  feed a sliver of paper every n idle minutes so the printer's
+//                auto-shutdown timer never fires (0 = off; default 0). Prefer
+//                disabling auto power-off in the printer's own app if it offers it.
+//
+// This printer drops off USB entirely when it sleeps, and nothing on the Mac can
+// wake it. So before each job the daemon checks the printer is actually present;
+// if not, it tells the queue (the tablet shows the reason) and the job waits.
 //
 // Sheet: A4 at 203 dpi = 1654 × 2339 px, 1-bit, Courier, dashed rules — the same
 // look as the tray permalink, because it is the same fax.
@@ -31,6 +38,30 @@ const DRY = process.env.DRY === '1';
 const W = 1654, H = 2339;                     // A4 @ 203 dpi
 const M = 90;                                  // margin
 const INFO = `${hostname().split('.')[0]} · ${PRINTER}`;
+const KEEPALIVE_MIN = Number(process.env.KEEPALIVE_MIN || 0);
+let lastPrintAt = Date.now();
+
+/// Is the printer physically present and accepting? CUPS marks a vanished USB
+/// printer with `offline-report`; a sleeping unit is simply not on the bus.
+async function printerPresent() {
+  if (DRY) return true;
+  try {
+    const { stdout } = await run('lpoptions', ['-p', PRINTER]);
+    return !/offline|paused|disabled/.test(stdout);
+  } catch { return false; }
+}
+
+/// A near-empty page: the smallest custom size the driver accepts. Just enough
+/// to reset the idle timer. ~3 mm of paper.
+async function keepAlive() {
+  const png = await sharp({ create: { width: W, height: 24, channels: 3, background: '#fff' } }).png().toBuffer();
+  const dir = await mkdtemp(join(tmpdir(), 'nftfax-ka-'));
+  const file = join(dir, 'keepalive.png');
+  await writeFile(file, png);
+  await run('lp', ['-d', PRINTER, '-o', 'media=Custom.210x3mm', '-t', 'nftfax-keepalive', file]);
+  lastPrintAt = Date.now();
+  log('keep-alive feed');
+}
 
 if (!KEY && !process.env.ONCE) { console.error('EXHIBIT_PRINT_KEY is required'); process.exit(1); }
 
@@ -127,13 +158,14 @@ async function printPng(png, label) {
   if (DRY) { log('DRY — rendered', file); return file; }
   // fit-to-page keeps the sheet on A4 whatever the driver's default; media A4 so it does not pick letter.
   await run('lp', ['-d', PRINTER, '-o', 'media=A4', '-o', 'fit-to-page', '-t', label, file]);
+  lastPrintAt = Date.now();
   return file;
 }
 
-async function ack(id, ok, error) {
+async function ack(id, ok, error, retry = false) {
   await fetch(`${ORIGIN}/api/exhibit/print?key=${encodeURIComponent(KEY)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ack: { id, ok, error: error ? String(error).slice(0, 200) : undefined } }),
+    body: JSON.stringify({ ack: { id, ok, retry, error: error ? String(error).slice(0, 200) : undefined } }),
   }).catch((e) => log('ack failed', e.message));
 }
 
@@ -147,9 +179,18 @@ async function loop() {
       if (!r.ok) throw new Error(`poll ${r.status}`);
       const { jobs } = await r.json();
       backoff = 1000;
+      if (jobs.length === 0 && KEEPALIVE_MIN > 0 && Date.now() - lastPrintAt > KEEPALIVE_MIN * 60_000 && await printerPresent()) {
+        try { await keepAlive(); } catch (e) { log(`keep-alive failed: ${e.message}`); }
+      }
       for (const job of jobs) {
         const label = `fax-${job.tokenId}-${job.id}`;
         log(`job ${job.id} (attempt ${job.attempt}) #${job.tokenId} ${job.event} ${job.handle || ''}`);
+        if (!(await printerPresent())) {
+          log('  printer not present (asleep / unplugged) — job held, will retry');
+          await ack(job.id, false, 'Printer asleep or unplugged — press its power button', true);
+          await new Promise((r) => setTimeout(r, 10_000));
+          continue;
+        }
         try {
           const png = await renderSheet(job);
           const file = await printPng(png, label);
