@@ -8,7 +8,11 @@
 #
 # Env: CAM_PUBLISH_PASS (required), CAM_DEVICE (default QDQHD2KCM),
 #      CAM_SIZE (default 1280x720), CAM_FPS (default 30), CAM_KBPS (default 2500),
-#      CAM_RELAY (default 46.225.158.75)
+#      CAM_RELAY (default 46.225.158.75), CAM_PATH (relay path, default printer)
+#
+# Two cameras = two instances of this script with different CAM_DEVICE/CAM_PATH
+# (the launchd agent app.nftfax.exhibit-cam2 runs the second). The tablet shows
+# whichever the operator picks with the 1 / 2 buttons.
 #
 # Notes for WebRTC: H.264 with no B-frames and a ~2 s keyframe interval so a
 # viewer joining mid-stream gets a picture quickly. The output rate is whatever
@@ -25,7 +29,8 @@ SIZE="${CAM_SIZE:-1280x720}"
 FPS="${CAM_FPS:-30.00003}"
 KBPS="${CAM_KBPS:-2500}"
 RELAY="${CAM_RELAY:-46.225.158.75}"
-URL="rtsp://publisher:${CAM_PUBLISH_PASS}@${RELAY}:8554/printer"
+CAM_PATH="${CAM_PATH:-printer}"
+URL="rtsp://publisher:${CAM_PUBLISH_PASS}@${RELAY}:8554/${CAM_PATH}"
 
 # A print job on the same USB 2 hub can starve the camera; the capture then
 # stalls and ffmpeg sits forever producing nothing, while the relay drops the
@@ -33,7 +38,7 @@ URL="rtsp://publisher:${CAM_PUBLISH_PASS}@${RELAY}:8554/printer"
 # a dead input or socket, and the progress watchdog below kills it if the frame
 # counter stops advancing for 15 s. The loop then reconnects.
 while true; do
-  echo "$(date '+%H:%M:%S') publishing ${DEV} ${SIZE}@${FPS} → ${RELAY}/printer"
+  echo "$(date '+%H:%M:%S') publishing ${DEV} ${SIZE}@${FPS} → ${RELAY}/${CAM_PATH}"
   PROG=$(mktemp -t nftfax-cam-progress)
   ffmpeg -hide_banner -loglevel warning -nostats -progress "$PROG" \
     -f avfoundation -framerate "$FPS" -video_size "$SIZE" -pixel_format "${CAM_PIXFMT:-uyvy422}" -i "${DEV}:none" \

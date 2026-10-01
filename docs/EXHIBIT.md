@@ -74,7 +74,8 @@ https://nftfax.app/exhibit?key=<EXHIBIT_PRINT_KEY>&cam=whep:https://…/webRTC/p
 | `key=<secret>` | none | Use the built-in print queue on nftfax.app; the printer daemon polls it with the same key. **This is the Marfa setup.** |
 | `middleware=<url>` | none | Instead of the queue, POST every event to your own local daemon. Without either, the dashboard is display-only. |
 | `poll=<s>` | 8 | Leaderboard poll interval. Do not go below ~5; the leaderboard route scans logs. |
-| `cam=whep:<url>` | off | Printer cam via WebRTC/WHEP — **sub-second**. Cloudflare Stream Live or MediaMTX. |
+| `cam=whep:<url>` | relay `printer` | Camera 1 via WebRTC/WHEP — **sub-second**. Defaults to the relay's `printer` stream; `cam=off` hides. |
+| `cam2=whep:<url>` | relay `wide` | Camera 2. When both exist the control bar gains **1 / 2** buttons to swap the PIP. The Mac runs a second publisher (`app.nftfax.exhibit-cam2`, built-in camera by default; `CAM2_DEVICE=` in the env file to use another). |
 | `cam=<https url>` | off | Printer cam via any embeddable player in an iframe (YouTube, Twitch, Cloudflare iframe). 3–10 s latency. |
 | `cam=local` | off | This device's own camera. Only useful if the printer is beside the tablet — it is not. |
 | `pip=br\|bl\|tr\|tl` | `br` | Which corner the printer cam sits in. |

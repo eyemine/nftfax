@@ -113,6 +113,8 @@ interface Options {
   queueKey: string;
   pollMs: number;
   cam: CamSource;
+  /// Optional second camera (`?cam2=`); the operator swaps with the 1 / 2 buttons.
+  cam2: CamSource;
   pip: 'br' | 'bl' | 'tr' | 'tl';
   test: boolean;
   /// Automatic print on every new mint. Off by default: the venue operator
@@ -127,7 +129,7 @@ const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfella
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
-const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment' };
+const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, cam2: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment' };
 
 function short(addr: string): string { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 /// chainDepth is the fax's POSITION in the chain (the origin send is 1). Hops
@@ -168,6 +170,7 @@ function readOptions(): Options {
     // The printer cam defaults to the relay: it is a public gallery feed, and
     // the bare /exhibit URL should show the machine. `cam=off` hides it.
     cam: parseCam(p.get('cam') ?? 'whep:https://nftfax.app/cam/printer/whep'),
+    cam2: parseCam(p.get('cam2') ?? 'whep:https://nftfax.app/cam/wide/whep'),
     pip: pip === 'bl' || pip === 'tr' || pip === 'tl' ? pip : 'br',
     test: p.get('test') === '1',
     auto: p.get('auto') === '1',
@@ -419,7 +422,11 @@ export default function ExhibitPage() {
   const [dissolve, setDissolve] = useState(0);
   const [events, setEvents] = useState<PrintEvent[]>([]);
   const [camOn, setCamOn] = useState(false);
-  const camKind = opts.cam.kind;
+  /// Which camera the PIP shows. Only meaningful when cam2 is configured.
+  const [camIdx, setCamIdx] = useState<0 | 1>(0);
+  const activeCam = camIdx === 1 && opts.cam2.kind !== 'off' ? opts.cam2 : opts.cam;
+  const camKind = activeCam.kind;
+  const twoCams = opts.cam.kind !== 'off' && opts.cam2.kind !== 'off';
   const [camError, setCamError] = useState('');
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [featuredTrayId, setFeaturedTrayId] = useState<string>('');
@@ -823,11 +830,11 @@ export default function ExhibitPage() {
       {/* ── Webcam PIP ────────────────────────────────────────────────────── */}
       {camOn && camKind !== 'off' && (
         <div className={`absolute ${pipClass} z-30 w-[48vw] min-w-[400px] max-w-[720px] overflow-hidden border-[3px] border-[#25251f] bg-black shadow-[0_16px_48px_rgba(0,0,0,.5)]`}>
-          {opts.cam.kind === 'whep' ? (
-            <WhepPlayer url={opts.cam.url} onError={setCamError} />
-          ) : opts.cam.kind === 'iframe' ? (
+          {activeCam.kind === 'whep' ? (
+            <WhepPlayer key={activeCam.url} url={activeCam.url} onError={setCamError} />
+          ) : activeCam.kind === 'iframe' ? (
             <iframe
-              src={opts.cam.url}
+              src={activeCam.url}
               title="Printer cam"
               className="block aspect-video w-full border-0"
               allow="autoplay; encrypted-media; picture-in-picture"
@@ -838,7 +845,7 @@ export default function ExhibitPage() {
             <video ref={videoRef} autoPlay muted playsInline className="block aspect-video w-full object-cover" />
           )}
           <div className="absolute left-0 top-0 flex items-center gap-1.5 bg-[#25251f]/85 px-2 py-0.5 text-[9px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e65b2f]" /> Printer cam
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#e65b2f]" /> Printer cam{twoCams ? ` ${camIdx + 1}` : ''}
           </div>
           {camError && <p className="absolute inset-x-0 bottom-0 bg-[#a94228] px-2 py-0.5 text-[9px] font-bold uppercase text-white">{camError}</p>}
         </div>
@@ -858,6 +865,16 @@ export default function ExhibitPage() {
               solid = PIP showing live video. */}
           <Cctv size={16} className={camKind === 'off' || (camOn && camError) ? 'opacity-40' : camOn ? '' : 'text-[#e65b2f]'} />
         </button>
+        {twoCams && ([0, 1] as const).map((i) => (
+          <button
+            key={i}
+            onClick={() => { primeFaxAudio(); setCamIdx(i); setCamError(''); if (!camOn) setCamOn(true); }}
+            title={`Printer cam ${i + 1}`}
+            className={`border border-[#77705f] px-2.5 py-2 text-[11px] font-black ${camOn && camIdx === i ? 'bg-[#25251f] text-[#efe8d8]' : 'bg-[#d8d0bf]/90 text-[#625e52]'}`}
+          >
+            {i + 1}
+          </button>
+        ))}
         {/* PRINT: the operator's pseudo-forward to the physical machine. Orange
             with a glow — it is the one control a visitor should notice. */}
         <button
