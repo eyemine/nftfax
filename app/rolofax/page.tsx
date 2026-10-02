@@ -150,6 +150,8 @@ export default function PreRegisterPage() {
   const [ensNames, setEnsNames] = useState<Record<string, string>>({});
   /// Free-text filter on the holder wallet: matches address or ENS name.
   const [walletFilter, setWalletFilter] = useState('');
+  // The header shows the connected wallet by ENS when it has one, even before it joins.
+  useEffect(() => { if (walletAddress) void resolveEns([walletAddress]); }, [walletAddress]); // eslint-disable-line react-hooks/exhaustive-deps
   const [ownedTokenIds, setOwnedTokenIds] = useState<number[]>([]);
   const [loadingTokens, setLoadingTokens] = useState(false);
 
@@ -318,7 +320,27 @@ export default function PreRegisterPage() {
             <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Player directory</p>
           </div>
         </div>
-        <Link href="/" className="key-shadow text-[11px] sm:text-[12px] font-bold uppercase tracking-[.12em] underline text-[#625e52] whitespace-nowrap"><ArrowLeft size={13} className="inline" /> Fax</Link>
+        {/* Wallet top-right, Fax link beneath it. */}
+        <div className="flex flex-col items-end gap-1.5">
+          {walletAddress ? (
+            <button
+              onClick={() => void disconnectWallet(activeWallet, { authenticated, logout })}
+              title="Disconnect"
+              className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-1.5 text-[10px] sm:text-[11px] font-bold uppercase tracking-[.1em] text-[#3e3b34] whitespace-nowrap"
+            >
+              <span className="h-2 w-2 rounded-full bg-[#56705a]" />
+              {ensNames[walletAddress] || `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`}
+            </button>
+          ) : (
+            <button
+              onClick={() => connectWallet()}
+              className="key-shadow flex items-center gap-1.5 border border-[#983b21] bg-[#e65b2f] px-2 sm:px-3 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-[.1em] text-white whitespace-nowrap"
+            >
+              <Users size={13} /> Connect wallet
+            </button>
+          )}
+          <Link href="/" className="key-shadow text-[11px] sm:text-[12px] font-bold uppercase tracking-[.12em] underline text-[#625e52] whitespace-nowrap"><ArrowLeft size={13} className="inline" /> Fax</Link>
+        </div>
       </header>
 
       <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[.9fr_1.1fr]">

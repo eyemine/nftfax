@@ -751,10 +751,16 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     if (activeTab === 'sent') return sentFaxes;
     if (activeTab === 'saved') return faxes.filter((f) => f.savedGnosis);
     if (activeTab === 'minted') {
-      const inboxMinted = faxes.filter((f) => f.mintedBase);
-      const inboxMintedIds = new Set(inboxMinted.map((f) => f.id));
-      const sentMinted = sentFaxes.filter((f) => f.mintedBase && !inboxMintedIds.has(f.id));
-      return [...inboxMinted, ...sentMinted];
+      // Only forwarded faxes can be minted, so the collectible IS the sent hop.
+      // The mint record is keyed by the received tray too (that is what gates a
+      // second mint), which made the received copy show up here alongside the
+      // hop that was actually minted. List the sent hop; drop a received fax
+      // whenever its forwarded hop is present.
+      const sentMinted = sentFaxes.filter((f) => f.mintedBase);
+      const sentIds = new Set(sentMinted.map((f) => f.id));
+      const sentSources = new Set(sentMinted.map((f) => f.sourceTrayId).filter(Boolean));
+      const inboxMinted = faxes.filter((f) => f.mintedBase && !sentIds.has(f.id) && !sentSources.has(f.id) && !(f.forwardedTrayId && sentIds.has(f.forwardedTrayId)));
+      return [...sentMinted, ...inboxMinted];
     }
     // Fax-Tray: show all received faxes (forwarded/minted retained with status badges)
     return faxes.filter((f) => !f.savedGnosis);
