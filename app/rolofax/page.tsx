@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, ArrowLeft, X, Send } from 'lucide-react';
+import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { FaxHandleThumb } from '../components/FaxHandleThumb';
 import Link from 'next/link';
@@ -320,7 +320,7 @@ export default function PreRegisterPage() {
             <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Player directory</p>
           </div>
         </div>
-        {/* Wallet top-right, Fax link beneath it. */}
+        {/* Wallet top-right; Office sits under the rule, left. */}
         <div className="flex flex-col items-end gap-1.5">
           {walletAddress ? (
             <button
@@ -339,9 +339,9 @@ export default function PreRegisterPage() {
               <Users size={13} /> Connect wallet
             </button>
           )}
-          <Link href="/" className="key-shadow text-[11px] sm:text-[12px] font-bold uppercase tracking-[.12em] underline text-[#625e52] whitespace-nowrap"><ArrowLeft size={13} className="inline" /> Fax</Link>
         </div>
       </header>
+      <div className="mx-auto mb-5 flex max-w-6xl"><Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link></div>
 
       <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[.9fr_1.1fr]">
         <SkinPanel theme={theme} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">

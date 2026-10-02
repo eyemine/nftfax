@@ -85,7 +85,11 @@ export default function DrawClient() {
   const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/draw/state', { cache: 'no-store' });
-      const json = (await res.json()) as {
+      // During a deploy (or a Cloudflare hiccup) the response is an HTML error
+      // page, and res.json() surfaces as "Unexpected token '<'". Read the body
+      // as text first so the fault is legible and the next poll can recover.
+      const text = await res.text();
+      let json: {
         round: number;
         currentBlock: number;
         totalMinted: number;
@@ -99,6 +103,7 @@ export default function DrawClient() {
         entries: MintEntry[];
         error?: string;
       };
+      try { json = JSON.parse(text); } catch { throw new Error(res.ok ? 'Draw state unreadable — retrying' : `Service restarting (${res.status}) — retrying`); }
       if (!res.ok || json.error) {
         throw new Error(json.error ?? 'Could not read draw state');
       }
@@ -229,14 +234,14 @@ export default function DrawClient() {
             <div className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center rounded-sm bg-[#25251f] text-[#efe8d8]"><Dices size={25} /></div>
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]">PRIZE POOL<span className="text-[#a94228]">*</span></h1>
-              <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Commit / reveal on a Base block hash</p>
+              <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Commit / reveal</p>
             </div>
           </div>
           <div className="flex gap-1.5 sm:gap-2">
             <Link href="/verify" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase"><ShieldAlert size={12} /> Verify</Link>
-            <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
           </div>
         </header>
+        <div className="mb-5 flex"><Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link></div>
 
         {!FAX_CONTRACT_DEPLOYED && (
           <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">

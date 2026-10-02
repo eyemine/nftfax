@@ -223,8 +223,8 @@ export default function RolofaxClient() {
               <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Leaderboard & chain log</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
         </header>
+        <div className="mb-5 flex"><Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link></div>
 
         {loading && (
           <div className="grid min-h-[200px] place-items-center"><Loader2 className="animate-spin text-[#847d6e]" size={28} /></div>
