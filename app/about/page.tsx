@@ -45,14 +45,15 @@ export default function AboutPage() {
           <SkinPanel theme={FAX_THEME} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
             <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">How to play</div>
             <div className="p-5 md:p-8 space-y-4 text-sm leading-relaxed text-[#3e3b34]">
-              <ul className="space-y-2 list-disc pl-4">
-                <li><strong>Register</strong> your <strong>@fax</strong> identity in the Rolofax directory before launch.</li>
-                <li><strong>Send</strong> a greyscale image to any <code>prefix.tokenId@fax</code> address.</li>
-                <li><strong>Forward</strong> public faxes you receive to keep the chain alive. <strong>Every forward spends 1 credit</strong>. Hops 1–5 also credit the recipient +1 (capped at 5). Hop 6+ forwards do not credit the recipient — the chain must be unlocked by a mint.</li>
-                <li><strong>Mint</strong> a fax to Base only after forwarding — the collectible costs 1 credit and credits the next recipient +1, giving them a fresh 72-hour timer.</li>
-                <li><strong>Save</strong> a fax to Gnosis for permanence — rescues it from the hop timer and 8-day gallery decay.</li>
-                <li><strong>No loops</strong> — each participant can only appear once in a chain. You cannot forward back to the sender or any previous hop.</li>
-              </ul>
+              <ol className="space-y-2 list-decimal pl-5">
+                <li><strong>Register</strong> your <strong>@fax</strong> identity in the Rolofax directory. You start with <strong>2 credits</strong>; the first 100 to join get 5.</li>
+                <li><strong>Send</strong> a greyscale image to any <code>collection.tokenId@fax</code> address — <code>chonk.681@fax</code>, <code>atom.648@fax</code>, <code>dfz.7837@fax</code>, <code>normie.2613@fax</code>.</li>
+                <li><strong>Forward</strong> public faxes you receive to keep the chain alive. Each forward adds your image to the chain&apos;s collage and <strong>costs you 1 credit</strong>; on hops 1–5 the recipient <strong>earns +1</strong> (max 5).</li>
+                <li><strong>Hop 6+</strong> earns nothing — the chain stalls until someone mints.</li>
+                <li><strong>Mint</strong> a fax you have forwarded to Base for <strong>0.002 ETH + 1 credit</strong>. The next recipient gets +1 credit and a fresh 72-hour timer, and you enter the prize draw.</li>
+                <li><strong>Beat the clock</strong> — every hop has <strong>72 hours</strong> before the line jams. A jammed hop dies; your credits don&apos;t.</li>
+                <li><strong>No loops</strong> — each @fax appears once per chain. Never forward back to the sender or any earlier hop.</li>
+              </ol>
             </div>
           </SkinPanel>
 
