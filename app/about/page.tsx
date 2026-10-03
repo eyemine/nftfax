@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowLeft, Info } from 'lucide-react';
+import { ArrowLeft, Info, LampDesk } from 'lucide-react';
 import { FAX_THEME } from '../lib/theme';
 import { SkinPanel } from '../components/SkinPanel';
 
@@ -23,7 +23,7 @@ export default function AboutPage() {
               <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">Rules of the chain letter</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
+          <Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link>
         </header>
 
         <div className="space-y-4">
@@ -165,9 +165,6 @@ export default function AboutPage() {
                 Deep chains can be minted into a fixed-supply <strong>2222 NFT collection</strong> tiered by hop depth.
                 The tier names are for clarity: two bookend names with meaning, nine literal hop descriptors in between.
                 A collector who sees <strong>7 Hop</strong> knows exactly what they earned.
-              </p>
-              <p className="border-l-4 border-[#e65b2f] bg-[#f5dcc8] p-3 text-[12px] font-bold uppercase tracking-[.12em] text-[#8a3e1e]">
-                ⚡ Mint contract launches on Base — 16 August 2026, 12:00 UTC. Chain play and Rolofax registration open 15 August 2026.
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-left text-[12px] md:text-xs">

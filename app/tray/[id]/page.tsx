@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Loader2, Lock, LayersArrowDown, X } from 'lucide-react';
+import { Loader2, Lock, LayersArrowDown, X, LampDesk } from 'lucide-react';
 import Link from 'next/link';
 import { FAX_THEME } from '../../lib/theme';
 import { SkinPanel } from '../../components/SkinPanel';
@@ -153,7 +153,7 @@ function FaxContent({ doc, embed = false, status = '', cc = '' }: { doc: TrayDoc
               <p className="text-[11px] sm:text-[11px] font-bold uppercase tracking-[0.2em] sm:tracking-[0.28em] text-[#625e52]">{FAX_THEME.tagline}</p>
             </div>
           </div>
-          <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
+          <Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link>
         </header>}
 
         {/* Embed mode is the flat, paper-like rendering the exhibit frames: no

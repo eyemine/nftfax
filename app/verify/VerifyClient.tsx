@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Loader2, ShieldCheck, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { Loader2, ShieldCheck, ArrowLeft, AlertTriangle, LampDesk } from 'lucide-react';
 import {
   FAX_CONTRACT,
   FAX_CONTRACT_DEPLOYED,
@@ -95,7 +95,7 @@ export default function VerifyClient() {
           </div>
           <div className="flex gap-1.5 sm:gap-2">
             <Link href="/draw" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Draw</Link>
-            <Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link>
+            <Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link>
           </div>
         </header>
 

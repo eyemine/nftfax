@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { Loader2, Dices, CheckCircle2, Clock, Trophy, ArrowLeft, ShieldAlert, Check } from 'lucide-react';
+import { Loader2, Dices, CheckCircle2, Clock, Trophy, ArrowLeft, ShieldAlert, Check, LampDesk } from 'lucide-react';
 import {
   FAX_CONTRACT,
   FAX_CONTRACT_DEPLOYED,
@@ -241,7 +241,7 @@ export default function DrawClient() {
             <Link href="/verify" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase"><ShieldAlert size={12} /> Verify</Link>
           </div>
         </header>
-        <div className="mb-5 flex"><Link href="/" className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap">Office</Link></div>
+        <div className="mb-5 flex"><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
 
         {!FAX_CONTRACT_DEPLOYED && (
           <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">
