@@ -61,11 +61,13 @@ async function printerPresent() {
 /// A near-empty page: the smallest custom size the driver accepts. Just enough
 /// to reset the idle timer. ~3 mm of paper.
 async function keepAlive() {
-  const png = await sharp({ create: { width: W, height: 24, channels: 3, background: '#fff' } }).png().toBuffer();
+  const png = await sharp({ create: { width: W, height: 8, channels: 3, background: '#fff' } }).png().toBuffer();
   const dir = await mkdtemp(join(tmpdir(), 'nftfax-ka-'));
   const file = join(dir, 'keepalive.png');
   await writeFile(file, png);
-  await run('lp', ['-d', PRINTER, '-o', 'media=Custom.210x3mm', '-t', 'nftfax-keepalive', file]);
+  // The driver adds its own gap and feed after a page; zero them, or a 3 mm
+  // page still pushes out a few centimetres.
+  await run('lp', ['-d', PRINTER, '-o', 'media=Custom.210x3mm', '-o', 'MediaTracking=0', '-o', 'PostAction=0', '-o', 'GapHeight=0', '-o', 'FeedOffset=0', '-t', 'nftfax-keepalive', file]);
   lastPrintAt = Date.now();
   log('keep-alive feed');
 }
