@@ -890,12 +890,11 @@ export default function ExhibitPage() {
               onClick={() => { if (noKey) return; primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); } }}
               disabled={noKey}
               title={noKey ? 'No print key — display only' : offline ? 'Machine offline — job will queue' : 'Fax this transmission to the machine'}
-              className={`flex items-center gap-2 border-2 p-2.5 transition-shadow ${live
+              className={`border-2 p-2.5 transition-shadow ${live
                 ? 'border-[#983b21] bg-[#e65b2f] text-white shadow-[0_0_18px_rgba(230,91,47,.75),0_0_40px_rgba(230,91,47,.35)] hover:shadow-[0_0_26px_rgba(230,91,47,.95),0_0_60px_rgba(230,91,47,.5)]'
                 : 'cursor-not-allowed border-[#77705f] bg-[#b5ad9d] text-[#625e52]'}`}
             >
               <Printer size={18} />
-              {noKey && <span className="text-[10px] font-black uppercase tracking-[.12em]">No print key — display only</span>}
             </button>
           );
         })()}

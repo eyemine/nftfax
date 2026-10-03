@@ -226,7 +226,7 @@ export default function RolofaxClient() {
         </header>
 
         {loading && (
-          <div className="grid min-h-[200px] place-items-center"><Loader2 className="animate-spin text-[#847d6e]" size={28} /></div>
+          <div className="grid min-h-[56px] place-items-center py-2"><Loader2 className="animate-spin text-[#847d6e]" size={22} /></div>
         )}
         {error && (
           <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">FAULT: {error}</div>

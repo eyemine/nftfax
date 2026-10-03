@@ -254,7 +254,7 @@ export default function DrawClient() {
         )}
 
         {loading && (
-          <div className="grid min-h-[200px] place-items-center"><Loader2 className="animate-spin text-[#847d6e]" size={28} /></div>
+          <div className="grid min-h-[56px] place-items-center py-2"><Loader2 className="animate-spin text-[#847d6e]" size={22} /></div>
         )}
 
         {error && (

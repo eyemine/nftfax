@@ -213,17 +213,17 @@ export default function HomeClient() {
         </div>
       </header>
 
-      <div className="mx-auto mb-4 flex max-w-6xl flex-wrap items-center gap-2 sm:grid sm:grid-cols-3">
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 sm:justify-self-start">
+      <div className="mx-auto mb-4 flex max-w-6xl flex-wrap items-center justify-center gap-2 md:grid md:grid-cols-3">
+        <div className="flex flex-wrap items-center gap-1.5 md:gap-2 md:justify-self-start">
           <Link
             href="/rolofax"
-            className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex items-center gap-1.5 md:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 md:px-4 py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
           >
             <Radar size={14} /> Rolofax
           </Link>
           <button
             onClick={() => { setShowSplash(false); setView('send'); }}
-            className={`key-shadow flex items-center gap-1.5 sm:gap-2 border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'send' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+            className={`key-shadow flex items-center gap-1.5 md:gap-2 border px-3 md:px-4 py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] ${view === 'send' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
             <Send size={14} /> Send
           </button>
@@ -232,9 +232,9 @@ export default function HomeClient() {
             title={unseenFaxTotal > 0
               ? `${unseenFaxTotal} fax${unseenFaxTotal === 1 ? '' : 'es'} waiting on ${unseenFaxAlerts.map((a) => `${a.handle}@fax`).join(', ')}`
               : undefined}
-            className={`key-shadow relative flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+            className={`key-shadow relative flex h-9 w-9 items-center justify-center gap-1.5 border md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
-            <Inbox size={14} /> <span className="hidden sm:inline">Fax-Tray</span>
+            <Inbox size={14} /> <span className="hidden md:inline">Fax-Tray</span>
             {unseenFaxTotal > 0 && (
               <span
                 aria-label={`${unseenFaxTotal} fax${unseenFaxTotal === 1 ? '' : 'es'} awaiting a forward`}
@@ -246,36 +246,36 @@ export default function HomeClient() {
           </button>
           <Link
             href="/leaderboard"
-            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
           >
-            <LinkIcon size={14} /> <span className="hidden sm:inline">Fax Chain Log</span>
+            <LinkIcon size={14} /> <span className="hidden md:inline">Fax Chain Log</span>
           </Link>
           <Link
             href="/draw"
-            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em]"
+            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
           >
-            <Dices size={14} /> <span className="hidden sm:inline">Prize Pool<span className="text-[#a94228]">*</span></span>
+            <Dices size={14} /> <span className="hidden md:inline">Prize Pool<span className="text-[#a94228]">*</span></span>
           </Link>
         </div>
         <Link
           href="/about"
-          className="key-shadow flex items-center gap-1.5 sm:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] sm:justify-self-center"
+          className="key-shadow order-last flex basis-full items-center justify-center gap-1.5 md:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 md:px-4 py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] md:order-none md:basis-auto md:justify-self-center"
         >
           <Info size={14} /> About
         </Link>
-        <div className="flex items-center gap-1.5 sm:gap-2 sm:justify-self-end">
+        <div className="flex items-center gap-1.5 md:gap-2 md:justify-self-end">
           {(collection || FAX_THEME.key) === 'chonk' && (
             <button
               onClick={() => { setShowSplash(false); setView('backpack'); }}
-              className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'backpack' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+              className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] ${view === 'backpack' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
               title="View your Chonk backpacks (tokenbound.org replacement)"
             >
-              <BackpackIcon size={14} /> <span className="hidden sm:inline">Backpack</span>
+              <BackpackIcon size={14} /> <span className="hidden md:inline">Backpack</span>
             </button>
           )}
           <button
             onClick={() => { setShowSplash(false); setView('delegate'); }}
-            className={`hidden sm:flex items-center gap-1.5 sm:gap-2 key-shadow border px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.1em] sm:tracking-[.14em] ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+            className={`hidden md:flex [@media(hover:none)_and_(orientation:landscape)_and_(max-width:1023px)]:!hidden items-center gap-1.5 md:gap-2 key-shadow border px-3 md:px-4 py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
             <UserCheck size={14} /> Delegate
           </button>
