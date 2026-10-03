@@ -807,7 +807,7 @@ export default function ExhibitPage() {
                   ? printer
                     ? <><span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${printer.daemonOnline ? 'bg-[#3d5a40]' : 'bg-[#a94228]'}`} />{printer.daemonOnline ? `Machine online${printer.daemonInfo ? ` · ${printer.daemonInfo}` : ''}` : 'Machine offline'}{printer.pending ? ` · ${printer.pending} queued` : ''}{printer.lastError ? ` · ${printer.lastError}` : ''}</>
                     : 'Queue · checking machine…'
-                  : opts.middleware ? `→ ${opts.middleware.replace(/^https?:\/\//, '')}` : 'no middleware · display only'}
+                  : opts.middleware ? `→ ${opts.middleware.replace(/^https?:\/\//, '')}` : <><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[#a94228]" />No print key — display only</>}
               </p>
             </div>
             <ul className="mt-1 max-h-16 space-y-0.5 overflow-hidden text-[9px] font-bold uppercase tracking-[.06em] xl:max-h-24 xl:text-[11px]">
@@ -877,13 +877,28 @@ export default function ExhibitPage() {
         ))}
         {/* PRINT: the operator's pseudo-forward to the physical machine. Orange
             with a glow — it is the one control a visitor should notice. */}
-        <button
-          onClick={() => { primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); } }}
-          title="Fax this transmission to the machine"
-          className="border-2 border-[#983b21] bg-[#e65b2f] p-2.5 text-white shadow-[0_0_18px_rgba(230,91,47,.75),0_0_40px_rgba(230,91,47,.35)] transition-shadow hover:shadow-[0_0_26px_rgba(230,91,47,.95),0_0_60px_rgba(230,91,47,.5)]"
-        >
-          <Printer size={18} />
-        </button>
+        {(() => {
+          // Without a print key the page is display-only and PRINT must say so,
+          // not play the handshake into the void. With a key but the machine
+          // offline, PRINT still queues (the daemon prints when it is back) but
+          // loses its glow so the operator notices.
+          const noKey = !opts.middleware;
+          const offline = !!opts.queueKey && printer !== null && !printer.daemonOnline;
+          const live = !noKey && !offline;
+          return (
+            <button
+              onClick={() => { if (noKey) return; primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); } }}
+              disabled={noKey}
+              title={noKey ? 'No print key — display only' : offline ? 'Machine offline — job will queue' : 'Fax this transmission to the machine'}
+              className={`flex items-center gap-2 border-2 p-2.5 transition-shadow ${live
+                ? 'border-[#983b21] bg-[#e65b2f] text-white shadow-[0_0_18px_rgba(230,91,47,.75),0_0_40px_rgba(230,91,47,.35)] hover:shadow-[0_0_26px_rgba(230,91,47,.95),0_0_60px_rgba(230,91,47,.5)]'
+                : 'cursor-not-allowed border-[#77705f] bg-[#b5ad9d] text-[#625e52]'}`}
+            >
+              <Printer size={18} />
+              {noKey && <span className="text-[10px] font-black uppercase tracking-[.12em]">No print key — display only</span>}
+            </button>
+          );
+        })()}
         {canFullscreen && (
           <button onClick={() => void document.documentElement.requestFullscreen?.()} title="Fullscreen" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
             <Maximize2 size={14} />
