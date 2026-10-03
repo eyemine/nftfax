@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send, LampDesk } from 'lucide-react';
+import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send, LampDesk, Backpack as BackpackIcon, UserCheck } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { FaxHandleThumb } from '../components/FaxHandleThumb';
 import Link from 'next/link';
@@ -341,7 +341,7 @@ export default function PreRegisterPage() {
           )}
         </div>
       </header>
-      <div className="mx-auto mb-5 flex max-w-6xl justify-end"><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
+      <div className="mx-auto mb-5 flex max-w-6xl justify-end gap-2"><Link href="/?view=delegate" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><UserCheck size={13} /> Delegate</Link><Link href="/?view=backpack" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><BackpackIcon size={13} /> Backpack</Link><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
 
       <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[.9fr_1.1fr]">
         <SkinPanel theme={theme} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, UserCheck, Info, Link as LinkIcon, Dices, Backpack as BackpackIcon, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
+import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, Info, Link as LinkIcon, Dices, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
 import InTray from './components/InTray';
 
 type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
@@ -48,7 +48,12 @@ export default function HomeClient() {
   const isConnected = authenticated || !!walletAddress;
   const [rolofaxEntries, setRolofaxEntries] = useState<{ handle: string; wallet: string; collection: string }[]>([]);
   const [allRolofaxEntries, setAllRolofaxEntries] = useState<{ handle: string; wallet: string; collection: string }[]>([]);
-  const [showSplash, setShowSplash] = useState(!searchParams.get('to'));
+  const [showSplash, setShowSplash] = useState(!searchParams.get('to') && !searchParams.get('view'));
+  // Backpack and Delegate are reached from the Rolofax / Fax Chain Log pages via ?view=.
+  useEffect(() => {
+    const v = searchParams.get('view');
+    if (v === 'backpack' || v === 'delegate') { setView(v); setShowSplash(false); }
+  }, [searchParams]);
   /// Actionable (unforwarded, not-yet-jammed) fax counts per owned @fax handle.
   /// Identities are per-NFT, so a fax often lands on a handle the player is not
   /// looking at and silently jams — these drive the Fax-Tray badge.
@@ -200,7 +205,7 @@ export default function HomeClient() {
           <div className="flex items-center gap-2 sm:gap-3">
             <LayersArrowDown size={28} className="text-[#1a1a14]" />
             <div>
-              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-[#1a1a14] font-black sm:font-bold [-webkit-text-stroke:0.6px_#1a1a14] sm:[-webkit-text-stroke:0.2px_#1a1a14]">{showSplash ? (collection ? collectionTheme.siteName : 'NFTFAX') : collectionTheme.siteName}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
+              <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-[#1a1a14] font-black sm:font-bold [-webkit-text-stroke:0.6px_#1a1a14] sm:[-webkit-text-stroke:0.2px_#1a1a14]">{showSplash && collection ? collectionTheme.siteName : 'NFTFAX'}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
             </div>
           </div>
         </div>
@@ -244,41 +249,26 @@ export default function HomeClient() {
               </span>
             )}
           </button>
-          <Link
-            href="/leaderboard"
-            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
-          >
-            <LinkIcon size={14} /> <span className="hidden md:inline">Fax Chain Log</span>
-          </Link>
+        </div>
+        <Link
+          href="/about"
+          className="key-shadow order-last flex h-9 basis-full items-center justify-center gap-1.5 md:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 md:px-4 md:h-auto md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] md:order-none md:basis-auto md:justify-self-center"
+        >
+          <Info size={14} /> About
+        </Link>
+        <div className="flex items-center gap-1.5 md:gap-2 md:justify-self-end">
           <Link
             href="/draw"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
           >
             <Dices size={14} /> <span className="hidden md:inline">Prize Pool<span className="text-[#a94228]">*</span></span>
           </Link>
-        </div>
-        <Link
-          href="/about"
-          className="key-shadow order-last flex basis-full items-center justify-center gap-1.5 md:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 md:px-4 py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] md:order-none md:basis-auto md:justify-self-center"
-        >
-          <Info size={14} /> About
-        </Link>
-        <div className="flex items-center gap-1.5 md:gap-2 md:justify-self-end">
-          {(collection || FAX_THEME.key) === 'chonk' && (
-            <button
-              onClick={() => { setShowSplash(false); setView('backpack'); }}
-              className={`key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] ${view === 'backpack' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
-              title="View your Chonk backpacks (tokenbound.org replacement)"
-            >
-              <BackpackIcon size={14} /> <span className="hidden md:inline">Backpack</span>
-            </button>
-          )}
-          <button
-            onClick={() => { setShowSplash(false); setView('delegate'); }}
-            className={`hidden md:flex [@media(hover:none)_and_(orientation:landscape)_and_(max-width:1023px)]:!hidden items-center gap-1.5 md:gap-2 key-shadow border px-3 md:px-4 py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] ${view === 'delegate' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
+          <Link
+            href="/leaderboard"
+            className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
           >
-            <UserCheck size={14} /> Delegate
-          </button>
+            <LinkIcon size={14} /> <span className="hidden md:inline">Fax Chain Log</span>
+          </Link>
         </div>
       </div>
 
