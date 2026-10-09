@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import { join } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { recordExhibitNote } from '../../../lib/exhibit-feed';
 import { publishExhibitSignal } from '../../../lib/exhibit-signal';
@@ -14,9 +16,8 @@ import { publishExhibitSignal } from '../../../lib/exhibit-signal';
 ///   POST ?key=K  {ack:{id,ok,error}} finish or fail a leased job (the daemon)
 ///   GET  ?key=K&status=1            daemon last-seen + depth   (the tablet)
 ///
-/// The queue lives in process memory. A container restart loses whatever is
-/// in flight, which is at most a few seconds of jobs given the poll cadence;
-/// that is an acceptable trade against adding storage for a weekend show.
+/// The queue persists to the app's data volume so a container restart returns
+/// leased jobs to pending instead of silently dropping physical print work.
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,9 +25,41 @@ export const dynamic = 'force-dynamic';
 type Job = { id: string; payload: Record<string, unknown>; enqueuedAt: number; leasedAt: number | null; attempts: number };
 type Queue = { jobs: Map<string, Job>; daemonSeenAt: number; daemonInfo: string; printed: number; failed: number; lastError: string | null; waiters: Array<() => void> };
 
-// Survive HMR in dev; a fresh Map per module instance in prod is fine.
+const QUEUE_DIR = process.env.EXHIBIT_DATA_DIR || join(process.cwd(), 'data');
+const QUEUE_FILE = join(QUEUE_DIR, 'exhibit-print-queue.json');
+
+function loadQueue(): Queue {
+  const queue: Queue = { jobs: new Map(), daemonSeenAt: 0, daemonInfo: '', printed: 0, failed: 0, lastError: null, waiters: [] };
+  try {
+    const parsed = JSON.parse(readFileSync(QUEUE_FILE, 'utf8')) as { jobs?: Job[]; printed?: number; failed?: number; lastError?: string | null };
+    for (const job of parsed.jobs || []) {
+      if (typeof job?.id !== 'string' || !job.id || typeof job.payload !== 'object' || !job.payload) continue;
+      queue.jobs.set(job.id, { ...job, payload: job.payload, leasedAt: null, attempts: Number(job.attempts) || 0 });
+    }
+    queue.printed = Number(parsed.printed) || 0;
+    queue.failed = Number(parsed.failed) || 0;
+    queue.lastError = typeof parsed.lastError === 'string' ? parsed.lastError : null;
+  } catch {
+    // Missing or unreadable queue: start empty rather than blocking the exhibit.
+  }
+  return queue;
+}
+
+function persistQueue() {
+  try {
+    mkdirSync(QUEUE_DIR, { recursive: true });
+    const temp = `${QUEUE_FILE}.tmp`;
+    writeFileSync(temp, JSON.stringify({ jobs: Array.from(Q.jobs.values()), printed: Q.printed, failed: Q.failed, lastError: Q.lastError }));
+    renameSync(temp, QUEUE_FILE);
+  } catch (cause) {
+    console.error('[exhibit-print] failed to persist queue', cause);
+  }
+}
+
+// Survive HMR in dev; a fresh Map per module instance in prod restores jobs
+// leased before a restart so the physical machine can retry them.
 const g = globalThis as unknown as { __nftfaxPrintQueue?: Queue };
-const Q: Queue = g.__nftfaxPrintQueue ??= { jobs: new Map(), daemonSeenAt: 0, daemonInfo: '', printed: 0, failed: 0, lastError: null, waiters: [] };
+const Q: Queue = g.__nftfaxPrintQueue ??= loadQueue();
 
 const KEY = process.env.EXHIBIT_PRINT_KEY || '';
 const LEASE_MS = 90_000;      // a job leased but not acked in 90 s goes back to pending
@@ -66,6 +99,7 @@ export async function POST(req: NextRequest) {
       if (job.attempts >= MAX_ATTEMPTS) { Q.jobs.delete(ack.id); Q.failed++; }
       else job.leasedAt = null;                  // back to pending; the next poll retries it
     }
+    persistQueue();
     return NextResponse.json({ ok: true });
   }
 
@@ -77,6 +111,7 @@ export async function POST(req: NextRequest) {
   recordExhibitNote({ event: body.event, source, tokenId: body.tokenId, from: body.from, visitor: body.visitor, coverNote: body.coverNote });
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   Q.jobs.set(id, { id, payload: body, enqueuedAt: Date.now(), leasedAt: null, attempts: 0 });
+  persistQueue();
   publishExhibitSignal(body.event, body.tokenId, source);
   wake();
   return NextResponse.json({ ok: true, id, position: pending().length, daemonOnline: Date.now() - Q.daemonSeenAt < 60_000 });
@@ -110,5 +145,6 @@ export async function GET(req: NextRequest) {
   const now = Date.now();
   const lease = pending().slice(0, 5);
   for (const j of lease) { j.leasedAt = now; j.attempts++; }
+  if (lease.length) persistQueue();
   return NextResponse.json({ jobs: lease.map((j) => ({ id: j.id, attempt: j.attempts, enqueuedAt: j.enqueuedAt, ...j.payload })) }, { headers: { 'Cache-Control': 'no-store' } });
 }
