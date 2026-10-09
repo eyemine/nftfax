@@ -450,7 +450,7 @@ export default function ExhibitPage() {
   }, []);
 
   // ── Middleware hook ───────────────────────────────────────────────────────
-  const notifyMiddleware = useCallback(async (mint: Mint, extra: { event: 'mint' | 'fax'; coverNote?: string; from?: string; cc?: string } = { event: 'mint' }): Promise<'none' | 'ok' | 'failed'> => {
+  const notifyMiddleware = useCallback(async (mint: Mint, extra: { event: 'mint' | 'fax'; coverNote?: string; from?: string; cc?: string; source?: string } = { event: 'mint' }): Promise<'none' | 'ok' | 'failed'> => {
     if (!opts.middleware) return 'none';
     const origin = window.location.origin;
     const key = COMMUNITY_KEY[mint.community];
@@ -486,7 +486,7 @@ export default function ExhibitPage() {
     if (soundOn) playFaxHandshake();
     if (printTimer.current) clearTimeout(printTimer.current);
     printTimer.current = setTimeout(() => setPrinting(null), PRINT_OVERLAY_MS);
-    void notifyMiddleware(mint).then((delivered) => {
+    void notifyMiddleware(mint, { event: 'mint', source: 'exhibit' }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
   }, [notifyMiddleware, soundOn]);
@@ -510,7 +510,7 @@ export default function ExhibitPage() {
     // the handshake plays, then a beat, so the visual and the audio agree.
     const ms = soundOn ? playFaxHandshake() : 0;
     printTimer.current = setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); setPrinting(null); setDissolve((n) => n + 1); }, Math.max(ms, 6000) + 1500);
-    void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, cc: OUTGOING_CC }).then((delivered) => {
+    void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, cc: OUTGOING_CC, source: 'exhibit' }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
   }, [outgoing, coverNote, soundOn, notifyMiddleware]);

@@ -140,9 +140,11 @@ export async function renderSheet(job) {
   const stamp = when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
   put(textSvg(['NFTFAX MACHINE  ·  ' + (isFax ? 'CARBON COPY TRANSMISSION' : 'INCOMING TRANSMISSION')], { size: 40, weight: 'bold' }));
   gap(10); put(rule()); gap(18);
+  const source = String(job.source || '').replace(/[^a-z0-9-]/gi, '').toUpperCase();
   put(textSvg([
     `FROM: ${isFax ? job.from || 'Marfa@fax' : job.handle || ''}`,
     `TO:   ${isFax ? job.cc || 'LocalMachine@fax' : ''}`.trimEnd(),
+    source ? `VIA:  ${source}` : '',
     `T/#${String(job.trayId || '').toUpperCase()}    ${stamp}`,
     `FAX CHAIN #${job.tokenId}  ·  ${job.collection || ''}  ·  Hop ${Math.max(0, (job.chainDepth ?? 1) - 1)}`,
   ].filter(Boolean)));

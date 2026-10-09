@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { recordExhibitNote } from '../../../lib/exhibit-feed';
+import { publishExhibitSignal } from '../../../lib/exhibit-signal';
 
 /// Print queue between the exhibition display and the physical fax machine.
 ///
@@ -70,8 +72,12 @@ export async function POST(req: NextRequest) {
   // Tablet enqueuing a print.
   if (typeof body.event !== 'string') return NextResponse.json({ error: 'event required' }, { status: 400 });
   if (Q.jobs.size >= MAX_QUEUE) return NextResponse.json({ error: 'queue full' }, { status: 429 });
+  const source = String(body.source || 'exhibit').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32) || 'exhibit';
+  body.source = source;
+  recordExhibitNote({ event: body.event, source, tokenId: body.tokenId, from: body.from, visitor: body.visitor, coverNote: body.coverNote });
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   Q.jobs.set(id, { id, payload: body, enqueuedAt: Date.now(), leasedAt: null, attempts: 0 });
+  publishExhibitSignal(body.event, body.tokenId, source);
   wake();
   return NextResponse.json({ ok: true, id, position: pending().length, daemonOnline: Date.now() - Q.daemonSeenAt < 60_000 });
 }
