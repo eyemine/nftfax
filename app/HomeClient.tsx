@@ -252,7 +252,7 @@ export default function HomeClient() {
         </div>
         <Link
           href="/about"
-          className="key-shadow order-last flex h-9 basis-full items-center justify-center gap-1.5 md:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 md:px-4 md:h-auto md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] md:order-none md:basis-auto md:justify-self-center"
+          className="key-shadow order-last flex h-9 items-center justify-center gap-1.5 md:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 md:px-4 md:h-auto md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] md:order-none md:justify-self-center"
         >
           <Info size={14} /> About
         </Link>

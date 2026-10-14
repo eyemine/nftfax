@@ -231,10 +231,10 @@ export default function RolofaxClient() {
         {error && (
           <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase">FAULT: {error}</div>
         )}
-        <div className="mb-5 grid grid-cols-3 items-center">
-          <span />
-          <div className="flex justify-center"><Link href="/about" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[12px] font-bold uppercase tracking-[.12em]"><Info size={12} /> About</Link></div>
-          <div className="flex justify-end gap-2"><Link href="/?view=backpack" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><BackpackIcon size={13} /> Backpack</Link><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
+        <div className="mb-5 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div className="flex justify-start"><Link href="/?view=backpack" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><BackpackIcon size={13} /> Backpack</Link></div>
+          <div className="flex justify-center"><Link href="/about" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-3 sm:px-4 py-2 text-[11px] sm:text-[12px] font-bold uppercase tracking-[.12em] whitespace-nowrap"><Info size={12} /> About</Link></div>
+          <div className="flex justify-end"><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
         </div>
 
         {data && (

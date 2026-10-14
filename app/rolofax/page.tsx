@@ -341,7 +341,11 @@ export default function PreRegisterPage() {
           )}
         </div>
       </header>
-      <div className="mx-auto mb-5 flex max-w-6xl justify-end gap-2"><Link href="/?view=delegate" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><UserCheck size={13} /> Delegate</Link><Link href="/?view=backpack" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><BackpackIcon size={13} /> Backpack</Link><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
+      <div className="mx-auto mb-5 grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className="flex justify-start"><Link href="/?view=backpack" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><BackpackIcon size={13} /> Backpack</Link></div>
+        <div className="flex justify-center"><Link href="/?view=delegate" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><UserCheck size={13} /> Delegate</Link></div>
+        <div className="flex justify-end"><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
+      </div>
 
       <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[.9fr_1.1fr]">
         <SkinPanel theme={theme} className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
