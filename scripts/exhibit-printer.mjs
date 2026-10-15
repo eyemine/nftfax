@@ -50,14 +50,27 @@ const TRAIL_PX = Math.round((Number(process.env.TRAIL_MM || 10) / 25.4) * 203);
 const LIGHTEN = Math.min(0.9, Math.max(0, Number(process.env.LIGHTEN ?? 0.25)));
 let lastPrintAt = Date.now();
 
-/// Is the printer physically present and accepting? CUPS marks a vanished USB
-/// printer with `offline-report`; a sleeping unit is simply not on the bus.
+/// Is the printer physically present and accepting? A sleeping unit is simply
+/// not on the USB bus. CUPS marks a vanished printer `offline-report`, but only
+/// refreshes that on its own schedule, so for a usb:// printer the bus is also
+/// checked directly: the queue's device serial (or model) must be listed by
+/// ioreg. If ioreg is unavailable, the CUPS answer stands.
 async function printerPresent() {
   if (DRY) return true;
+  let uri = '';
   try {
     const { stdout } = await run('lpoptions', ['-p', PRINTER]);
-    return !/offline|paused|disabled/.test(stdout);
+    if (/offline|paused|disabled/.test(stdout)) return false;
+    uri = (stdout.match(/device-uri=(\S+)/) || [])[1] || '';
   } catch { return false; }
+  if (!uri.startsWith('usb://')) return true;
+  const serial = decodeURIComponent((uri.match(/[?&]serial=([^&]+)/) || [])[1] || '');
+  const model = decodeURIComponent(uri.slice(6).split('?')[0].split('/').pop() || '');
+  try {
+    const { stdout } = await run('ioreg', ['-p', 'IOUSB', '-l', '-w0'], { maxBuffer: 16 * 1024 * 1024 });
+    if (serial && stdout.includes(`"${serial}"`)) return true;
+    return !!model && stdout.split('\n').some((line) => line.includes('"USB Product Name"') && line.toLowerCase().includes(model.toLowerCase()));
+  } catch { return true; } // ioreg unavailable: trust CUPS, as before
 }
 
 /// A near-empty page: the smallest custom size the driver accepts. Just enough
