@@ -36,6 +36,10 @@
 ///   cam=0 / omitted    no printer cam
 ///   pip=br|bl|tr|tl    printer-cam corner (default br)
 ///   test=1             fire a print event for the latest mint on load
+///   kiosk=<id>         with key=: send a health heartbeat every 60 s as this
+///                      kiosk (battery, charging, Wi-Fi, screen — from Fully
+///                      Kiosk's JavaScript interface when enabled). Status:
+///                      /exhibit/status?key=…
 ///
 /// Keys (when a keyboard is attached): F fullscreen · C camera · T test · Esc
 
@@ -122,6 +126,8 @@ interface Options {
   /// during setup and printing before the cover-note modal was even opened.
   auto: boolean;
   facing: 'user' | 'environment';
+  /// `?kiosk=<id>`: this display reports its health under that id (needs key).
+  kiosk: string;
 }
 
 // Contract enum: NONE=0, CHONK=1, DEADFELLAZ=2, POW=3, NORMIE=4.
@@ -129,7 +135,8 @@ const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfella
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
-const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, cam2: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment' };
+const CAM_AUTO_HIDE_MS = 5 * 60_000;
+const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, cam2: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment', kiosk: '' };
 
 function short(addr: string): string { return `${addr.slice(0, 6)}…${addr.slice(-4)}`; }
 /// chainDepth is the fax's POSITION in the chain (the origin send is 1). Hops
@@ -175,6 +182,43 @@ function readOptions(): Options {
     test: p.get('test') === '1',
     auto: p.get('auto') === '1',
     facing: p.get('facing') === 'user' ? 'user' : 'environment',
+    kiosk: /^[a-z0-9-]{1,32}$/.test(p.get('kiosk') || '') ? (p.get('kiosk') as string) : '',
+  };
+}
+
+/// Fully Kiosk Browser's JavaScript interface (Settings → Advanced Web
+/// Settings → Enable JavaScript Interface). Absent in a normal browser.
+type FullyApi = {
+  getBatteryLevel?: () => number;
+  isPlugged?: () => boolean;
+  getWifiSsid?: () => string;
+  getWifiSignalLevel?: () => number;
+  getScreenOn?: () => boolean;
+};
+const attempt = <T,>(fn: () => T | undefined): T | null => {
+  try { const v = fn(); return v === undefined ? null : v; } catch { return null; }
+};
+
+/// One heartbeat's worth of device health: Fully first, the browser's own
+/// (partial) APIs otherwise. Every reading is optional.
+async function readHealth() {
+  const fully = (window as unknown as { fully?: FullyApi }).fully;
+  let battery = fully ? attempt(() => fully.getBatteryLevel?.()) : null;
+  let charging = fully ? attempt(() => fully.isPlugged?.()) : null;
+  if (battery === null) {
+    const nav = navigator as Navigator & { getBattery?: () => Promise<{ level: number; charging: boolean }> };
+    const b = await nav.getBattery?.().catch(() => null);
+    if (b) { battery = Math.round(b.level * 100); charging = b.charging; }
+  }
+  return {
+    battery,
+    charging,
+    wifiSsid: fully ? attempt(() => fully.getWifiSsid?.())?.replace(/^"|"$/g, '') || null : null,
+    wifiSignal: fully ? attempt(() => fully.getWifiSignalLevel?.()) : null,
+    screenOn: fully ? attempt(() => fully.getScreenOn?.()) : document.visibilityState === 'visible',
+    fully: Boolean(fully),
+    agent: navigator.userAgent,
+    page: `${location.pathname}${location.search.replace(/([?&]key=)[^&]*/, '$1…')}`,
   };
 }
 
@@ -224,13 +268,15 @@ function DissolveOverlay({ trigger }: { trigger: number }) {
   return <canvas ref={ref} className="pointer-events-none absolute inset-0 z-20 h-full w-full" />;
 }
 
-function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, dissolve, onResolved }: { mint: Mint; highlight: boolean; faxing: boolean; cc?: string; zoom: number; onZoom: (z: number) => void; dissolve: number; onResolved?: (trayId: string) => void }) {
+/// `tokenId` null = a public transmission that has not been minted: shown with
+/// a white frame and NOT MINTED, and it cannot be printed.
+function FeaturedFax({ displayId, tokenId, highlight, faxing, cc, zoom, onZoom, dissolve, onResolved }: { displayId: string; tokenId: number | null; highlight: boolean; faxing: boolean; cc?: string; zoom: number; onZoom: (z: number) => void; dissolve: number; onResolved?: (trayId: string) => void }) {
   // ONE round trip. The embed page owns the not-found case and is handed the
   // token's immutable artwork as a fallback, so there is no pre-check fetch.
-  const displayId = mint.displayTrayId || mint.trayId;
   useEffect(() => { onResolved?.(displayId); }, [displayId, onResolved]);
 
-  const params = new URLSearchParams({ embed: '1', fallback: `/api/metadata/${mint.tokenId}/image` });
+  const params = new URLSearchParams({ embed: '1' });
+  if (tokenId !== null) params.set('fallback', `/api/metadata/${tokenId}/image`);
   if (faxing) { params.set('status', 'faxing'); if (cc) params.set('cc', cc); }
 
   // The embed reports its sheet height (postMessage). The iframe is sized to
@@ -274,7 +320,9 @@ function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, dissolve, onRe
 
   const frame = highlight
     ? 'border-[#e65b2f] shadow-[0_0_0_5px_rgba(230,91,47,.35),0_0_50px_rgba(230,91,47,.5)]'
-    : 'border-[#3d6fd6] shadow-[0_0_0_3px_rgba(61,111,214,.3)]';
+    : tokenId === null
+      ? 'border-white shadow-[0_0_0_3px_rgba(255,255,255,.35)]'
+      : 'border-[#3d6fd6] shadow-[0_0_0_3px_rgba(61,111,214,.3)]';
 
   const h = contentH || viewH || 800;
   return (
@@ -309,8 +357,8 @@ function FeaturedFax({ mint, highlight, faxing, cc, zoom, onZoom, dissolve, onRe
       </div>
       <DissolveOverlay trigger={dissolve} />
       <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-2 bg-[#25251f]/90 px-3 py-1.5 text-[11px] font-black uppercase tracking-[.16em] text-[#efe8d8]">
-        <span className={`h-2 w-2 rounded-full ${highlight ? 'animate-pulse bg-[#e65b2f]' : 'bg-[#7fa178]'}`} />
-        Minted · FAX CHAIN #{mint.tokenId}
+        <span className={`h-2 w-2 rounded-full ${highlight ? 'animate-pulse bg-[#e65b2f]' : tokenId === null ? 'bg-[#d32f0f]' : 'bg-[#7fa178]'}`} />
+        {tokenId === null ? 'Not minted' : `Minted · FAX CHAIN #${tokenId}`}
       </div>
       {/* Zoom for detail, up to 3x; the % button snaps back to fit. */}
       <div className="absolute right-0 top-0 z-30 flex items-center gap-1 bg-[#25251f]/90 px-1.5 py-1 text-[#efe8d8]">
@@ -393,6 +441,10 @@ export default function ExhibitPage() {
   const [telegraph, setTelegraph] = useState<Telegraph | null>(null);
   const [online, setOnline] = useState(true);
   const [featured, setFeatured] = useState<Mint | null>(null);
+  /// A latest transmission that has NOT been minted, shown in the left window
+  /// instead of `featured`. View only: PRINT is off while it is showing.
+  const [featuredFax, setFeaturedFax] = useState<PublicFax | null>(null);
+  const showMint = useCallback((m: Mint) => { setFeatured(m); setFeaturedFax(null); }, []);
   const [printing, setPrinting] = useState<Mint | null>(null);
   /// Manual "pseudo-forward": the operator faxes the featured transmission to
   /// the physical machine. Distinct from the automatic mint print: it opens a
@@ -418,6 +470,27 @@ export default function ExhibitPage() {
     const t = setInterval(tick, 10_000);
     return () => { stop = true; clearInterval(t); };
   }, [opts.queueKey]);
+  // Kiosk heartbeat: every 60 s, and as soon as the page is visible again.
+  // Silence is the alarm (healthchecks.io), so failures here are ignored.
+  useEffect(() => {
+    if (!opts.queueKey || !opts.kiosk) return;
+    const beat = async () => {
+      try {
+        const health = await readHealth();
+        await fetch(`/api/exhibit/kiosk?key=${encodeURIComponent(opts.queueKey)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: opts.kiosk, ...health }),
+          keepalive: true,
+        });
+      } catch { /* offline: the missing heartbeat is the report */ }
+    };
+    void beat();
+    const t = setInterval(() => void beat(), 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void beat(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVisible); };
+  }, [opts.queueKey, opts.kiosk]);
   /// Increments when a transmission finishes; the frame runs its dissolve once per value.
   const [dissolve, setDissolve] = useState(0);
   const [events, setEvents] = useState<PrintEvent[]>([]);
@@ -428,6 +501,23 @@ export default function ExhibitPage() {
   const camKind = activeCam.kind;
   const twoCams = opts.cam.kind !== 'off' && opts.cam2.kind !== 'off';
   const [camError, setCamError] = useState('');
+  // The camera pop-up hides itself 5 minutes after it was last opened or used
+  // for a print. While a transmission is printing the clock keeps resetting.
+  const camTouched = useRef(0);
+  const camOnNow = useRef(false); // read by showCamForPrint without re-creating it (and the poll loop)
+  useEffect(() => { camOnNow.current = camOn; if (camOn) camTouched.current = Date.now(); }, [camOn, camIdx]);
+  const showCamForPrint = useCallback(() => {
+    camTouched.current = Date.now();
+    if (!camOnNow.current && opts.cam.kind !== 'off') { setCamIdx(0); setCamError(''); setCamOn(true); }
+  }, [opts.cam.kind]);
+  useEffect(() => {
+    if (!camOn) return;
+    const t = setInterval(() => {
+      if (printing || faxingId !== null) { camTouched.current = Date.now(); return; }
+      if (Date.now() - camTouched.current > CAM_AUTO_HIDE_MS) setCamOn(false);
+    }, 10_000);
+    return () => clearInterval(t);
+  }, [camOn, printing, faxingId]);
   const [canFullscreen, setCanFullscreen] = useState(false);
   const [featuredTrayId, setFeaturedTrayId] = useState<string>('');
   const [hydrated, setHydrated] = useState(false);
@@ -481,7 +571,8 @@ export default function ExhibitPage() {
 
   // ── Print event ───────────────────────────────────────────────────────────
   const firePrint = useCallback((mint: Mint) => {
-    setFeatured(mint);
+    showMint(mint);
+    showCamForPrint();
     setPrinting(mint);
     if (soundOn) playFaxHandshake();
     if (printTimer.current) clearTimeout(printTimer.current);
@@ -489,7 +580,7 @@ export default function ExhibitPage() {
     void notifyMiddleware(mint, { event: 'mint', source: 'exhibit' }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
-  }, [notifyMiddleware, soundOn]);
+  }, [notifyMiddleware, soundOn, showMint, showCamForPrint]);
 
   // ── Outgoing transmission (operator-initiated) ────────────────────────────
   const OUTGOING_FROM = 'Marfa@fax';
@@ -502,7 +593,9 @@ export default function ExhibitPage() {
     setOutgoing(null);
     setCoverNote('');
     setLiveCc(note);
-    setFeatured(mint);
+    showMint(mint);
+    // Camera 1 pops up for the print, unless camera 1 or 2 is already showing.
+    showCamForPrint();
     setFaxingId(mint.tokenId);
     setPrinting(mint);
     if (printTimer.current) clearTimeout(printTimer.current);
@@ -513,7 +606,7 @@ export default function ExhibitPage() {
     void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, cc: OUTGOING_CC, source: 'exhibit' }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
-  }, [outgoing, coverNote, soundOn, notifyMiddleware]);
+  }, [outgoing, coverNote, soundOn, notifyMiddleware, showMint, showCamForPrint]);
 
   // ── Polling ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -545,7 +638,7 @@ export default function ExhibitPage() {
           lastSeenTokenId.current = newest.tokenId;
           // New mints always come to the front. They only PRINT when ?auto=1.
           if (opts.auto) fresh.forEach((m, i) => setTimeout(() => firePrint(m), i * 4000));
-          else { setFeatured(fresh[fresh.length - 1]); setZoom(1); }
+          else { showMint(fresh[fresh.length - 1]); setZoom(1); }
         }
       } catch (err) {
         if (!cancelled) { setOnline(false); console.warn('[exhibit] poll failed', err); }
@@ -554,7 +647,7 @@ export default function ExhibitPage() {
     void tick();
     const id = setInterval(tick, opts.pollMs);
     return () => { cancelled = true; clearInterval(id); };
-  }, [opts.pollMs, opts.test, opts.auto, firePrint]);
+  }, [opts.pollMs, opts.test, opts.auto, firePrint, showMint]);
 
   useEffect(() => {
     let cancelled = false;
@@ -594,12 +687,12 @@ export default function ExhibitPage() {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'f' || e.key === 'F') void document.documentElement.requestFullscreen?.();
       if (e.key === 'c' || e.key === 'C') setCamOn((v) => !v);
-      if ((e.key === 't' || e.key === 'T') && board?.mints[0]) firePrint(featured ?? board.mints[0]);
+      if ((e.key === 't' || e.key === 'T') && board?.mints[0] && !featuredFax) firePrint(featured ?? board.mints[0]);
       if (e.key === 'Escape') setPrinting(null);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [board, featured, firePrint]);
+  }, [board, featured, featuredFax, firePrint]);
 
   // ── Infinite scroll for the minted grid ───────────────────────────────────
   useEffect(() => {
@@ -633,6 +726,22 @@ export default function ExhibitPage() {
   // above the mints without a frame and without tap-to-feature: only a minted
   // hop is a permanent exhibit; a public fax may still be mid-chain and decays.
   const latestPublic = useMemo(() => (telegraph?.recent ?? []).slice(0, 6), [telegraph]);
+  // A latest transmission that HAS been minted is shown as its mint: minted
+  // status overrides NOT MINTED, and it can be printed.
+  const mintByTray = useMemo(() => {
+    const map = new Map<string, Mint>();
+    for (const m of [...(board?.mints ?? []), ...mintPages]) {
+      if (m.displayTrayId && !map.has(m.displayTrayId)) map.set(m.displayTrayId, m);
+      if (!map.has(m.trayId)) map.set(m.trayId, m);
+    }
+    return map;
+  }, [board, mintPages]);
+  const pickTransmission = (f: PublicFax) => {
+    const minted = mintByTray.get(f.id);
+    if (minted) showMint(minted);
+    else setFeaturedFax(f);
+    setZoom(1);
+  };
   const perCollection = useMemo(() => {
     const out: Record<string, number> = {};
     for (const row of board?.leaderboard ?? []) out[norm(row.collection)] = (out[norm(row.collection)] || 0) + row.mints;
@@ -695,15 +804,31 @@ export default function ExhibitPage() {
         {/* Featured fax */}
         <div className="grid min-h-0 grid-rows-[1fr_auto] gap-2">
           <div className="min-h-0">
-            {featured ? (
-              <FeaturedFax mint={featured} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} cc={liveCc} zoom={zoom} onZoom={setZoom} dissolve={dissolve} onResolved={setFeaturedTrayId} />
+            {featuredFax ? (
+              <FeaturedFax displayId={featuredFax.id} tokenId={null} highlight={false} faxing={false} zoom={zoom} onZoom={setZoom} dissolve={0} />
+            ) : featured ? (
+              <FeaturedFax displayId={featured.displayTrayId || featured.trayId} tokenId={featured.tokenId} highlight={(!!printing && printing.tokenId === featured.tokenId) || faxingId === featured.tokenId} faxing={faxingId === featured.tokenId} cc={liveCc} zoom={zoom} onZoom={setZoom} dissolve={dissolve} onResolved={setFeaturedTrayId} />
             ) : (
               <div className="grid h-full place-items-center border-4 border-dashed border-[#8f8878] text-[12px] font-bold uppercase tracking-[.2em] text-[#625e52]">
                 {!hydrated ? 'Loading…' : online ? 'Waiting for the first transmission…' : 'Reconnecting…'}
               </div>
             )}
           </div>
-          {featured && (
+          {featuredFax ? (
+            <div className="grid grid-cols-[1fr_auto] items-stretch gap-4 border-t-2 border-[#575244] pt-2">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission · not minted · view only</p>
+                <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{featuredFax.id.toUpperCase()}</p>
+                <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[.1em] text-[#3d5a40] xl:text-[12px]">
+                  {featuredFax.from} → {featuredFax.to ?? '…'}
+                </p>
+              </div>
+              <div className="flex flex-col items-end justify-end self-stretch text-right">
+                <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Hop</p>
+                <p className="text-lg font-black leading-none text-[#e65b2f] xl:text-2xl">{hopsOf(featuredFax)}</p>
+              </div>
+            </div>
+          ) : featured && (
             <div className="grid grid-cols-[1fr_auto] items-stretch gap-4 border-t-2 border-[#575244] pt-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission</p>
@@ -753,16 +878,26 @@ export default function ExhibitPage() {
               in as it scrolls, so it can reach the full 2,222 without loading
               them up front. */}
           <div className="min-h-0 overflow-y-auto pr-1 [scrollbar-width:thin]">
-            <p className="mb-1 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmissions</p>
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmissions · tap to view</p>
             <div className="grid grid-cols-3 gap-2">
-              {latestPublic.map((f) => (
-                <div key={f.id} title={`T/#${f.id.toUpperCase()} · ${f.from} → ${f.to ?? '…'}`} className="relative aspect-[3/4] overflow-hidden bg-[#eee8dc]">
-                  <Image src={`/api/tray/${f.id}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover" loading="lazy" />
-                  <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
-                    {f.from.replace(/@fax$/, '')} · hop {hopsOf(f)}
-                  </span>
-                </div>
-              ))}
+              {latestPublic.map((f) => {
+                const minted = mintByTray.get(f.id);
+                const selected = featuredFax?.id === f.id || (!featuredFax && !!minted && featured?.tokenId === minted.tokenId);
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => pickTransmission(f)}
+                    title={`T/#${f.id.toUpperCase()} · ${f.from} → ${f.to ?? '…'}${minted ? ` · FAX CHAIN #${minted.tokenId}` : ' · not minted'}`}
+                    className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#eee8dc] text-left transition-all ${selected ? 'border-white shadow-[0_0_18px_rgba(255,255,255,.6)]' : 'border-transparent'}`}
+                  >
+                    <Image src={`/api/tray/${f.id}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover" loading="lazy" />
+                    <span className="absolute bottom-0 left-0 right-0 flex items-center gap-1 truncate bg-[#25251f]/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
+                      <span className={`inline-block h-1.5 w-1.5 flex-none rounded-full ${minted ? 'bg-[#7fa178]' : 'bg-[#d32f0f]'}`} />
+                      <span className="truncate">{minted ? `#${minted.tokenId}` : f.from.replace(/@fax$/, '')} · hop {hopsOf(f)}</span>
+                    </span>
+                  </button>
+                );
+              })}
               {latestPublic.length === 0 && <p className="col-span-3 text-[10px] font-bold uppercase text-[#847d6e]">No public transmissions yet</p>}
             </div>
 
@@ -771,11 +906,11 @@ export default function ExhibitPage() {
             </p>
             <div className="grid grid-cols-3 gap-2">
               {mintedGrid.map((m) => {
-                const isFeatured = featured?.tokenId === m.tokenId;
+                const isFeatured = !featuredFax && featured?.tokenId === m.tokenId;
                 return (
                   <button
                     key={m.tokenId}
-                    onClick={() => { setFeatured(m); setZoom(1); }}
+                    onClick={() => { showMint(m); setZoom(1); }}
                     title={`FAX CHAIN #${m.tokenId} · ${handleFor(m)}`}
                     className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
                   >
@@ -883,13 +1018,14 @@ export default function ExhibitPage() {
           // offline, PRINT still queues (the daemon prints when it is back) but
           // loses its glow so the operator notices.
           const noKey = !opts.middleware;
+          const unminted = !!featuredFax; // a not-minted transmission is view only
           const offline = !!opts.queueKey && printer !== null && !printer.daemonOnline;
-          const live = !noKey && !offline;
+          const live = !noKey && !unminted && !offline;
           return (
             <button
-              onClick={() => { if (noKey) return; primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); } }}
-              disabled={noKey}
-              title={noKey ? 'No print key — display only' : offline ? 'Machine offline — job will queue' : 'Fax this transmission to the machine'}
+              onClick={() => { if (noKey || unminted) return; primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); } }}
+              disabled={noKey || unminted}
+              title={noKey ? 'No print key — display only' : unminted ? 'Not minted — view only' : offline ? 'Machine offline — job will queue' : 'Fax this transmission to the machine'}
               className={`border-2 p-2.5 transition-shadow ${live
                 ? 'border-[#983b21] bg-[#e65b2f] text-white shadow-[0_0_18px_rgba(230,91,47,.75),0_0_40px_rgba(230,91,47,.35)] hover:shadow-[0_0_26px_rgba(230,91,47,.95),0_0_60px_rgba(230,91,47,.5)]'
                 : 'cursor-not-allowed border-[#77705f] bg-[#b5ad9d] text-[#625e52]'}`}
