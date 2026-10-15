@@ -111,6 +111,7 @@ export const printerCheckUrl = () => checkUrl(process.env.EXHIBIT_PRINTER_HEALTH
 /// a bare un-awaited fetch can be dropped once a route handler has returned
 /// its response, which silently stopped the kiosk pings.
 const lastState = new Map<string, boolean>();
+const loggedOk = new Set<string>(); // log the first success per check (and every state change), not every ping
 export async function pingCheck(url: string | null, ok: boolean, note: string): Promise<void> {
   if (!url) return;
   const now = Date.now();
@@ -120,9 +121,12 @@ export async function pingCheck(url: string | null, ok: boolean, note: string): 
   lastState.set(url, ok);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
+  const check = url.slice(url.lastIndexOf('/') + 1, url.lastIndexOf('/') + 9); // first 8 chars of the uuid
   try {
     const res = await fetch(ok ? url : `${url}/fail`, { method: 'POST', body: note.slice(0, 2000), signal: controller.signal, cache: 'no-store' });
-    if (!res.ok) { lastPing.delete(url); console.error(`[exhibit-health] healthcheck ping ${res.status}`); }
+    const answer = (await res.text().catch(() => '')).slice(0, 40);
+    if (!res.ok) { lastPing.delete(url); console.error(`[exhibit-health] ping ${check} ${ok ? 'ok' : 'fail'} -> ${res.status} ${answer}`); }
+    else if (flipped || !loggedOk.has(url)) { loggedOk.add(url); console.log(`[exhibit-health] ping ${check} ${ok ? 'ok' : 'fail'} -> ${res.status} ${answer}`); }
   } catch (cause) {
     lastPing.delete(url); // retry on the next heartbeat instead of waiting out the throttle
     console.error('[exhibit-health] healthcheck ping failed', cause instanceof Error ? cause.message : cause);

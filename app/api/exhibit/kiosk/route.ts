@@ -1,4 +1,4 @@
-import { after, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { describeKiosk, kioskCheckUrl, listKiosks, LOW_BATTERY, pingCheck, recordKiosk } from '../../../lib/exhibit-health';
 
 /// Kiosk heartbeat for the exhibit displays.
@@ -27,7 +27,9 @@ export async function POST(req: NextRequest) {
   if (!report) return NextResponse.json({ error: 'bad or unknown kiosk id' }, { status: 400 });
   const low = report.battery !== null && report.battery <= LOW_BATTERY && report.charging !== true;
   const note = `${describeKiosk(report)}${low ? ` · LOW BATTERY (≤${LOW_BATTERY}%, not charging)` : ''}`;
-  after(() => pingCheck(kioskCheckUrl(report.id), !low, note));
+  // Awaited, not deferred: the kiosk does not care how long this takes (≤8 s,
+  // keepalive), and a deferred ping is exactly what went missing before.
+  await pingCheck(kioskCheckUrl(report.id), !low, note);
   return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
