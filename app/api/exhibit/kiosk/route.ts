@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { describeKiosk, kioskCheckUrl, listKiosks, LOW_BATTERY, pingCheck, recordKiosk } from '../../../lib/exhibit-health';
 
 /// Kiosk heartbeat for the exhibit displays.
@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
   const report = recordKiosk(String(body.id || ''), body);
   if (!report) return NextResponse.json({ error: 'bad or unknown kiosk id' }, { status: 400 });
   const low = report.battery !== null && report.battery <= LOW_BATTERY && report.charging !== true;
-  pingCheck(kioskCheckUrl(report.id), !low, `${describeKiosk(report)}${low ? ` · LOW BATTERY (≤${LOW_BATTERY}%, not charging)` : ''}`);
+  const note = `${describeKiosk(report)}${low ? ` · LOW BATTERY (≤${LOW_BATTERY}%, not charging)` : ''}`;
+  after(() => pingCheck(kioskCheckUrl(report.id), !low, note));
   return NextResponse.json({ ok: true }, { headers: { 'Cache-Control': 'no-store' } });
 }
 

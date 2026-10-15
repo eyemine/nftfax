@@ -107,10 +107,11 @@ export function kioskCheckUrl(id: string) {
 export const printerCheckUrl = () => checkUrl(process.env.EXHIBIT_PRINTER_HEALTHCHECK_URL);
 
 /// Pings a healthchecks.io check, at most once per 50 s per check unless the
-/// state flips. Fire-and-forget: a slow or failing monitor never delays the
-/// kiosk or the printer daemon.
+/// state flips. Never throws. Callers run it with next/server's `after()`:
+/// a bare un-awaited fetch can be dropped once a route handler has returned
+/// its response, which silently stopped the kiosk pings.
 const lastState = new Map<string, boolean>();
-export function pingCheck(url: string | null, ok: boolean, note: string) {
+export async function pingCheck(url: string | null, ok: boolean, note: string): Promise<void> {
   if (!url) return;
   const now = Date.now();
   const flipped = lastState.get(url) !== ok;
@@ -119,9 +120,15 @@ export function pingCheck(url: string | null, ok: boolean, note: string) {
   lastState.set(url, ok);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
-  fetch(ok ? url : `${url}/fail`, { method: 'POST', body: note.slice(0, 2000), signal: controller.signal })
-    .catch(() => {})
-    .finally(() => clearTimeout(timer));
+  try {
+    const res = await fetch(ok ? url : `${url}/fail`, { method: 'POST', body: note.slice(0, 2000), signal: controller.signal, cache: 'no-store' });
+    if (!res.ok) { lastPing.delete(url); console.error(`[exhibit-health] healthcheck ping ${res.status}`); }
+  } catch (cause) {
+    lastPing.delete(url); // retry on the next heartbeat instead of waiting out the throttle
+    console.error('[exhibit-health] healthcheck ping failed', cause instanceof Error ? cause.message : cause);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function describeKiosk(k: KioskReport) {

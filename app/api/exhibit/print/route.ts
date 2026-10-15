@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { recordExhibitNote } from '../../../lib/exhibit-feed';
 import { publishExhibitSignal } from '../../../lib/exhibit-signal';
 import { pingCheck, printerCheckUrl } from '../../../lib/exhibit-health';
@@ -140,7 +140,8 @@ export async function GET(req: NextRequest) {
   Q.daemonSeenAt = Date.now();
   Q.daemonInfo = (p.get('info') || '').slice(0, 80);
   // Dead-man's switch for the printer Mac: pings stop when the daemon does.
-  pingCheck(printerCheckUrl(), true, `printer daemon${Q.daemonInfo ? ` ${Q.daemonInfo}` : ''} · ${pending().length} pending · last error: ${Q.lastError || 'none'}`);
+  const printerNote = `printer daemon${Q.daemonInfo ? ` ${Q.daemonInfo}` : ''} · ${pending().length} pending · last error: ${Q.lastError || 'none'}`;
+  after(() => pingCheck(printerCheckUrl(), true, printerNote));
   const wait = Math.min(25, Math.max(0, Number(p.get('wait') || 0))) * 1000;
   if (pending().length === 0 && wait > 0) {
     await new Promise<void>((resolve) => { const t = setTimeout(resolve, wait); Q.waiters.push(() => { clearTimeout(t); resolve(); }); });
