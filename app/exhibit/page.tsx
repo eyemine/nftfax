@@ -456,7 +456,7 @@ export default function ExhibitPage() {
   /// Zoom for the featured fax: 1 = fit, up to 3x; pan by dragging.
   const [zoom, setZoom] = useState(1);
   /// Remote printer daemon status, from the queue. Null when not using the queue.
-  const [printer, setPrinter] = useState<{ daemonOnline: boolean; pending: number; printed: number; lastError: string | null; daemonInfo: string | null } | null>(null);
+  const [printer, setPrinter] = useState<{ daemonOnline: boolean; printerAwake?: boolean | null; pending: number; printed: number; lastError: string | null; daemonInfo: string | null } | null>(null);
   useEffect(() => {
     if (!opts.queueKey) return;
     let stop = false;
@@ -940,7 +940,7 @@ export default function ExhibitPage() {
               <p className="truncate text-[8px] font-bold uppercase tracking-[.1em] text-[#847d6e] xl:text-[10px]">
                 {opts.queueKey
                   ? printer
-                    ? <><span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${printer.daemonOnline ? 'bg-[#3d5a40]' : 'bg-[#a94228]'}`} />{printer.daemonOnline ? `Machine online${printer.daemonInfo ? ` · ${printer.daemonInfo}` : ''}` : 'Machine offline'}{printer.pending ? ` · ${printer.pending} queued` : ''}{printer.lastError ? ` · ${printer.lastError}` : ''}</>
+                    ? <><span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${!printer.daemonOnline ? 'bg-[#a94228]' : printer.printerAwake === false ? 'bg-[#c08a2f]' : 'bg-[#3d5a40]'}`} />{printer.daemonOnline ? `Machine online${printer.daemonInfo ? ` · ${printer.daemonInfo}` : ''}${printer.printerAwake === false ? ' · printer asleep' : ''}` : 'Machine offline'}{printer.pending ? ` · ${printer.pending} queued` : ''}{printer.lastError ? ` · ${printer.lastError}` : ''}</>
                     : 'Queue · checking machine…'
                   : opts.middleware ? `→ ${opts.middleware.replace(/^https?:\/\//, '')}` : <><span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-[#a94228]" />No print key — display only</>}
               </p>

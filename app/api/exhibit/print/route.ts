@@ -24,13 +24,15 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Job = { id: string; payload: Record<string, unknown>; enqueuedAt: number; leasedAt: number | null; attempts: number };
-type Queue = { jobs: Map<string, Job>; daemonSeenAt: number; daemonInfo: string; printed: number; failed: number; lastError: string | null; waiters: Array<() => void> };
+/// printerAwake: what the daemon last saw of the printer itself (null = an older
+/// daemon that does not report it).
+type Queue = { jobs: Map<string, Job>; daemonSeenAt: number; daemonInfo: string; printerAwake: boolean | null; printed: number; failed: number; lastError: string | null; waiters: Array<() => void> };
 
 const QUEUE_DIR = process.env.EXHIBIT_DATA_DIR || join(process.cwd(), 'data');
 const QUEUE_FILE = join(QUEUE_DIR, 'exhibit-print-queue.json');
 
 function loadQueue(): Queue {
-  const queue: Queue = { jobs: new Map(), daemonSeenAt: 0, daemonInfo: '', printed: 0, failed: 0, lastError: null, waiters: [] };
+  const queue: Queue = { jobs: new Map(), daemonSeenAt: 0, daemonInfo: '', printerAwake: null, printed: 0, failed: 0, lastError: null, waiters: [] };
   try {
     const parsed = JSON.parse(readFileSync(QUEUE_FILE, 'utf8')) as { jobs?: Job[]; printed?: number; failed?: number; lastError?: string | null };
     for (const job of parsed.jobs || []) {
@@ -127,6 +129,7 @@ export async function GET(req: NextRequest) {
       daemonOnline: Date.now() - Q.daemonSeenAt < 60_000,
       daemonSeenAt: Q.daemonSeenAt || null,
       daemonInfo: Q.daemonInfo || null,
+      printerAwake: Date.now() - Q.daemonSeenAt < 60_000 ? Q.printerAwake : null,
       pending: pending().length,
       inFlight: Array.from(Q.jobs.values()).filter((j) => j.leasedAt !== null).length,
       printed: Q.printed,
@@ -139,9 +142,12 @@ export async function GET(req: NextRequest) {
   // request instead of hammering; wake early when a job arrives.
   Q.daemonSeenAt = Date.now();
   Q.daemonInfo = (p.get('info') || '').slice(0, 80);
+  const reported = p.get('printer');
+  Q.printerAwake = reported === 'awake' ? true : reported === 'asleep' ? false : null;
   // Dead-man's switch for the printer Mac: pings stop when the daemon does.
-  const printerNote = `printer daemon${Q.daemonInfo ? ` ${Q.daemonInfo}` : ''} · ${pending().length} pending · last error: ${Q.lastError || 'none'}`;
-  after(() => pingCheck(printerCheckUrl(), true, printerNote));
+  // A sleeping printer is a /fail ping, so healthchecks alerts at once.
+  const printerNote = `printer daemon${Q.daemonInfo ? ` ${Q.daemonInfo}` : ''} · printer ${Q.printerAwake === false ? 'ASLEEP — press its power button' : Q.printerAwake ? 'awake' : 'state unknown'} · ${pending().length} pending · last error: ${Q.lastError || 'none'}`;
+  after(() => pingCheck(printerCheckUrl(), Q.printerAwake !== false, printerNote));
   const wait = Math.min(25, Math.max(0, Number(p.get('wait') || 0))) * 1000;
   if (pending().length === 0 && wait > 0) {
     await new Promise<void>((resolve) => { const t = setTimeout(resolve, wait); Q.waiters.push(() => { clearTimeout(t); resolve(); }); });

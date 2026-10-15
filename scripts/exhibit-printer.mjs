@@ -23,6 +23,8 @@
 // This printer drops off USB entirely when it sleeps, and nothing on the Mac can
 // wake it. So before each job the daemon checks the printer is actually present;
 // if not, it tells the queue (the tablet shows the reason) and the job waits.
+// Every poll also reports `printer=awake|asleep`, so the queue's healthcheck
+// alerts when the printer itself is asleep, not only when this Mac goes quiet.
 //
 // Sheet: A4 at 203 dpi = 1654 × 2339 px, 1-bit, Courier, dashed rules — the same
 // look as the tray permalink, because it is the same fax.
@@ -220,7 +222,8 @@ async function loop() {
   let backoff = 1000;
   for (;;) {
     try {
-      const r = await fetch(`${ORIGIN}/api/exhibit/print?key=${encodeURIComponent(KEY)}&wait=25&info=${encodeURIComponent(INFO)}`, { signal: AbortSignal.timeout(40_000) });
+      const state = (await printerPresent()) ? 'awake' : 'asleep';
+      const r = await fetch(`${ORIGIN}/api/exhibit/print?key=${encodeURIComponent(KEY)}&wait=25&info=${encodeURIComponent(INFO)}&printer=${state}`, { signal: AbortSignal.timeout(40_000) });
       if (r.status === 401) { console.error('queue rejected the key — check EXHIBIT_PRINT_KEY'); process.exit(1); }
       if (!r.ok) throw new Error(`poll ${r.status}`);
       const { jobs } = await r.json();

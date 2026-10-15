@@ -11,7 +11,7 @@ type Kiosk = {
   battery: number | null; charging: boolean | null; wifiSsid: string | null; wifiSignal: number | null;
   screenOn: boolean | null; fully: boolean; agent: string; page: string;
 };
-type Printer = { daemonOnline: boolean; daemonSeenAt: number | null; daemonInfo: string | null; pending: number; inFlight: number; printed: number; failed: number; lastError: string | null };
+type Printer = { daemonOnline: boolean; daemonSeenAt: number | null; daemonInfo: string | null; printerAwake?: boolean | null; pending: number; inFlight: number; printed: number; failed: number; lastError: string | null };
 
 const ago = (ms: number | null) => {
   if (!ms) return 'never';
@@ -68,7 +68,10 @@ export default function ExhibitStatusPage() {
           <h2 className="border-b border-[#8f8878] bg-[#d8d0bf] px-3 py-2 text-[12px] font-black uppercase tracking-[.14em]">Printer (the fax machine)</h2>
           {printer ? (
             <div className="space-y-1 p-3 text-[13px]">
-              <p className="font-bold"><Dot ok={printer.daemonOnline} />{printer.daemonOnline ? 'Online' : 'OFFLINE'} · last poll {ago(printer.daemonSeenAt)}{printer.daemonInfo ? ` · ${printer.daemonInfo}` : ''}</p>
+              <p className="font-bold"><Dot ok={printer.daemonOnline} warn={printer.printerAwake === false} />Mac daemon {printer.daemonOnline ? 'online' : 'OFFLINE'} · last poll {ago(printer.daemonSeenAt)}{printer.daemonInfo ? ` · ${printer.daemonInfo}` : ''}</p>
+              <p className={printer.printerAwake === false ? 'font-bold text-[#a94228]' : ''}>
+                Printer {printer.printerAwake === true ? 'awake' : printer.printerAwake === false ? 'ASLEEP — press its power button' : 'state unknown (daemon not updated, or offline)'}
+              </p>
               <p>{printer.pending} queued · {printer.inFlight} printing · {printer.printed} printed · {printer.failed} failed</p>
               {printer.lastError && <p className="text-[#a94228]">Last error: {printer.lastError}</p>}
             </div>
