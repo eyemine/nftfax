@@ -44,7 +44,7 @@ const DRY = process.env.DRY === '1';
 const W = 1654, H = 2339;                     // A4 @ 203 dpi
 const M = 90;                                  // margin
 const INFO = `${hostname().split('.')[0]} · ${PRINTER}`;
-const KEEPALIVE_MIN = Number(process.env.KEEPALIVE_MIN || 0);
+const KEEPALIVE_MIN = Number(process.env.KEEPALIVE_MIN || 28);
 const DARKNESS = process.env.DARKNESS || '1';
 const TRAIL_PX = Math.round((Number(process.env.TRAIL_MM || 10) / 25.4) * 203);
 const LIGHTEN = Math.min(0.9, Math.max(0, Number(process.env.LIGHTEN ?? 0.25)));
@@ -142,6 +142,35 @@ function floydSteinberg(src, w, h) {
   return out;
 }
 
+/// The cover note as its own slip, only as tall as the message — a fax cover
+/// sheet that precedes the transmission instead of sharing its page.
+export async function renderCoverSheet(job) {
+  const layers = [];
+  let y = M;
+  const put = (layer) => { layers.push({ input: layer.buf, top: y, left: M }); y += layer.h; };
+  const gap = (px) => { y += px; };
+  const when = new Date(job.at || Date.now());
+  const stamp = when.toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+  put(textSvg(['NFTFAX MACHINE  ·  COVER NOTE'], { size: 40, weight: 'bold' }));
+  gap(10); put(rule()); gap(18);
+  const source = String(job.source || '').replace(/[^a-z0-9-]/gi, '').toUpperCase();
+  put(textSvg([
+    `FROM: ${job.from || 'Marfa@fax'}`,
+    `TO:   ${job.cc || 'LocalMachine@fax'}`.trimEnd(),
+    source ? `VIA:  ${source}` : '',
+    `T/#${String(job.trayId || '').toUpperCase()}    ${stamp}`,
+  ].filter(Boolean)));
+  gap(10); put(rule()); gap(18);
+  put(textSvg(wrap(job.coverNote, 62)));
+  gap(18); put(rule()); gap(12);
+  put(textSvg(['— transmission follows —'], { size: 28 }));
+  const sheetH = Math.min(H, y + TRAIL_PX);
+  const composed = await sharp({ create: { width: W, height: sheetH, channels: 3, background: '#fff' } })
+    .composite(layers).png().toBuffer();
+  const png = await sharp(composed).greyscale().threshold(128).png({ compressionLevel: 9 }).toBuffer();
+  return { png, heightMm: Math.round((sheetH / 203) * 25.4) };
+}
+
 /// Compose one job into a 1-bit PNG. Returns the PNG buffer.
 export async function renderSheet(job) {
   const isFax = job.event === 'fax';
@@ -164,13 +193,6 @@ export async function renderSheet(job) {
     `FAX CHAIN #${job.tokenId}  ·  ${job.collection || ''}  ·  Hop ${Math.max(0, (job.chainDepth ?? 1) - 1)}`,
   ].filter(Boolean)));
   gap(10); put(rule()); gap(18);
-
-  // Cover note (fax events only).
-  if (isFax && job.coverNote) {
-    put(textSvg(['CC: COVER NOTE'], { size: 30, weight: 'bold' }));
-    put(textSvg(wrap(job.coverNote, 62)));
-    gap(10); put(rule()); gap(18);
-  }
 
   // The bitmap. Nearest-neighbour so the fax pixels stay crisp. The source is
   // near pure black/white, and solid black on thermal paper prints heavy, so
@@ -254,6 +276,10 @@ async function loop() {
           continue;
         }
         try {
+          if (job.event === 'fax' && job.coverNote) {
+            const cover = await renderCoverSheet(job);
+            await printPng(cover, `cover-${job.id}`);
+          }
           const sheet = await renderSheet(job);
           const file = await printPng(sheet, label);
           log(`  printed → ${file}`);
