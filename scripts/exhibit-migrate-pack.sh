@@ -56,9 +56,22 @@ B="$(cd "$(dirname "$0")" && pwd)"
 APP="$HOME/nftfax-exhibit"                    # where the daemons live
 
 echo "== deps =="
-command -v brew >/dev/null || { echo "Install Homebrew first: https://brew.sh"; exit 1; }
-brew list node   >/dev/null 2>&1 || brew install node
-brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+SW_VERS=$(sw_vers -productVersion)
+echo "macOS $SW_VERS"
+case "$SW_VERS" in
+  10.*|11.*|12.*)
+    echo
+    echo "NOTE: macOS 12 Monterey is no longer supported by Homebrew upstream."
+    echo "'brew install' may fall back to building from source (slow) or fail."
+    echo "Easier fallbacks if it does:"
+    echo "  node   → install the LTS pkg from nodejs.org (works on macOS 12)"
+    echo "  ffmpeg → static build from evermeet.cx/ffmpeg (x86_64, no deps)"
+    echo "Make sure 'node' and 'ffmpeg' are on PATH, then re-run this script."
+    ;;
+esac
+command -v node   >/dev/null 2>&1 || brew install node   || { echo "node missing — see note above"; exit 1; }
+command -v ffmpeg >/dev/null 2>&1 || brew install ffmpeg || { echo "ffmpeg missing — see note above"; exit 1; }
+command -v node >/dev/null && command -v ffmpeg >/dev/null || exit 1
 
 echo "== app =="
 mkdir -p "$APP" "$HOME/Library/Logs/nftfax" "$HOME/.config/nftfax"
