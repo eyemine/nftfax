@@ -100,18 +100,32 @@ done
 echo "== CUPS printer =="
 if [ -f "$B/cups/BY_P800.ppd" ]; then
   sudo cp "$B/cups/km-raster-filter" /usr/libexec/cups/filter/
-  sudo cp "$B/cups/BY_P800.ppd" /etc/cups/ppd/
+  # Tarballs carry quarantine xattrs; CUPS (as _lp) can't exec a quarantined
+  # filter and fails jobs silently.
+  sudo xattr -d com.apple.quarantine /usr/libexec/cups/filter/km-raster-filter 2>/dev/null || true
   sudo chmod 755 /usr/libexec/cups/filter/km-raster-filter
   sudo chown root:wheel /usr/libexec/cups/filter/km-raster-filter
+  # -P the bundle's PPD via /tmp, NOT /etc/cups/ppd/ — if a generic queue was
+  # created earlier (e.g. via System Settings), /etc/cups/ppd/BY_P800.ppd is
+  # the generic one and -P on it just reinstalls Generic.
+  cp "$B/cups/BY_P800.ppd" /tmp/BY_P800-install.ppd
+  # A stale generic queue must go, not be skipped — check it's actually ours.
+  if lpstat -p BY_P800 >/dev/null 2>&1 && ! grep -q km-raster-filter /etc/cups/ppd/BY_P800.ppd 2>/dev/null; then
+    echo "  existing BY_P800 queue uses a generic PPD — recreating"
+    sudo lpadmin -x BY_P800
+  fi
   if lpstat -p BY_P800 >/dev/null 2>&1; then
     echo "  queue BY_P800 already exists — leaving it"
   else
     echo "  connect the BY P800 now, then press Enter"; read -r _
     URI=$(lpinfo -v | grep -i "usb.*P800\|usb.*BY" | awk '{print $2}' | head -1)
     [ -z "$URI" ] && URI="usb://BY/P800?serial=BY80121120007"
-    sudo lpadmin -p BY_P800 -E -v "$URI" -P /etc/cups/ppd/BY_P800.ppd
+    sudo lpadmin -p BY_P800 -E -v "$URI" -P /tmp/BY_P800-install.ppd
     echo "  created queue BY_P800 → $URI"
   fi
+  grep -q km-raster-filter /etc/cups/ppd/BY_P800.ppd 2>/dev/null \
+    && echo "  PPD ok (km-raster-filter)" \
+    || echo "  !! /etc/cups/ppd/BY_P800.ppd is still not the BY P800 driver"
 fi
 
 echo

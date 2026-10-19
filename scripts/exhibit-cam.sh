@@ -9,7 +9,8 @@
 # Env: CAM_PUBLISH_PASS (required), CAM_DEVICE (default QDQHD2KCM),
 #      CAM_SIZE (default 1280x720), CAM_FPS (default 30), CAM_KBPS (default 2500),
 #      CAM_RELAY (default 46.225.158.75), CAM_PATH (relay path, default printer),
-#      CAM_VF (optional ffmpeg -vf filter, e.g. hflip,vflip = rotate 180°)
+#      CAM_VF / CAM_VF_<path> (optional ffmpeg -vf filter, e.g.
+#      CAM_VF_printer=hflip,vflip rotates camera 1 by 180°)
 #
 # Two cameras = two instances of this script with different CAM_DEVICE/CAM_PATH
 # (the launchd agent app.nftfax.exhibit-cam2 runs the second). The tablet shows
@@ -34,8 +35,12 @@ CAM_PATH="${CAM_PATH:-printer}"
 URL="rtsp://publisher:${CAM_PUBLISH_PASS}@${RELAY}:8554/${CAM_PATH}"
 # Optional ffmpeg video filter, e.g. CAM_VF=hflip,vflip turns an upside-down
 # camera the right way up for every viewer (exhibit page and OgarVerse alike).
+# Both cameras source the same env file, so CAM_VF_<path> (CAM_VF_printer,
+# CAM_VF_wide) targets one camera and takes precedence over CAM_VF.
+PV="CAM_VF_${CAM_PATH}"
+CAM_VF="${!PV:-${CAM_VF:-}}"
 VF=()
-[ -n "${CAM_VF:-}" ] && VF=(-vf "$CAM_VF")
+[ -n "$CAM_VF" ] && VF=(-vf "$CAM_VF")
 # ~2 s keyframe interval whatever the frame rate.
 GOP=$(printf '%.0f' "$(echo "${FPS} * 2" | bc -l)")
 
