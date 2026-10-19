@@ -8,7 +8,8 @@
 #
 # Env: CAM_PUBLISH_PASS (required), CAM_DEVICE (default QDQHD2KCM),
 #      CAM_SIZE (default 1280x720), CAM_FPS (default 30), CAM_KBPS (default 2500),
-#      CAM_RELAY (default 46.225.158.75), CAM_PATH (relay path, default printer)
+#      CAM_RELAY (default 46.225.158.75), CAM_PATH (relay path, default printer),
+#      CAM_VF (optional ffmpeg -vf filter, e.g. hflip,vflip = rotate 180°)
 #
 # Two cameras = two instances of this script with different CAM_DEVICE/CAM_PATH
 # (the launchd agent app.nftfax.exhibit-cam2 runs the second). The tablet shows
@@ -31,6 +32,24 @@ KBPS="${CAM_KBPS:-2500}"
 RELAY="${CAM_RELAY:-46.225.158.75}"
 CAM_PATH="${CAM_PATH:-printer}"
 URL="rtsp://publisher:${CAM_PUBLISH_PASS}@${RELAY}:8554/${CAM_PATH}"
+# Optional ffmpeg video filter, e.g. CAM_VF=hflip,vflip turns an upside-down
+# camera the right way up for every viewer (exhibit page and OgarVerse alike).
+VF=()
+[ -n "${CAM_VF:-}" ] && VF=(-vf "$CAM_VF")
+# ~2 s keyframe interval whatever the frame rate.
+GOP=$(printf '%.0f' "$(echo "${FPS} * 2" | bc -l)")
+
+# One publisher per relay path. Two instances (a stray applet, a manual run, a
+# relaunch while the old one hangs) kick each other off MediaMTX every few
+# seconds and the wall flickers between "live" and "disconnected". The newest
+# instance wins: it terminates the previous one and any orphaned ffmpeg still
+# pushing to this path, and an instance that loses the lock exits.
+LOCK="${TMPDIR:-/tmp}/nftfax-cam-${CAM_PATH}.pid"
+OLD=$(cat "$LOCK" 2>/dev/null)
+[ -n "$OLD" ] && [ "$OLD" != "$$" ] && kill "$OLD" 2>/dev/null
+echo $$ > "$LOCK"
+FF=""
+trap '[ -n "$FF" ] && kill "$FF" 2>/dev/null; exit 0' TERM INT
 
 # A print job on the same USB 2 hub can starve the camera; the capture then
 # stalls and ffmpeg sits forever producing nothing, while the relay drops the
@@ -38,14 +57,16 @@ URL="rtsp://publisher:${CAM_PUBLISH_PASS}@${RELAY}:8554/${CAM_PATH}"
 # a dead input or socket, and the progress watchdog below kills it if the frame
 # counter stops advancing for 15 s. The loop then reconnects.
 while true; do
-  echo "$(date '+%H:%M:%S') publishing ${DEV} ${SIZE}@${FPS} → ${RELAY}/${CAM_PATH}"
+  [ "$(cat "$LOCK" 2>/dev/null)" = "$$" ] || { echo "$(date '+%H:%M:%S') another publisher took ${CAM_PATH} — exiting"; exit 0; }
+  pkill -f ":8554/${CAM_PATH}\$" 2>/dev/null && sleep 1
+  echo "$(date '+%H:%M:%S') publishing ${DEV} ${SIZE}@${FPS} ${KBPS}k ${CAM_VF:-} → ${RELAY}/${CAM_PATH}"
   PROG=$(mktemp -t nftfax-cam-progress)
   ffmpeg -hide_banner -loglevel warning -nostats -progress "$PROG" \
     -f avfoundation -framerate "$FPS" -video_size "$SIZE" -pixel_format "${CAM_PIXFMT:-uyvy422}" -i "${DEV}:none" \
-    -an \
+    -an ${VF[@]+"${VF[@]}"} \
     -c:v h264_videotoolbox -realtime 1 -profile:v main -bf 0 \
     -b:v "${KBPS}k" -maxrate "${KBPS}k" -bufsize "$((KBPS * 2))k" \
-    -g 30 -pix_fmt yuv420p \
+    -g "$GOP" -pix_fmt yuv420p \
     -rw_timeout 10000000 \
     -f rtsp -rtsp_transport tcp "$URL" &
   FF=$!
@@ -58,6 +79,7 @@ while true; do
     if [ "$STALL" -ge 15 ]; then echo "$(date '+%H:%M:%S') capture stalled (${CUR:-no frames}) — restarting ffmpeg"; kill "$FF" 2>/dev/null; sleep 1; kill -9 "$FF" 2>/dev/null; break; fi
   done
   wait "$FF" 2>/dev/null; RC=$?
+  FF=""
   rm -f "$PROG"
   echo "$(date '+%H:%M:%S') ffmpeg exited ($RC) — reconnecting in 3 s"
   sleep 3
