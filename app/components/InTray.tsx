@@ -607,20 +607,35 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         return;
       }
 
-      const res = await fetch(`/api/tray/${targetId}/${kind}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          local: cleanLocal,
-          domain: effectiveDomain,
-          ownerWallet: wallet,
-          chainId: cfg.chain.id,
-          contract: cfg.contract,
-          ...(kind === 'mint' ? { baseTx: txHash, arweaveUri } : { gnosisTx: txHash }),
-        }),
-      });
-      const data = await res.json() as { error?: string };
-      if (!res.ok) throw new Error(data.error || `${kind} failed`);
+      // The server verifies the Base receipt before recording a mint and answers
+      // 425 while the transaction is still unconfirmed, so keep asking for a
+      // while instead of dropping an on-chain mint.
+      let res: Response | undefined;
+      let data: { error?: string } = {};
+      for (let attempt = 0; attempt < 12; attempt++) {
+        if (attempt > 0) {
+          setNotice('Waiting for Base to confirm the mint…');
+          await new Promise((r) => setTimeout(r, 5000));
+        }
+        res = await fetch(`/api/tray/${targetId}/${kind}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            local: cleanLocal,
+            domain: effectiveDomain,
+            ownerWallet: wallet,
+            chainId: cfg.chain.id,
+            contract: cfg.contract,
+            ...(kind === 'mint' ? { baseTx: txHash, arweaveUri } : { gnosisTx: txHash }),
+          }),
+        });
+        data = await res.json().catch(() => ({})) as { error?: string };
+        if (res.status !== 425 && res.status < 500) break;
+      }
+      if (!res?.ok) {
+        const ref = kind === 'mint' && txHash ? ` (Base tx ${txHash} — it will be recorded automatically; no need to mint again)` : '';
+        throw new Error((data.error || `${kind} failed`) + ref);
+      }
       if (placeholder) {
         setNotice(kind === 'mint'
           ? `Recorded off-chain — ${cfg.chain.name} mint contract not deployed yet (placeholder).`

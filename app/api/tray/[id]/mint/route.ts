@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { transferMintCredit } from '@/app/lib/fax-credits';
+import { verifyMintTx } from '@/app/lib/mint-verify';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -86,6 +87,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         code: 'ALREADY_MINTED',
       }, { status: 409, headers: NO_STORE });
     }
+    // Only record what Base confirms: the receipt must be a successful
+    // FaxMinted for this fax (the forwarded hop is what gets minted). 425 tells
+    // the client to retry while the transaction is still unconfirmed.
+    if (!body.baseTx) {
+      return NextResponse.json({ error: 'Missing Base mint transaction', code: 'TX_REQUIRED' }, { status: 400, headers: NO_STORE });
+    }
+    const verdict = await verifyMintTx(body.baseTx, [fax.forwardedTrayId, id].filter((t): t is string => !!t));
+    if (verdict.status === 'pending') {
+      return NextResponse.json({ error: 'Mint transaction not confirmed yet', code: 'TX_PENDING' }, { status: 425, headers: NO_STORE });
+    }
+    if (verdict.status === 'invalid') {
+      return NextResponse.json({ error: verdict.reason, code: 'TX_INVALID' }, { status: 400, headers: NO_STORE });
+    }
+    body.baseTokenId = verdict.mint.tokenId;
 
     // v2 credit economy: minting spends one credit from the minter and credits
     // the next recipient (the player who received the forwarded hop) +1.

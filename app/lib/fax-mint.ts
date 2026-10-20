@@ -28,7 +28,7 @@ const MINT_PRICE_SELECTOR = '0x6817c76c'; // mintPrice()
 const DEFAULT_MINT_PRICE_WEI = BigInt('2000000000000000'); // 0.002 ETH fallback if the price read fails
 
 /// Community enum ordinal, matching `enum Community` in NFTFaxCollectible.sol.
-const COMMUNITY_ENUM: Record<CollectionKey, number> = {
+export const COMMUNITY_ENUM: Record<CollectionKey, number> = {
   chonk: 1,
   deadfellaz: 2,
   pow: 3,
@@ -91,7 +91,7 @@ function chainSuffixFromRoot(rootTrayId: string): bigint {
   return BigInt('0x' + hex) % CHAIN_SUFFIX_MOD;
 }
 
-function encodeCompositeSourceTokenId(realTokenId: bigint, rootTrayId: string): bigint {
+export function encodeCompositeSourceTokenId(realTokenId: bigint, rootTrayId: string): bigint {
   return realTokenId * CHAIN_SUFFIX_MOD + chainSuffixFromRoot(rootTrayId);
 }
 
@@ -438,24 +438,32 @@ async function getCallsTransactionHash(provider: EthereumProvider, callId: strin
   throw new Error('Call bundle confirmation timed out.');
 }
 
-async function waitForRpcReceipt(rpcUrl: string, txHash: string, timeoutMs = 25000, intervalMs = 2000): Promise<void> {
+class TxRevertedError extends Error {}
+
+/// Polls for the receipt of an already-broadcast transaction. Returns 'confirmed'
+/// or 'pending' (still unknown at timeout); throws TxRevertedError only for a
+/// definitive on-chain revert. RPC hiccups (429s from the public Base RPC,
+/// non-JSON bodies, network errors) are retried, never treated as failure: the
+/// transaction is already on its way and must still be recorded.
+async function waitForRpcReceipt(rpcUrl: string, txHash: string, timeoutMs = 60000, intervalMs = 2000): Promise<'confirmed' | 'pending'> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     await sleep(intervalMs);
-    const res = await fetch(rpcUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [txHash] }),
-    });
-    const json = (await res.json()) as RpcReceiptResponse | undefined;
-    if (json?.error) throw new Error(json.error.message || 'Receipt fetch failed.');
-    if (json?.result) {
-      if (json.result.status === '0x1') return;
-      if (json.result.status === '0x0') throw new Error('Transaction reverted on-chain.');
-      throw new Error('Transaction receipt status unknown.');
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [txHash] }),
+      });
+      if (!res.ok) continue;
+      const json = (await res.json()) as RpcReceiptResponse | undefined;
+      if (json?.result?.status === '0x1') return 'confirmed';
+      if (json?.result?.status === '0x0') throw new TxRevertedError('Transaction reverted on-chain.');
+    } catch (err) {
+      if (err instanceof TxRevertedError) throw err;
     }
   }
-  throw new Error('Transaction confirmation timed out.');
+  return 'pending';
 }
 
 function isSendCallsUnsupported(err: unknown): boolean {
@@ -476,13 +484,18 @@ function isSendCallsUnsupported(err: unknown): boolean {
 /// If eth_sendTransaction fails (e.g. wallet doesn't support direct sends for
 /// smart accounts), it falls back to EIP-5792 wallet_sendCalls.
 ///
-/// The returned hash is only returned after the transaction is confirmed
-/// on-chain, so failed mints are never recorded as minted.
+/// A reverted transaction returns `error`. Once the wallet has returned a hash
+/// the transaction is never retried through another path and the hash is
+/// always returned (`pending: true` if the receipt was not seen in time), so
+/// the caller records it; the server verifies the receipt before recording.
+/// Previously a receipt-poll hiccup after a successful broadcast was treated
+/// like "method unsupported": the code fell through to wallet_sendCalls, the
+/// hash was dropped, and a mint that succeeded on-chain was never recorded.
 export async function sendMintTx(
   provider: EthereumProvider,
   fromAccount: string,
   tx: BuildMintTxResult,
-): Promise<{ txHash?: string; error?: string }> {
+): Promise<{ txHash?: string; pending?: boolean; error?: string }> {
   if (tx.error || !tx.data) {
     return { error: tx.error || 'Mint transaction could not be built.' };
   }
@@ -492,15 +505,20 @@ export async function sendMintTx(
   // to the target contract. The EOA's delegated code does NOT intercept when
   // the EOA is the sender (only when it's the recipient), so msg.value is
   // forwarded correctly. This avoids the redeemDelegations wrapper entirely.
+  let broadcastHash: string | undefined;
   try {
     const txHash = await provider.request({
       method: 'eth_sendTransaction',
       params: [{ from: fromAccount, to: tx.to, data: tx.data, value: tx.value }],
     });
     if (typeof txHash !== 'string') throw new Error('Wallet did not return a transaction hash.');
-    if (tx.rpcUrl) await waitForRpcReceipt(tx.rpcUrl, txHash);
-    return { txHash };
+    broadcastHash = txHash;
+    const state = tx.rpcUrl ? await waitForRpcReceipt(tx.rpcUrl, txHash) : 'pending';
+    return { txHash, pending: state === 'pending' };
   } catch (err: unknown) {
+    if (broadcastHash) {
+      return err instanceof TxRevertedError ? { error: err.message } : { txHash: broadcastHash, pending: true };
+    }
     // If eth_sendTransaction works but the tx reverts on-chain, return the
     // error — don't silently retry with wallet_sendCalls (which would also
     // fail and could confuse the user with a second MetaMask popup).
@@ -548,8 +566,8 @@ export async function sendMintTx(
       const callId = (bundle as { id?: string }).id;
       if (!callId) throw new Error('wallet_sendCalls did not return a call bundle id.');
       const txHash = await getCallsTransactionHash(provider, callId);
-      if (tx.rpcUrl) await waitForRpcReceipt(tx.rpcUrl, txHash);
-      return { txHash };
+      const state = tx.rpcUrl ? await waitForRpcReceipt(tx.rpcUrl, txHash) : 'pending';
+      return { txHash, pending: state === 'pending' };
     } catch (err: unknown) {
       return { error: err instanceof Error ? err.message : String(err) };
     }
