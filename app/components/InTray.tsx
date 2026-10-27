@@ -759,28 +759,27 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     return { notice, hasMinted };
   }, [cleanLocal, selected, mintedChainRoots]);
 
-  const sentMintedIds = useMemo(() => new Set(
-    sentFaxes.filter((f) => f.mintedBase).map((f) => f.id),
-  ), [sentFaxes]);
+  // Only forwarded faxes can be minted, so the collectible IS the sent hop.
+  // The mint record is keyed by the received tray too (that is what gates a
+  // second mint), which made the received copy show up here alongside the
+  // hop that was actually minted. List the sent hop; drop a received fax
+  // whenever its forwarded hop is present. The tab label counts this same
+  // list — counting both copies made it read one more than it showed.
+  const mintedFaxes: InboxFax[] = useMemo(() => {
+    const sentMinted = sentFaxes.filter((f) => f.mintedBase);
+    const sentIds = new Set(sentMinted.map((f) => f.id));
+    const sentSources = new Set(sentMinted.map((f) => f.sourceTrayId).filter(Boolean));
+    const inboxMinted = faxes.filter((f) => f.mintedBase && !sentIds.has(f.id) && !sentSources.has(f.id) && !(f.forwardedTrayId && sentIds.has(f.forwardedTrayId)));
+    return [...sentMinted, ...inboxMinted];
+  }, [faxes, sentFaxes]);
 
   const displayedFaxes: InboxFax[] = useMemo(() => {
     if (activeTab === 'sent') return sentFaxes;
     if (activeTab === 'saved') return faxes.filter((f) => f.savedGnosis);
-    if (activeTab === 'minted') {
-      // Only forwarded faxes can be minted, so the collectible IS the sent hop.
-      // The mint record is keyed by the received tray too (that is what gates a
-      // second mint), which made the received copy show up here alongside the
-      // hop that was actually minted. List the sent hop; drop a received fax
-      // whenever its forwarded hop is present.
-      const sentMinted = sentFaxes.filter((f) => f.mintedBase);
-      const sentIds = new Set(sentMinted.map((f) => f.id));
-      const sentSources = new Set(sentMinted.map((f) => f.sourceTrayId).filter(Boolean));
-      const inboxMinted = faxes.filter((f) => f.mintedBase && !sentIds.has(f.id) && !sentSources.has(f.id) && !(f.forwardedTrayId && sentIds.has(f.forwardedTrayId)));
-      return [...sentMinted, ...inboxMinted];
-    }
+    if (activeTab === 'minted') return mintedFaxes;
     // Fax-Tray: show all received faxes (forwarded/minted retained with status badges)
     return faxes.filter((f) => !f.savedGnosis);
-  }, [activeTab, faxes, sentFaxes, sentMintedIds]);
+  }, [activeTab, faxes, sentFaxes, mintedFaxes]);
 
   if (!cleanLocal || !wallet) {
     return (
@@ -812,7 +811,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       {/* Tabs */}
       <div className="mb-4 flex gap-1 border-b border-[#8f8878]">
-        {([['inbox', `in-Tray (${faxes.filter(f => !f.savedGnosis).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${faxes.filter(f => f.mintedBase).length + sentMintedIds.size})`]] as [TabKey, string][]).map(([key, label]) => (
+        {([['inbox', `in-Tray (${faxes.filter(f => !f.savedGnosis).length})`], ['sent', `Sent (${sentFaxes.length})`], ['saved', `Saved (${faxes.filter(f => f.savedGnosis).length})`], ['minted', `Minted (${mintedFaxes.length})`]] as [TabKey, string][]).map(([key, label]) => (
           <button key={key} onClick={() => { setActiveTab(key); setNotice(''); }} className={`px-4 py-2 text-[12px] font-bold uppercase tracking-wider transition ${activeTab === key ? 'border-b-2 border-[#e65b2f] text-[#25251f]' : 'text-[#615c50] hover:text-[#4a4638]'}`}>
             {label}
           </button>
