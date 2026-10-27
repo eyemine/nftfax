@@ -91,27 +91,46 @@ function loadPrinter(ac: AudioContext): Promise<AudioBuffer | null> {
   return printerLoad;
 }
 
-/// Plays the whole recording from `start`. If the file only finished loading
-/// after `start` had passed, it joins at the point it would have reached.
-function thermalPrint(ac: AudioContext, out: AudioNode, start: number) {
+/// Pause between the cover-note slip and the fax itself.
+export const SLIP_GAP_SEC = 0.8;
+
+/// `len` seconds of the recording from `offset`, starting at `start`. If the
+/// file only finished loading after `start`, it joins where it would have been.
+function playSegment(ac: AudioContext, out: AudioNode, buf: AudioBuffer, start: number, offset: number, len: number) {
+  const at = Math.max(start, ac.currentTime + 0.02);
+  const skip = at - start;
+  if (skip >= len - 0.3) return;
+  const end = start + len;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(1, at);
+  g.gain.setValueAtTime(1, end - 0.08);
+  g.gain.linearRampToValueAtTime(0, end); // no click when a segment is cut short
+  g.connect(out);
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  src.connect(g);
+  src.start(at, offset + skip);
+  src.stop(end);
+}
+
+/// The printer: with a cover note, its slip first (`coverSec` of the recording),
+/// a short pause, then the whole recording for the fax.
+function thermalPrint(ac: AudioContext, out: AudioNode, start: number, coverSec: number) {
   const play = (buf: AudioBuffer) => {
-    const at = Math.max(start, ac.currentTime + 0.02);
-    const offset = at - start;
-    if (offset >= buf.duration - 0.5) return;
-    const src = ac.createBufferSource();
-    src.buffer = buf;
-    src.connect(out);
-    src.start(at, offset);
+    let t = start;
+    if (coverSec > 0) { playSegment(ac, out, buf, t, 0, Math.min(coverSec, buf.duration)); t += coverSec + SLIP_GAP_SEC; }
+    playSegment(ac, out, buf, t, 0, buf.duration);
   };
   if (printerBuf) play(printerBuf);
   else void loadPrinter(ac).then((buf) => { if (buf) play(buf); });
 }
 
-/// Plays the handshake, then (with `thermalSec`) the printer recording in full.
+/// Plays the handshake, then (with `thermalSec`) the printer recording in full,
+/// preceded by `coverSec` of it for a cover-note slip.
 /// Returns the total duration in ms so the caller can hold its visual state
 /// for the same time. Never throws: on a device without Web Audio it returns
 /// 0 and the display simply runs silent.
-export function playFaxHandshake(digits = '4326293', { thermalSec = 0 }: { thermalSec?: number } = {}): number {
+export function playFaxHandshake(digits = '4326293', { thermalSec = 0, coverSec = 0 }: { thermalSec?: number; coverSec?: number } = {}): number {
   const ac = audio();
   if (!ac) return 0;
   const master = ac.createGain();
@@ -145,7 +164,11 @@ export function playFaxHandshake(digits = '4326293', { thermalSec = 0 }: { therm
   tone(ac, master, [1650], t, 0.18, 0.12); t += 0.3;
 
   // The recording's own length once decoded; `thermalSec` until then.
-  if (thermalSec > 0) { t += 0.4; thermalPrint(ac, master, t); t += printerBuf?.duration ?? thermalSec; }
+  if (thermalSec > 0) {
+    t += 0.4;
+    thermalPrint(ac, master, t, coverSec);
+    t += (coverSec > 0 ? coverSec + SLIP_GAP_SEC : 0) + (printerBuf?.duration ?? thermalSec);
+  }
 
   return Math.ceil((t - ac.currentTime) * 1000);
 }

@@ -46,7 +46,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { Cctv, ExternalLink, LampDesk, Maximize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
-import { playFaxHandshake, primeFaxAudio } from '../lib/fax-audio';
+import { playFaxHandshake, primeFaxAudio, SLIP_GAP_SEC } from '../lib/fax-audio';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
 import { cleanSenderName, composeSender, DEFAULT_EXHIBIT_SENDER, SENDER_NAME_MAX } from '../lib/exhibit-keys';
@@ -139,6 +139,8 @@ const PRINT_OVERLAY_MS = 14_000;
 const RECENT_PAGE = 24;
 /// Length of the printer recording (public/sounds/printer.mp3) after the handshake.
 const THERMAL_SEC = 36.5;
+/// Printer sound for the cover-note slip, before the fax itself.
+const COVER_SLIP_SEC = 6;
 const CAM_AUTO_HIDE_MS = 5 * 60_000;
 const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, cam2: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment', kiosk: '' };
 
@@ -640,8 +642,10 @@ export default function ExhibitPage() {
     // The sound comes from this page. FAXING holds for the handshake; the
     // print overlay stays up while the thermal printer runs after it, so the
     // visual and the audio agree.
-    const ms = soundOn ? playFaxHandshake(undefined, { thermalSec: THERMAL_SEC }) : 0;
-    const handshakeMs = soundOn ? Math.max(0, ms - THERMAL_SEC * 1000 - 400) : 0;
+    // A cover note prints as its own slip first: 6 s of the printer, then the fax.
+    const coverSec = note ? COVER_SLIP_SEC : 0;
+    const ms = soundOn ? playFaxHandshake(undefined, { thermalSec: THERMAL_SEC, coverSec }) : 0;
+    const handshakeMs = soundOn ? Math.max(0, ms - ((coverSec ? coverSec + SLIP_GAP_SEC : 0) + THERMAL_SEC) * 1000 - 400) : 0;
     if (faxTimer.current) clearTimeout(faxTimer.current);
     faxTimer.current = setTimeout(() => setFaxingId((cur) => (cur === mint.tokenId ? null : cur)), Math.max(handshakeMs, 6000) + 1500);
     printTimer.current = setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); setPrinting(null); setDissolve((n) => n + 1); }, Math.max(ms, 6000) + 1500);
