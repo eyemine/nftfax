@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send, LampDesk, Backpack as BackpackIcon, UserCheck } from 'lucide-react';
+import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send, LampDesk, UserCheck } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { FaxHandleThumb } from '../components/FaxHandleThumb';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
 import { disconnectWallet } from '../lib/disconnect';
 import { SkinPanel } from '../components/SkinPanel';
+import { ExhibitButton } from '../components/ExhibitButton';
 
 type RegisterStatus = 'idle' | 'registering' | 'registered' | 'error';
 
@@ -148,6 +149,8 @@ export default function PreRegisterPage() {
   const [tokenId, setTokenId] = useState('');
   const [entries, setEntries] = useState<RolofaxEntry[]>([]);
   const [ensNames, setEnsNames] = useState<Record<string, string>>({});
+  /// Chonk token ids whose backpack holds a FAX CHAIN NFT.
+  const [mintedChonks, setMintedChonks] = useState<Set<string>>(new Set());
   /// Free-text filter on the holder wallet: matches address or ENS name.
   const [walletFilter, setWalletFilter] = useState('');
   // The header shows the connected wallet by ENS when it has one, even before it joins.
@@ -295,6 +298,20 @@ export default function PreRegisterPage() {
     }
   }
 
+  const chonkIds = useMemo(
+    () => entries.filter((e) => e.collection === 'chonk').map((e) => e.handle.match(/\.(\d+)$/)?.[1]).filter((id): id is string => !!id).join(','),
+    [entries],
+  );
+  useEffect(() => {
+    if (!chonkIds) return;
+    let cancelled = false;
+    fetch(`/api/chonks/minted?ids=${chonkIds}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { minted?: string[] } | null) => { if (!cancelled && d?.minted) setMintedChonks(new Set(d.minted)); })
+      .catch(() => { /* badge is decorative */ });
+    return () => { cancelled = true; };
+  }, [chonkIds]);
+
   const communityTotal = entries.length;
   const readyCount = entries.filter((e) => e.ready).length;
 
@@ -342,7 +359,7 @@ export default function PreRegisterPage() {
         </div>
       </header>
       <div className="mx-auto mb-5 grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div className="flex justify-start"><Link href="/?view=backpack" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><BackpackIcon size={13} /> Backpack</Link></div>
+        <div className="flex justify-start"><ExhibitButton /></div>
         <div className="flex justify-center"><Link href="/?view=delegate" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><UserCheck size={13} /> Delegate</Link></div>
         <div className="flex justify-end"><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
       </div>
@@ -569,11 +586,16 @@ export default function PreRegisterPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {entry.ready ? (
-                        <span className="flex items-center gap-1 text-[11px] font-bold uppercase text-[#456049]"><span className="h-2 w-2 rounded-full bg-[#56705a]" /> Ready</span>
-                      ) : (
-                        <span className="text-[11px] font-bold uppercase text-[#625e52]">Registered</span>
-                      )}
+                      <div className="flex flex-col items-start gap-0.5">
+                        {entry.ready ? (
+                          <span className="flex items-center gap-1 text-[11px] font-bold uppercase text-[#456049]"><span className="h-2 w-2 rounded-full bg-[#56705a]" /> Ready</span>
+                        ) : (
+                          <span className="text-[11px] font-bold uppercase text-[#625e52]">Registered</span>
+                        )}
+                        {entry.collection === 'chonk' && mintedChonks.has(entry.handle.match(/\.(\d+)$/)?.[1] ?? '') && (
+                          <span className="flex items-center gap-1 text-[11px] font-bold uppercase text-[#3d6fd6]" title="FAX CHAIN NFT in this Chonk's backpack"><span className="h-2 w-2 rounded-full bg-[#3d6fd6]" /> Minted</span>
+                        )}
+                      </div>
                       {!isOwn && (
                         <Link
                           href={`/?to=${entry.handle}@fax`}

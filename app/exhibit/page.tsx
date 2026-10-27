@@ -135,6 +135,7 @@ const COMMUNITY_KEY: Record<number, CollectionKey> = { 1: 'chonk', 2: 'deadfella
 const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz', pow: 'atom', normie: 'normie' };
 
 const PRINT_OVERLAY_MS = 14_000;
+const RECENT_PAGE = 24;
 const CAM_AUTO_HIDE_MS = 5 * 60_000;
 const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, cam2: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment', kiosk: '' };
 
@@ -424,6 +425,27 @@ function WhepPlayer({ url, onError }: { url: string; onError: (msg: string) => v
   return <video ref={videoRef} autoPlay muted playsInline className="block aspect-video w-full object-cover" />;
 }
 
+/// A minted collectible: blue frame, tap to feature.
+function MintTile({ m, featured, onPick }: { m: Mint; featured: boolean; onPick: () => void }) {
+  return (
+    <button
+      onClick={onPick}
+      title={`FAX CHAIN #${m.tokenId} · ${handleFor(m)}`}
+      className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${featured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
+    >
+      {/* next/image resizes through sharp and caches on disk, so the
+          tablet pulls a small thumbnail instead of the ~700KB master. */}
+      {/* Keyed by the DISPLAY tray, not the token: if the resolved hop
+          ever changes, the URL changes with it, so neither the browser,
+          Cloudflare nor next/image can pin a stale image for a day. */}
+      <Image src={`/api/tray/${m.displayTrayId || m.trayId}/image${m.imageVersion ? `?v=${m.imageVersion}` : ''}`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
+      <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
+        #{m.tokenId} · hop {hopsOf(m)}
+      </span>
+    </button>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function ExhibitPage() {
@@ -439,6 +461,15 @@ export default function ExhibitPage() {
   const loadingPage = useRef(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [telegraph, setTelegraph] = useState<Telegraph | null>(null);
+  /// Latest transmissions, one horizontal row. The poll refreshes the head;
+  /// older ones page in as the row scrolls right.
+  const [recentList, setRecentList] = useState<PublicFax[]>([]);
+  const [recentExhausted, setRecentExhausted] = useState(false);
+  const loadingRecent = useRef(false);
+  const recentRowRef = useRef<HTMLDivElement>(null);
+  const recentSentinelRef = useRef<HTMLDivElement>(null);
+  /// Minted grid order: newest first, or grouped by FAX CHAIN (root tray).
+  const [mintSort, setMintSort] = useState<'recent' | 'chain'>('recent');
   const [online, setOnline] = useState(true);
   const [featured, setFeatured] = useState<Mint | null>(null);
   /// A latest transmission that has NOT been minted, shown in the left window
@@ -653,8 +684,16 @@ export default function ExhibitPage() {
     let cancelled = false;
     async function tick() {
       try {
-        const res = await fetch('/api/tray/telegraph', { cache: 'no-store' });
-        if (res.ok && !cancelled) setTelegraph(await res.json() as Telegraph);
+        const res = await fetch(`/api/tray/telegraph?limit=${RECENT_PAGE}`, { cache: 'no-store' });
+        if (!res.ok || cancelled) return;
+        const data = await res.json() as Telegraph;
+        setTelegraph(data);
+        const head = data.recent ?? [];
+        if (head.length < RECENT_PAGE) setRecentExhausted(true);
+        setRecentList((prev) => {
+          const seen = new Set(head.map((f) => f.id));
+          return [...head, ...prev.filter((f) => !seen.has(f.id))];
+        });
       } catch { /* summary is decorative; leave the last value */ }
     }
     void tick();
@@ -720,12 +759,73 @@ export default function ExhibitPage() {
     return () => io.disconnect();
   }, [mintPage, mintsExhausted]);
 
+  // ── Endless row for latest transmissions ──────────────────────────────────
+  useEffect(() => {
+    const el = recentSentinelRef.current;
+    const root = recentRowRef.current;
+    if (!el || !root || recentExhausted || recentList.length === 0) return;
+    const io = new IntersectionObserver(async (entries) => {
+      if (!entries[0].isIntersecting || loadingRecent.current) return;
+      loadingRecent.current = true;
+      try {
+        const res = await fetch(`/api/tray/telegraph?offset=${recentList.length}&limit=${RECENT_PAGE}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const more = (await res.json() as Telegraph).recent ?? [];
+        if (more.length < RECENT_PAGE) setRecentExhausted(true);
+        setRecentList((prev) => {
+          const seen = new Set(prev.map((f) => f.id));
+          return [...prev, ...more.filter((f) => !seen.has(f.id))];
+        });
+      } finally {
+        loadingRecent.current = false;
+      }
+    }, { root, rootMargin: '0px 400px 0px 0px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [recentList.length, recentExhausted]);
+
+  // Grouping by chain needs every mint of a chain, not just the pages scrolled
+  // so far, so choosing it pages in the rest of the collection (100 at a time).
+  useEffect(() => {
+    if (mintSort !== 'chain' || mintsExhausted) return;
+    let cancelled = false;
+    void (async () => {
+      for (let page = 1; !cancelled; page++) {
+        const res = await fetch(`/api/tray/leaderboard?page=${page}&pageSize=100`, { cache: 'no-store' }).catch(() => null);
+        if (!res?.ok) return;
+        const data = await res.json() as Leaderboard;
+        if (cancelled) return;
+        setMintPages((prev) => {
+          const seen = new Set(prev.map((m) => m.tokenId));
+          return [...prev, ...data.mints.filter((m) => !seen.has(m.tokenId))].sort((a, b) => b.tokenId - a.tokenId);
+        });
+        if (data.mints.length < 100) { setMintsExhausted(true); return; }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mintSort, mintsExhausted]);
+
   // ── Derived ───────────────────────────────────────────────────────────────
   const mintedGrid = mintPages;
+  /// Chains newest-activity first; within a chain, by hop (origin first).
+  const mintChains = useMemo(() => {
+    if (mintSort !== 'chain') return [];
+    const groups = new Map<string, Mint[]>();
+    for (const m of mintPages) {
+      const root = m.rootTrayId || m.trayId;
+      const g = groups.get(root);
+      if (g) g.push(m); else groups.set(root, [m]);
+    }
+    return Array.from(groups, ([root, mints]) => ({
+      root,
+      mints: mints.sort((a, b) => (a.chainDepth ?? 1) - (b.chainDepth ?? 1) || a.tokenId - b.tokenId),
+      newest: Math.max(...mints.map((m) => m.tokenId)),
+    })).sort((a, b) => b.newest - a.newest);
+  }, [mintSort, mintPages]);
   // Latest public transmissions — what just went through the machine. Shown
   // above the mints without a frame and without tap-to-feature: only a minted
   // hop is a permanent exhibit; a public fax may still be mid-chain and decays.
-  const latestPublic = useMemo(() => (telegraph?.recent ?? []).slice(0, 6), [telegraph]);
+  const latestPublic = recentList;
   // A latest transmission that HAS been minted is shown as its mint: minted
   // status overrides NOT MINTED, and it can be printed.
   const mintByTray = useMemo(() => {
@@ -878,8 +978,10 @@ export default function ExhibitPage() {
               in as it scrolls, so it can reach the full 2,222 without loading
               them up front. */}
           <div className="min-h-0 overflow-y-auto pr-1 [scrollbar-width:thin]">
-            <p className="mb-1 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmissions · tap to view</p>
-            <div className="grid grid-cols-3 gap-2">
+            <p className="mb-1 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmissions · tap to view · swipe for more</p>
+            {/* One row, three tiles wide, endless to the right: older
+                transmissions page in as the sentinel nears the edge. */}
+            <div ref={recentRowRef} className="flex snap-x snap-mandatory gap-2 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]">
               {latestPublic.map((f) => {
                 const minted = mintByTray.get(f.id);
                 const selected = featuredFax?.id === f.id || (!featuredFax && !!minted && featured?.tokenId === minted.tokenId);
@@ -888,7 +990,7 @@ export default function ExhibitPage() {
                     key={f.id}
                     onClick={() => pickTransmission(f)}
                     title={`T/#${f.id.toUpperCase()} · ${f.from} → ${f.to ?? '…'}${minted ? ` · FAX CHAIN #${minted.tokenId}` : ' · not minted'}`}
-                    className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#eee8dc] text-left transition-all ${selected ? 'border-white shadow-[0_0_18px_rgba(255,255,255,.6)]' : 'border-transparent'}`}
+                    className={`relative aspect-[3/4] w-[calc((100%-1rem)/3)] flex-none snap-start overflow-hidden border-[3px] bg-[#eee8dc] text-left transition-all ${selected ? 'border-white shadow-[0_0_18px_rgba(255,255,255,.6)]' : 'border-transparent'}`}
                   >
                     <Image src={`/api/tray/${f.id}/image`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover" loading="lazy" />
                     <span className="absolute bottom-0 left-0 right-0 flex items-center gap-1 truncate bg-[#25251f]/80 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
@@ -898,35 +1000,38 @@ export default function ExhibitPage() {
                   </button>
                 );
               })}
-              {latestPublic.length === 0 && <p className="col-span-3 text-[10px] font-bold uppercase text-[#847d6e]">No public transmissions yet</p>}
+              {latestPublic.length === 0 && <p className="text-[10px] font-bold uppercase text-[#847d6e]">No public transmissions yet</p>}
+              {latestPublic.length > 0 && !recentExhausted && (
+                <div ref={recentSentinelRef} className="grid w-8 flex-none place-items-center text-[9px] font-bold uppercase text-[#847d6e]">…</div>
+              )}
             </div>
 
-            <p className="mb-1 mt-3 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">
-              Minted · tap to feature · {mintedGrid.length} of {board?.mintsTotal ?? '…'}
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {mintedGrid.map((m) => {
-                const isFeatured = !featuredFax && featured?.tokenId === m.tokenId;
-                return (
-                  <button
-                    key={m.tokenId}
-                    onClick={() => { showMint(m); setZoom(1); }}
-                    title={`FAX CHAIN #${m.tokenId} · ${handleFor(m)}`}
-                    className={`relative aspect-[3/4] overflow-hidden border-[3px] bg-[#25251f] text-left transition-all ${isFeatured ? 'border-[#e65b2f] shadow-[0_0_18px_rgba(230,91,47,.5)]' : 'border-[#3d6fd6]'}`}
-                  >
-                    {/* next/image resizes through sharp and caches on disk, so the
-                        tablet pulls a small thumbnail instead of the ~700KB master. */}
-                    {/* Keyed by the DISPLAY tray, not the token: if the resolved hop
-                        ever changes, the URL changes with it, so neither the browser,
-                        Cloudflare nor next/image can pin a stale image for a day. */}
-                    <Image src={`/api/tray/${m.displayTrayId || m.trayId}/image${m.imageVersion ? `?v=${m.imageVersion}` : ''}`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
-                    <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
-                      #{m.tokenId} · hop {hopsOf(m)}
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="mb-1 mt-3 flex items-baseline justify-between gap-2 text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">
+              <p className="truncate">Minted · tap to feature · {mintedGrid.length} of {board?.mintsTotal ?? '…'}</p>
+              <button
+                onClick={() => setMintSort((s) => (s === 'chain' ? 'recent' : 'chain'))}
+                className="flex-none whitespace-nowrap text-[#3d5840] underline"
+                title={mintSort === 'chain' ? 'Show newest mints first' : 'Group mints by FAX CHAIN'}
+              >
+                {mintSort === 'chain' ? 'Sort: newest' : 'Sort by Fax Chain'}
+              </button>
             </div>
+            {mintSort === 'chain' ? (
+              mintChains.map((c) => (
+                <div key={c.root} className="mb-2">
+                  <p className="mb-1 truncate text-[8px] font-bold uppercase tracking-[.14em] text-[#847d6e] xl:text-[10px]">
+                    Chain T/#{c.root.toUpperCase()} · {c.mints.length} minted · to hop {Math.max(...c.mints.map(hopsOf))}
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {c.mints.map((m) => <MintTile key={m.tokenId} m={m} featured={!featuredFax && featured?.tokenId === m.tokenId} onPick={() => { showMint(m); setZoom(1); }} />)}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {mintedGrid.map((m) => <MintTile key={m.tokenId} m={m} featured={!featuredFax && featured?.tokenId === m.tokenId} onPick={() => { showMint(m); setZoom(1); }} />)}
+              </div>
+            )}
             {/* Sentinel: when this scrolls into view, the next page loads. */}
             <div ref={sentinelRef} className="h-6 text-center text-[9px] font-bold uppercase text-[#847d6e]">
               {mintsExhausted ? (mintedGrid.length ? 'End of collection' : '') : mintedGrid.length ? 'Loading earlier…' : ''}

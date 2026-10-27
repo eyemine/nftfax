@@ -897,7 +897,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
       {selected && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#25251f]/80 p-0 sm:p-4"
           onMouseDown={(e) => { backdropPressed.current = e.target === e.currentTarget; }}
           onClick={(e) => {
             if (e.target !== e.currentTarget || !backdropPressed.current) return;
@@ -905,8 +905,10 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
             resetForward(); resetReply(); setSelected(null); setNotice('');
           }}
         >
-          <div className="machine-shadow flex h-[75vh] w-[75vw] flex-col overflow-hidden border border-[#8f8878] bg-[#c8c0ae]" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3">
+          {/* Phones get the whole screen: composing a forward needs room for
+              the live preview and the placement controls at once. */}
+          <div className="machine-shadow flex h-[100dvh] w-screen flex-col overflow-hidden border border-[#8f8878] bg-[#c8c0ae] sm:h-[90dvh] sm:w-[92vw] lg:h-[75vh] lg:w-[75vw]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-[#8f8878] bg-[#b5ad9d] px-3 py-2 sm:px-5 sm:py-3">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-[.24em] text-[#615c50]">Transmission detail</p>
                 <h3 className="text-lg font-black uppercase">T/#{selected.id.toUpperCase()}</h3>
@@ -914,9 +916,9 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
               <button onClick={() => { resetForward(); resetReply(); setSelected(null); setNotice(''); }} className="key-shadow border border-[#77705f] bg-[#d8d0bf] p-2"><X size={16} /></button>
             </div>
 
-            <div className="grid min-h-0 flex-1 lg:grid-cols-[1.2fr_1fr]">
+            <div className={`grid min-h-0 flex-1 lg:grid-cols-[1.2fr_1fr] lg:grid-rows-1 ${forwardFor === selected.id ? 'grid-rows-[minmax(0,1.15fr)_minmax(0,1fr)]' : 'grid-rows-[minmax(0,1fr)_minmax(0,1fr)]'}`}>
               {/* Left: the fax (or live composite preview) */}
-              <div className="flex min-h-0 flex-col border-b border-[#918978] bg-[#e7e0d1] p-4 lg:border-b-0 lg:border-r">
+              <div className="flex min-h-0 flex-col border-b border-[#918978] bg-[#e7e0d1] p-2 sm:p-4 lg:border-b-0 lg:border-r">
                 {(() => {
                   const forwardedId = forwardedTrayId;
                   const showForwardedImage = !compositePreview && !!forwardedId && !selected.mintedBase && !selected.savedGnosis;
@@ -966,7 +968,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
               </div>
 
               {/* Right: metadata + actions + chain builder */}
-              <div className="min-h-0 overflow-auto bg-[#bbb3a2] p-5">
+              <div className="min-h-0 overflow-auto bg-[#bbb3a2] p-3 sm:p-5">
                 {/* Surface the shared notice INSIDE the modal. It also renders in
                     the tray list, but this overlay (fixed inset-0 z-50) covers
                     that completely — so every mint/save failure was being
@@ -1228,7 +1230,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
 
                 {forwardFor === selected.id && (
                   <div className="border-t-2 border-dashed border-[#8f8878] pt-5">
-                    <p className="mb-3 whitespace-nowrap text-[16px] font-bold uppercase tracking-[.18em]">Remix and continue the chain</p>
+                    <p className="mb-3 text-[13px] font-bold uppercase tracking-[.18em] sm:whitespace-nowrap sm:text-[16px]">Remix and continue the chain</p>
 
                     {forwardError && (
                       <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">{forwardError}</div>
