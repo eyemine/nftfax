@@ -238,125 +238,8 @@ export default function RolofaxClient() {
           <div className="flex justify-end"><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
         </div>
 
-        {data && (
-          <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-            <div className="flex items-center gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]"><LinkIcon size={14} /> Network summary</div>
-            <div className="grid grid-cols-2 gap-px border-b border-[#8f8878] bg-[#8f8878] md:grid-cols-5">
-              {[
-                ['Public faxes', data.totalPublic ?? 0],
-                ['Senders', data.uniqueSenders ?? 0],
-                ['Recipients', data.uniqueRecipients ?? 0],
-                ['Wallets', leaderboard.uniqueMintersTotal ?? 0],
-                ['24h velocity', data.velocity24h ?? 0],
-              ].map(([label, value]) => (
-                <div key={String(label)} className="bg-[#c8c0ae] p-4 text-center">
-                  <p className="text-2xl font-black text-[#e65b2f]">{value}</p>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#615c50]">{label}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Longest active chains</div>
-            <div className="max-h-[280px] overflow-y-auto">
-              {(data.topChains ?? []).length === 0 ? (
-                <div className="p-5 text-[12px] font-bold uppercase text-[#6e685a]">No public chains yet.</div>
-              ) : (
-                <table className="w-full border-collapse text-left text-[12px]">
-                  <thead className="sticky top-0 bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
-                    <tr>
-                      {([['id', 'Fax ID'], ['from', 'From'], ['to', 'To'], ['chainDepth', 'Depth'], ['createdAt', 'Sent']] as [ChainSortKey, string][]).map(([key, label]) => (
-                        <th key={key} className="border-b border-[#8f8878] p-0 font-bold">
-                          <button onClick={() => toggleChainSort(key)} className={`flex w-full items-center gap-1 p-3 text-left hover:bg-[#c8c0ae] ${chainSort.key === key ? 'text-[#25251f]' : ''}`} aria-sort={chainSort.key === key ? (chainSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
-                            {label}
-                            {chainSort.key === key ? (chainSort.dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
-                          </button>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from(
-                      data.topChains?.reduce((map, entry) => {
-                        const key = `${entry.id}-${entry.from}-${entry.to}`;
-                        if (!map.has(key)) map.set(key, entry);
-                        return map;
-                      }, new Map<string, ChainEntry>()).values() ?? []
-                    ).sort((a, b) => {
-                        const k = chainSort.key;
-                        const av = a[k], bv = b[k];
-                        const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
-                        return chainSort.dir === 'asc' ? cmp : -cmp;
-                      }).map((entry) => (
-                      <tr key={entry.id} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
-                        <td className="p-3 font-mono text-[11px]">
-                          <a href={`https://nftmail.box/tray/${entry.id}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">T/#{entry.id}</a>
-                        </td>
-                        <td className="p-3">{entry.from}</td>
-                        <td className="p-3">{entry.to}</td>
-                        <td className="p-3">{entry.chainDepth}</td>
-                        <td className="p-3">{formatDate(entry.createdAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
-            <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
-            <div className="flex items-center gap-3">
-              <span className="text-[#615c50]">
-                {leaderboard.totalMints ?? 0} mints ·{' '}
-                <a
-                  href={`https://basescan.org/address/${FAX_COLLECTIBLE_CONTRACT}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:text-[#e65b2f]"
-                >
-                  {leaderboard.contractBalanceEth ?? '0'} ETH accumulated
-                </a>
-              </span>
-              <button
-                onClick={() => void refresh()}
-                disabled={refreshing || mintsLoading}
-                className="key-shadow flex items-center gap-1 border border-[#77705f] bg-[#d8d0bf] px-2 py-1 text-[11px] font-bold uppercase disabled:opacity-50"
-                title="Refresh leaderboard"
-              >
-                <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} /> Refresh
-              </button>
-            </div>
-          </div>
-          {leaderboard.leaderboard && leaderboard.leaderboard.length > 0 ? (
-            <table className="w-full border-collapse text-left text-[12px]">
-              <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
-                <tr>
-                  <th className="border-b border-[#8f8878] p-3 font-bold">Collection</th>
-                  <th className="border-b border-[#8f8878] p-3 font-bold text-right">Mints</th>
-                  <th className="border-b border-[#8f8878] p-3 font-bold text-right">Latest Token ID</th>
-                  <th className="border-b border-[#8f8878] p-3 font-bold text-right">Communities</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leaderboard.leaderboard.map((entry) => (
-                  <tr key={entry.collection} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
-                    <td className="p-3 font-bold capitalize">{entry.collection}</td>
-                    <td className="p-3 text-right font-black text-[#e65b2f]">{entry.mints}</td>
-                    <td className="p-3 text-right">#{entry.maxTokenId}</td>
-                    <td className="p-3 text-right">{entry.communities}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="p-5 text-center text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet — be the first to forward and mint a fax chain</div>
-          )}
-        </div>
-
         {/* Per-mint collection panel */}
-        <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+        <div className="machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
             <span>Minted fax collection</span>
             {mintsTotal > 0 && (
@@ -454,6 +337,126 @@ export default function RolofaxClient() {
             </div>
           </div>
         </div>
+
+        <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">
+            <span className="flex items-center gap-2"><Trophy size={14} /> Mint leaderboard by collection</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[#615c50]">
+                {leaderboard.totalMints ?? 0} mints ·{' '}
+                <a
+                  href={`https://basescan.org/address/${FAX_COLLECTIBLE_CONTRACT}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-[#e65b2f]"
+                >
+                  {leaderboard.contractBalanceEth ?? '0'} ETH accumulated
+                </a>
+              </span>
+              <button
+                onClick={() => void refresh()}
+                disabled={refreshing || mintsLoading}
+                className="key-shadow flex items-center gap-1 border border-[#77705f] bg-[#d8d0bf] px-2 py-1 text-[11px] font-bold uppercase disabled:opacity-50"
+                title="Refresh leaderboard"
+              >
+                <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
+          </div>
+          {leaderboard.leaderboard && leaderboard.leaderboard.length > 0 ? (
+            <table className="w-full border-collapse text-left text-[12px]">
+              <thead className="bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
+                <tr>
+                  <th className="border-b border-[#8f8878] p-3 font-bold">Collection</th>
+                  <th className="border-b border-[#8f8878] p-3 font-bold text-right">Mints</th>
+                  <th className="border-b border-[#8f8878] p-3 font-bold text-right">Latest Token ID</th>
+                  <th className="border-b border-[#8f8878] p-3 font-bold text-right">Communities</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leaderboard.leaderboard.map((entry) => (
+                  <tr key={entry.collection} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
+                    <td className="p-3 font-bold capitalize">{entry.collection}</td>
+                    <td className="p-3 text-right font-black text-[#e65b2f]">{entry.mints}</td>
+                    <td className="p-3 text-right">#{entry.maxTokenId}</td>
+                    <td className="p-3 text-right">{entry.communities}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-5 text-center text-[12px] font-bold uppercase tracking-[.12em] text-[#625e52]">No mints yet — be the first to forward and mint a fax chain</div>
+          )}
+        </div>
+
+        {data && (
+          <>
+          <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+            <div className="flex items-center gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]"><LinkIcon size={14} /> Network summary</div>
+            <div className="grid grid-cols-2 gap-px border-b border-[#8f8878] bg-[#8f8878] md:grid-cols-5">
+              {[
+                ['Public faxes', data.totalPublic ?? 0],
+                ['Senders', data.uniqueSenders ?? 0],
+                ['Recipients', data.uniqueRecipients ?? 0],
+                ['Wallets', leaderboard.uniqueMintersTotal ?? 0],
+                ['24h velocity', data.velocity24h ?? 0],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="bg-[#c8c0ae] p-4 text-center">
+                  <p className="text-2xl font-black text-[#e65b2f]">{value}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[#615c50]">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 machine-shadow overflow-hidden rounded-[18px] border border-[#8f8878] bg-[#c8c0ae]">
+            <div className="flex items-center gap-2 border-b border-[#8f8878] bg-[#b5ad9d] px-5 py-3 text-[12px] font-bold uppercase tracking-[.16em]">Longest active chains</div>
+            <div className="max-h-[280px] overflow-y-auto">
+              {(data.topChains ?? []).length === 0 ? (
+                <div className="p-5 text-[12px] font-bold uppercase text-[#6e685a]">No public chains yet.</div>
+              ) : (
+                <table className="w-full border-collapse text-left text-[12px]">
+                  <thead className="sticky top-0 bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
+                    <tr>
+                      {([['id', 'Fax ID'], ['from', 'From'], ['to', 'To'], ['chainDepth', 'Depth'], ['createdAt', 'Sent']] as [ChainSortKey, string][]).map(([key, label]) => (
+                        <th key={key} className="border-b border-[#8f8878] p-0 font-bold">
+                          <button onClick={() => toggleChainSort(key)} className={`flex w-full items-center gap-1 p-3 text-left hover:bg-[#c8c0ae] ${chainSort.key === key ? 'text-[#25251f]' : ''}`} aria-sort={chainSort.key === key ? (chainSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                            {label}
+                            {chainSort.key === key ? (chainSort.dir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />) : <ArrowUpDown size={11} className="opacity-40" />}
+                          </button>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Array.from(
+                      data.topChains?.reduce((map, entry) => {
+                        const key = `${entry.id}-${entry.from}-${entry.to}`;
+                        if (!map.has(key)) map.set(key, entry);
+                        return map;
+                      }, new Map<string, ChainEntry>()).values() ?? []
+                    ).sort((a, b) => {
+                        const k = chainSort.key;
+                        const av = a[k], bv = b[k];
+                        const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
+                        return chainSort.dir === 'asc' ? cmp : -cmp;
+                      }).map((entry) => (
+                      <tr key={entry.id} className="border-b border-[#8f8878]/50 hover:bg-[#e7e0d1]">
+                        <td className="p-3 font-mono text-[11px]">
+                          <a href={`https://nftmail.box/tray/${entry.id}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">T/#{entry.id}</a>
+                        </td>
+                        <td className="p-3">{entry.from}</td>
+                        <td className="p-3">{entry.to}</td>
+                        <td className="p-3">{entry.chainDepth}</td>
+                        <td className="p-3">{formatDate(entry.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+          </>
+        )}
       </div>
     </main>
   );

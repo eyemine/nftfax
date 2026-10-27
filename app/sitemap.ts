@@ -19,7 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const routes: { path: string; priority: number; changeFrequency: 'daily' | 'weekly' | 'monthly' }[] = [
     { path: '', priority: 1.0, changeFrequency: 'daily' },
     { path: '/rolofax', priority: 0.9, changeFrequency: 'daily' },
-    { path: '/leaderboard', priority: 0.8, changeFrequency: 'daily' },
+    { path: '/chain-log', priority: 0.8, changeFrequency: 'daily' },
     { path: '/draw', priority: 0.7, changeFrequency: 'daily' },
     { path: '/about', priority: 0.7, changeFrequency: 'monthly' },
     { path: '/verify', priority: 0.5, changeFrequency: 'monthly' },

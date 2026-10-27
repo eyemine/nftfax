@@ -45,7 +45,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Cctv, ExternalLink, Maximize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
+import { Cctv, ExternalLink, LampDesk, Maximize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
 import { playFaxHandshake, primeFaxAudio } from '../lib/fax-audio';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
@@ -867,7 +867,7 @@ export default function ExhibitPage() {
           </div>
           <div>
             <h1 className="text-xl font-black leading-none tracking-[-0.06em] xl:text-3xl">NFTFAX MACHINE<span className="text-[#e65b2f]">™</span></h1>
-            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[.25em] text-[#625e52] xl:text-[12px] xl:tracking-[.3em]">nftfax.app · live · Marfa</p>
+            <p className="mt-0.5 text-[9px] font-bold uppercase tracking-[.25em] text-[#625e52] xl:text-[12px] xl:tracking-[.3em]">nftfax.app · live</p>
           </div>
         </div>
 
@@ -892,8 +892,21 @@ export default function ExhibitPage() {
             <p className="text-[8px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[10px]">Minted on Base</p>
             <OdometerCounter value={board?.mintsTotal ?? 0} digits={4} height={34} label="FAX CHAIN mints" />
           </div>
-          <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ${online ? 'text-[#3d5a40]' : 'text-[#a94228]'}`}>
-            {online ? <Wifi size={13} /> : <WifiOff size={13} />}
+          <div className="flex flex-col items-center gap-2">
+            <div className={`flex items-center gap-1 text-[10px] font-bold uppercase ${online ? 'text-[#3d5a40]' : 'text-[#a94228]'}`}>
+              {online ? <Wifi size={13} /> : <WifiOff size={13} />}
+            </div>
+            {/* Back to the office. Disabled whenever a printer key is in the URL:
+                that is the venue kiosk, and visitors must not be able to leave it. */}
+            {opts.queueKey || !hydrated ? (
+              <span aria-disabled="true" title="Kiosk mode — locked to the exhibit" className="grid h-7 w-7 cursor-not-allowed place-items-center border border-[#8f8878] bg-[#c8c0ae] text-[#9a9282] opacity-50">
+                <LampDesk size={13} />
+              </span>
+            ) : (
+              <a href="/" title="Back to NFTfax.app" className="key-shadow grid h-7 w-7 place-items-center border border-[#77705f] bg-[#d8d0bf] text-[#25251f] hover:bg-[#e65b2f] hover:text-white">
+                <LampDesk size={13} />
+              </a>
+            )}
           </div>
         </div>
       </header>

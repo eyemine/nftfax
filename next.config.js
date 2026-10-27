@@ -14,6 +14,10 @@ const nextConfig = {
     ],
   },
   allowedDevOrigins: ['127.0.0.1', 'localhost'],
+  async redirects() {
+    // The chain log moved from /leaderboard; old links and shares keep working.
+    return [{ source: '/leaderboard', destination: '/chain-log', permanent: true }];
+  },
   async rewrites() {
     return [
       {

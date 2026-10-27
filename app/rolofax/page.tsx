@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
-import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send, LampDesk, UserCheck } from 'lucide-react';
+import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send, LampDesk, Backpack as BackpackIcon, UserCheck } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { FaxHandleThumb } from '../components/FaxHandleThumb';
 import Link from 'next/link';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
 import { disconnectWallet } from '../lib/disconnect';
 import { SkinPanel } from '../components/SkinPanel';
-import { ExhibitButton } from '../components/ExhibitButton';
 
 type RegisterStatus = 'idle' | 'registering' | 'registered' | 'error';
 
@@ -359,7 +358,7 @@ export default function PreRegisterPage() {
         </div>
       </header>
       <div className="mx-auto mb-5 grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div className="flex justify-start"><ExhibitButton /></div>
+        <div className="flex justify-start"><Link href="/?view=backpack" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><BackpackIcon size={13} /> Backpack</Link></div>
         <div className="flex justify-center"><Link href="/?view=delegate" className="key-shadow flex items-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><UserCheck size={13} /> Delegate</Link></div>
         <div className="flex justify-end"><Link href="/" className="flex items-center gap-1.5 key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-2 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap"><LampDesk size={13} /> Office</Link></div>
       </div>

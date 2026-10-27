@@ -239,7 +239,7 @@ export default function HomeClient() {
               : undefined}
             className={`key-shadow relative flex h-9 w-9 items-center justify-center gap-1.5 border md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] ${view === 'tray' ? 'border-[#983b21] bg-[#e65b2f] text-white' : 'border-[#77705f] bg-[#d8d0bf]'}`}
           >
-            <Inbox size={14} /> <span className="hidden md:inline">Fax-Tray</span>
+            <Inbox size={14} /> <span className="hidden md:inline">Tray</span>
             {unseenFaxTotal > 0 && (
               <span
                 aria-label={`${unseenFaxTotal} fax${unseenFaxTotal === 1 ? '' : 'es'} awaiting a forward`}
@@ -250,9 +250,11 @@ export default function HomeClient() {
             )}
           </button>
         </div>
+        {/* Centred on wide screens; on narrow ones About moves into the right
+            group (below) so it always sits to the right of Prizes / Chain-log. */}
         <Link
           href="/about"
-          className="key-shadow order-last flex h-9 items-center justify-center gap-1.5 md:gap-2 border border-[#77705f] bg-[#d8d0bf] px-3 md:px-4 md:h-auto md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em] md:order-none md:justify-self-center"
+          className="key-shadow hidden items-center justify-center gap-2 border border-[#77705f] bg-[#d8d0bf] px-4 py-2 text-[12px] font-bold uppercase tracking-[.14em] md:flex md:justify-self-center"
         >
           <Info size={14} /> About
         </Link>
@@ -261,13 +263,19 @@ export default function HomeClient() {
             href="/draw"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
           >
-            <Dices size={14} /> <span className="hidden md:inline">Prize Pool<span className="text-[#a94228]">*</span></span>
+            <Dices size={14} /> <span className="hidden md:inline">Prizes<span className="text-[#a94228]">*</span></span>
           </Link>
           <Link
-            href="/leaderboard"
+            href="/chain-log"
             className="key-shadow flex h-9 w-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] md:h-auto md:w-auto md:gap-2 md:px-4 md:py-2 text-[11px] md:text-[12px] font-bold uppercase tracking-[.1em] md:tracking-[.14em]"
           >
-            <LinkIcon size={14} /> <span className="hidden md:inline">Fax Chain Log</span>
+            <LinkIcon size={14} /> <span className="hidden md:inline">Chain-log</span>
+          </Link>
+          <Link
+            href="/about"
+            className="key-shadow flex h-9 items-center justify-center gap-1.5 border border-[#77705f] bg-[#d8d0bf] px-3 text-[11px] font-bold uppercase tracking-[.1em] md:hidden"
+          >
+            <Info size={14} /> About
           </Link>
         </div>
       </div>

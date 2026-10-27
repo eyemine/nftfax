@@ -1,10 +1,10 @@
 import RolofaxClient from './RolofaxClient';
 
 export const metadata = {
-  title: 'Fax Chain Log',
+  title: 'Chain-log',
   description:
     'Live NFTFAX standings: minted FAX CHAIN collectibles, chain depth reached, and the most active @fax identities across every community.',
-  alternates: { canonical: '/leaderboard' },
+  alternates: { canonical: '/chain-log' },
 };
 
 export const dynamic = 'force-dynamic';
