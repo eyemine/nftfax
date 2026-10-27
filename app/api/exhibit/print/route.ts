@@ -4,6 +4,7 @@ import { after, NextRequest, NextResponse } from 'next/server';
 import { recordExhibitNote } from '../../../lib/exhibit-feed';
 import { publishExhibitSignal } from '../../../lib/exhibit-signal';
 import { pingCheck, printerCheckUrl } from '../../../lib/exhibit-health';
+import { composeSender, exhibitForKey } from '../../../lib/exhibit-keys';
 
 /// Print queue between the exhibition display and the physical fax machine.
 ///
@@ -64,14 +65,14 @@ function persistQueue() {
 const g = globalThis as unknown as { __nftfaxPrintQueue?: Queue };
 const Q: Queue = g.__nftfaxPrintQueue ??= loadQueue();
 
-const KEY = process.env.EXHIBIT_PRINT_KEY || '';
 const LEASE_MS = 90_000;      // a job leased but not acked in 90 s goes back to pending
 const MAX_ATTEMPTS = 3;
 const MAX_QUEUE = 50;
 
+/// The exhibit this request's key belongs to (see app/lib/exhibit-keys.ts).
 function authed(req: NextRequest) {
   const k = req.nextUrl.searchParams.get('key') || req.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
-  return KEY.length > 0 && k === KEY;
+  return exhibitForKey(k);
 }
 function pending() {
   const now = Date.now();
@@ -80,7 +81,8 @@ function pending() {
 function wake() { const w = Q.waiters.splice(0); for (const fn of w) fn(); }
 
 export async function POST(req: NextRequest) {
-  if (!authed(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const exhibit = authed(req);
+  if (!exhibit) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: 'bad json' }, { status: 400 });
 
@@ -111,6 +113,9 @@ export async function POST(req: NextRequest) {
   if (Q.jobs.size >= MAX_QUEUE) return NextResponse.json({ error: 'queue full' }, { status: 429 });
   const source = String(body.source || 'exhibit').toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 32) || 'exhibit';
   body.source = source;
+  // The sender is the key's identity; the visitor may only put a name before it.
+  if (body.event === 'fax') body.from = composeSender(body.fromName, exhibit.sender);
+  delete body.fromName;
   recordExhibitNote({ event: body.event, source, tokenId: body.tokenId, from: body.from, visitor: body.visitor, coverNote: body.coverNote });
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   Q.jobs.set(id, { id, payload: body, enqueuedAt: Date.now(), leasedAt: null, attempts: 0 });
@@ -121,11 +126,13 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  if (!authed(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const exhibit = authed(req);
+  if (!exhibit) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const p = req.nextUrl.searchParams;
 
   if (p.get('status')) {
     return NextResponse.json({
+      sender: exhibit.sender,
       daemonOnline: Date.now() - Q.daemonSeenAt < 60_000,
       daemonSeenAt: Q.daemonSeenAt || null,
       daemonInfo: Q.daemonInfo || null,

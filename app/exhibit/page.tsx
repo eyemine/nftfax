@@ -1,6 +1,6 @@
 'use client';
 
-/// /exhibit — the Marfa exhibition dashboard.
+/// /exhibit — the exhibition dashboard.
 ///
 /// A venue display for a real thermal printer housed in a replica fax machine.
 /// It watches the public leaderboard for new FAX CHAIN mints and, on each one:
@@ -49,6 +49,7 @@ import { Cctv, ExternalLink, LampDesk, Maximize2, Minus, Plus, Printer, Send, Wi
 import { playFaxHandshake, primeFaxAudio } from '../lib/fax-audio';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
+import { cleanSenderName, composeSender, DEFAULT_EXHIBIT_SENDER, SENDER_NAME_MAX } from '../lib/exhibit-keys';
 import { getCollectionTheme, type CollectionKey } from '../lib/theme';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -136,6 +137,8 @@ const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz
 
 const PRINT_OVERLAY_MS = 14_000;
 const RECENT_PAGE = 24;
+/// Seconds of thermal-printer sound after the handshake.
+const THERMAL_SEC = 20;
 const CAM_AUTO_HIDE_MS = 5 * 60_000;
 const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, cam2: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment', kiosk: '' };
 
@@ -487,7 +490,7 @@ export default function ExhibitPage() {
   /// Zoom for the featured fax: 1 = fit, up to 3x; pan by dragging.
   const [zoom, setZoom] = useState(1);
   /// Remote printer daemon status, from the queue. Null when not using the queue.
-  const [printer, setPrinter] = useState<{ daemonOnline: boolean; printerAwake?: boolean | null; pending: number; printed: number; lastError: string | null; daemonInfo: string | null } | null>(null);
+  const [printer, setPrinter] = useState<{ sender?: string; daemonOnline: boolean; printerAwake?: boolean | null; pending: number; printed: number; lastError: string | null; daemonInfo: string | null } | null>(null);
   useEffect(() => {
     if (!opts.queueKey) return;
     let stop = false;
@@ -555,6 +558,7 @@ export default function ExhibitPage() {
 
   const lastSeenTokenId = useRef<number | null>(null);
   const printTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const faxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const testFired = useRef(false);
 
@@ -571,7 +575,7 @@ export default function ExhibitPage() {
   }, []);
 
   // ── Middleware hook ───────────────────────────────────────────────────────
-  const notifyMiddleware = useCallback(async (mint: Mint, extra: { event: 'mint' | 'fax'; coverNote?: string; from?: string; cc?: string; source?: string } = { event: 'mint' }): Promise<'none' | 'ok' | 'failed'> => {
+  const notifyMiddleware = useCallback(async (mint: Mint, extra: { event: 'mint' | 'fax'; coverNote?: string; from?: string; fromName?: string; cc?: string; source?: string } = { event: 'mint' }): Promise<'none' | 'ok' | 'failed'> => {
     if (!opts.middleware) return 'none';
     const origin = window.location.origin;
     const key = COMMUNITY_KEY[mint.community];
@@ -605,22 +609,25 @@ export default function ExhibitPage() {
     showMint(mint);
     showCamForPrint();
     setPrinting(mint);
-    if (soundOn) playFaxHandshake();
+    const ms = soundOn ? playFaxHandshake(undefined, { thermalSec: THERMAL_SEC }) : 0;
     if (printTimer.current) clearTimeout(printTimer.current);
-    printTimer.current = setTimeout(() => setPrinting(null), PRINT_OVERLAY_MS);
+    printTimer.current = setTimeout(() => setPrinting(null), Math.max(ms, PRINT_OVERLAY_MS));
     void notifyMiddleware(mint, { event: 'mint', source: 'exhibit' }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
   }, [notifyMiddleware, soundOn, showMint, showCamForPrint]);
 
   // ── Outgoing transmission (operator-initiated) ────────────────────────────
-  const OUTGOING_FROM = 'Marfa@fax';
+  // The queue decides the sender from the printer key; this is the preview.
+  const outgoingSender = printer?.sender || DEFAULT_EXHIBIT_SENDER;
+  const [fromName, setFromName] = useState('');
   const OUTGOING_CC = 'LocalMachine@fax';
   const [liveCc, setLiveCc] = useState('');
   const sendOutgoing = useCallback(() => {
     const mint = outgoing;
     if (!mint) return;
     const note = coverNote.trim().slice(0, 140);
+    const name = cleanSenderName(fromName);
     setOutgoing(null);
     setCoverNote('');
     setLiveCc(note);
@@ -630,14 +637,18 @@ export default function ExhibitPage() {
     setFaxingId(mint.tokenId);
     setPrinting(mint);
     if (printTimer.current) clearTimeout(printTimer.current);
-    // The sound comes from this page. Hold the FAXING header for as long as
-    // the handshake plays, then a beat, so the visual and the audio agree.
-    const ms = soundOn ? playFaxHandshake() : 0;
+    // The sound comes from this page. FAXING holds for the handshake; the
+    // print overlay stays up while the thermal printer runs after it, so the
+    // visual and the audio agree.
+    const ms = soundOn ? playFaxHandshake(undefined, { thermalSec: THERMAL_SEC }) : 0;
+    const handshakeMs = soundOn ? Math.max(0, ms - THERMAL_SEC * 1000 - 400) : 0;
+    if (faxTimer.current) clearTimeout(faxTimer.current);
+    faxTimer.current = setTimeout(() => setFaxingId((cur) => (cur === mint.tokenId ? null : cur)), Math.max(handshakeMs, 6000) + 1500);
     printTimer.current = setTimeout(() => { setFaxingId((cur) => (cur === mint.tokenId ? null : cur)); setLiveCc(''); setPrinting(null); setDissolve((n) => n + 1); }, Math.max(ms, 6000) + 1500);
-    void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: OUTGOING_FROM, cc: OUTGOING_CC, source: 'exhibit' }).then((delivered) => {
+    void notifyMiddleware(mint, { event: 'fax', coverNote: note || undefined, from: composeSender(name, outgoingSender), fromName: name || undefined, cc: OUTGOING_CC, source: 'exhibit' }).then((delivered) => {
       setEvents((prev) => [{ at: Date.now(), mint, delivered }, ...prev].slice(0, 12));
     });
-  }, [outgoing, coverNote, soundOn, notifyMiddleware, showMint, showCamForPrint]);
+  }, [outgoing, coverNote, fromName, outgoingSender, soundOn, notifyMiddleware, showMint, showCamForPrint]);
 
   // ── Polling ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1141,7 +1152,7 @@ export default function ExhibitPage() {
           const live = !noKey && !unminted && !offline;
           return (
             <button
-              onClick={() => { if (noKey || unminted) return; primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); } }}
+              onClick={() => { if (noKey || unminted) return; primeFaxAudio(); const m = featured ?? board?.mints[0]; if (m) { setOutgoing(m); setCoverNote(''); setFromName(''); } }}
               disabled={noKey || unminted}
               title={noKey ? 'No print key — display only' : unminted ? 'Not minted — view only' : offline ? 'Machine offline — job will queue' : 'Fax this transmission to the machine'}
               className={`border-2 p-2.5 transition-shadow ${live
@@ -1170,7 +1181,18 @@ export default function ExhibitPage() {
               <button onClick={() => setOutgoing(null)} className="text-[#666] hover:text-[#a94228]"><X size={16} /></button>
             </div>
             <div className="space-y-2 px-4 py-3 text-[11px]">
-              <p className="text-[#888]">FROM: <b className="text-[#2a2a2a]">{OUTGOING_FROM}</b></p>
+              <label className="flex items-center gap-2 text-[#888]">
+                FROM:
+                <input
+                  value={fromName}
+                  onChange={(e) => setFromName(e.target.value.slice(0, SENDER_NAME_MAX))}
+                  maxLength={SENDER_NAME_MAX}
+                  placeholder="Your name (optional)"
+                  autoComplete="off"
+                  className="min-w-0 flex-1 border border-[#999] bg-[#e8e4d8] px-2 py-1 text-[12px] text-[#2a2a2a] outline-none focus:border-[#e65b2f]"
+                />
+                <b className="whitespace-nowrap text-[#2a2a2a]">{outgoingSender}</b>
+              </label>
               <p className="text-[#888]">CC: <b className="text-[#2a2a2a]">{OUTGOING_CC}</b></p>
               <p className="text-[#888]">RE: <b className="text-[#2a2a2a]">T/#{(featuredTrayId || outgoing.trayId).toUpperCase()} · FAX CHAIN #{outgoing.tokenId}</b></p>
               <label className="block pt-2">
@@ -1186,7 +1208,7 @@ export default function ExhibitPage() {
                 />
               </label>
               <label className="flex items-center gap-2 pt-1 text-[10px] text-[#666]">
-                <input type="checkbox" checked={soundOn} onChange={(e) => setSoundOn(e.target.checked)} className="accent-[#e65b2f]" /> Play handshake on this device
+                <input type="checkbox" checked={soundOn} onChange={(e) => setSoundOn(e.target.checked)} className="accent-[#e65b2f]" /> Play handshake + printer on this device
               </label>
             </div>
             <div className="flex gap-2 border-t-2 border-dashed border-[#999] px-4 py-3">

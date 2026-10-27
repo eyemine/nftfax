@@ -155,7 +155,7 @@ export async function renderCoverSheet(job) {
   gap(10); put(rule()); gap(18);
   const source = String(job.source || '').replace(/[^a-z0-9-]/gi, '').toUpperCase();
   put(textSvg([
-    `FROM: ${job.from || 'Marfa@fax'}`,
+    `FROM: ${job.from || 'exhibit@fax'}`,
     `TO:   ${job.cc || 'LocalMachine@fax'}`.trimEnd(),
     source ? `VIA:  ${source}` : '',
     `T/#${String(job.trayId || '').toUpperCase()}    ${stamp}`,
@@ -186,7 +186,7 @@ export async function renderSheet(job) {
   gap(10); put(rule()); gap(18);
   const source = String(job.source || '').replace(/[^a-z0-9-]/gi, '').toUpperCase();
   put(textSvg([
-    `FROM: ${isFax ? job.from || 'Marfa@fax' : job.handle || ''}`,
+    `FROM: ${isFax ? job.from || 'exhibit@fax' : job.handle || ''}`,
     `TO:   ${isFax ? job.cc || 'LocalMachine@fax' : ''}`.trimEnd(),
     source ? `VIA:  ${source}` : '',
     `T/#${String(job.trayId || '').toUpperCase()}    ${stamp}`,
@@ -298,7 +298,7 @@ async function loop() {
 }
 
 if (process.env.ONCE) {
-  const job = { event: 'fax', at: new Date().toISOString(), tokenId: 21, trayId: 'd4172ce5fced', handle: 'atom.648@fax', collection: 'POW NFT', chainDepth: 3, minterEns: 'rgbanksy.eth', from: 'Marfa@fax', cc: 'LocalMachine@fax', coverNote: 'Greetings from Marfa. This fax crossed the Pacific to reach you.', imageUrl: `${ORIGIN}/api/tray/d4172ce5fced/image`, id: 'test', ...JSON.parse(process.env.ONCE === '1' ? '{}' : process.env.ONCE) };
+  const job = { event: 'fax', at: new Date().toISOString(), tokenId: 21, trayId: 'd4172ce5fced', handle: 'atom.648@fax', collection: 'POW NFT', chainDepth: 3, minterEns: 'rgbanksy.eth', from: 'exhibit@fax', cc: 'LocalMachine@fax', coverNote: 'Greetings from the exhibit. This fax crossed the Pacific to reach you.', imageUrl: `${ORIGIN}/api/tray/d4172ce5fced/image`, id: 'test', ...JSON.parse(process.env.ONCE === '1' ? '{}' : process.env.ONCE) };
   const sheet = await renderSheet(job);
   console.log(await printPng(sheet, 'nftfax-test'));
 } else {

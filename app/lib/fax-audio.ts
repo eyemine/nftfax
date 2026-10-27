@@ -76,10 +76,83 @@ const DTMF: Record<string, [number, number]> = {
   '6': [770, 1477], '7': [852, 1209], '8': [852, 1336], '9': [852, 1477], '0': [941, 1336],
 };
 
-/// Plays the handshake. Returns the total duration in ms so the caller can hold
-/// its visual state for the same time. Never throws: on a device without Web
-/// Audio it returns 0 and the display simply runs silent.
-export function playFaxHandshake(digits = '4326293'): number {
+/// A thermal printer running for `dur` seconds: the head's line-strobe buzz
+/// (gated noise), the paper stepper's whine, printing in uneven bursts the way
+/// image rows vary, then a paper feed and the cutter. One looped 1 s noise
+/// buffer, so a long print costs no more memory than a short one.
+function thermalPrint(ac: AudioContext, out: AudioNode, start: number, dur: number) {
+  const end = start + dur;
+  const feedAt = end - 1.4;
+  const bus = ac.createGain();
+  bus.gain.setValueAtTime(0, start);
+  bus.connect(out);
+
+  // Print head: bandpassed noise, chopped at the line rate.
+  const buf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const head = ac.createBufferSource();
+  head.buffer = buf;
+  head.loop = true;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 3200;
+  bp.Q.value = 1.4;
+  const gate = ac.createGain();
+  gate.gain.value = 0.5;
+  const lfo = ac.createOscillator();
+  lfo.type = 'square';
+  lfo.frequency.value = 88;
+  const depth = ac.createGain();
+  depth.gain.value = 0.5;
+  lfo.connect(depth).connect(gate.gain);
+  const headGain = ac.createGain();
+  headGain.gain.value = 0.11;
+  head.connect(bp).connect(gate).connect(headGain).connect(bus);
+
+  // Paper stepper: a filtered square whine with a little wobble.
+  const motor = ac.createOscillator();
+  motor.type = 'square';
+  motor.frequency.setValueAtTime(410, start);
+  const wob = ac.createOscillator();
+  wob.frequency.value = 6;
+  const wobDepth = ac.createGain();
+  wobDepth.gain.value = 6;
+  wob.connect(wobDepth).connect(motor.frequency);
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 1300;
+  const motorGain = ac.createGain();
+  motorGain.gain.value = 0.035;
+  motor.connect(lp).connect(motorGain).connect(bus);
+
+  // Uneven bursts: rows of an image print at different densities, with short
+  // stalls while the next band is sent.
+  let t = start;
+  while (t < feedAt) {
+    const run = 0.25 + Math.random() * 0.6;
+    bus.gain.setTargetAtTime(0.65 + Math.random() * 0.35, t, 0.015);
+    t += run;
+    if (t < feedAt && Math.random() < 0.35) {
+      bus.gain.setTargetAtTime(0.08, t, 0.02);
+      t += 0.06 + Math.random() * 0.1;
+    }
+  }
+  // Paper feed: head off, motor up a tone, then the cutter.
+  bus.gain.setTargetAtTime(0.7, feedAt, 0.02);
+  headGain.gain.setTargetAtTime(0, feedAt, 0.02);
+  motor.frequency.setValueAtTime(560, feedAt);
+  bus.gain.setTargetAtTime(0, end - 0.35, 0.03);
+  for (const at of [end - 0.3, end - 0.18]) noise(ac, out, at, 0.04, 0.22);
+
+  for (const n of [head, lfo, motor, wob]) { n.start(start); n.stop(end); }
+}
+
+/// Plays the handshake, then (with `thermalSec`) the printer printing it.
+/// Returns the total duration in ms so the caller can hold its visual state
+/// for the same time. Never throws: on a device without Web Audio it returns
+/// 0 and the display simply runs silent.
+export function playFaxHandshake(digits = '4326293', { thermalSec = 0 }: { thermalSec?: number } = {}): number {
   const ac = audio();
   if (!ac) return 0;
   const master = ac.createGain();
@@ -111,6 +184,8 @@ export function playFaxHandshake(digits = '4326293'): number {
   // Confirmation.
   tone(ac, master, [1650], t, 0.18, 0.12); t += 0.25;
   tone(ac, master, [1650], t, 0.18, 0.12); t += 0.3;
+
+  if (thermalSec > 0) { t += 0.4; thermalPrint(ac, master, t, thermalSec); t += thermalSec; }
 
   return Math.ceil((t - ac.currentTime) * 1000);
 }
