@@ -137,8 +137,8 @@ const PREFIX: Record<CollectionKey, string> = { chonk: 'chonk', deadfellaz: 'dfz
 
 const PRINT_OVERLAY_MS = 14_000;
 const RECENT_PAGE = 24;
-/// Seconds of thermal-printer sound after the handshake.
-const THERMAL_SEC = 20;
+/// Length of the printer recording (public/sounds/printer.mp3) after the handshake.
+const THERMAL_SEC = 36.5;
 const CAM_AUTO_HIDE_MS = 5 * 60_000;
 const DEFAULTS: Options = { middleware: '', queueKey: '', pollMs: 8000, cam: { kind: 'off' }, cam2: { kind: 'off' }, pip: 'br', test: false, auto: false, facing: 'environment', kiosk: '' };
 
@@ -735,6 +735,12 @@ export default function ExhibitPage() {
   // ── Keys ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Shortcuts are for an attached keyboard on the bare display. Never while
+      // typing (the cover note's first "t" was firing a test print) or while
+      // the cover-note modal is open.
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || outgoing) return;
       if (e.key === 'f' || e.key === 'F') void document.documentElement.requestFullscreen?.();
       if (e.key === 'c' || e.key === 'C') setCamOn((v) => !v);
       if ((e.key === 't' || e.key === 'T') && board?.mints[0] && !featuredFax) firePrint(featured ?? board.mints[0]);
@@ -742,7 +748,7 @@ export default function ExhibitPage() {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [board, featured, featuredFax, firePrint]);
+  }, [board, featured, featuredFax, firePrint, outgoing]);
 
   // ── Infinite scroll for the minted grid ───────────────────────────────────
   useEffect(() => {
