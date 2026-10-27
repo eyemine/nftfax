@@ -15,6 +15,7 @@ import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
 import { SkinPanel } from './components/SkinPanel';
 import { DelegatePanel } from './components/DelegatePanel';
 import { ChonkBackpack } from './components/ChonkBackpack';
+import { RolofaxOptionGroups } from './components/RolofaxOptionGroups';
 import { FaxHandleThumb } from './components/FaxHandleThumb';
 import { FaxHandleOwner } from './components/FaxHandleOwner';
 import Link from 'next/link';
@@ -320,16 +321,16 @@ export default function HomeClient() {
             {rolofaxEntries.length > 0 && (
               <select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]">
                 <option value="">Select a Rolofax handle…</option>
-                {rolofaxEntries.map((entry) => {
-                  // <option> cannot host a styled badge, so the count goes in
-                  // the label. The clickable chips below carry the red badge.
-                  const waiting = faxAlerts.find((a) => a.handle === entry.handle)?.actionable ?? 0;
-                  return (
-                    <option key={entry.handle} value={entry.handle}>
-                      {entry.handle}@fax ({entry.collection}){waiting > 0 ? ` — ${waiting} waiting` : ''}
-                    </option>
-                  );
-                })}
+                {/* <option> cannot host a styled badge, so the count goes in
+                    the label. The clickable chips below carry the red badge. */}
+                <RolofaxOptionGroups
+                  entries={rolofaxEntries}
+                  firstWallet={walletAddress}
+                  label={(entry) => {
+                    const waiting = faxAlerts.find((a) => a.handle === entry.handle)?.actionable ?? 0;
+                    return `${entry.handle}@fax (${entry.collection})${waiting > 0 ? ` — ${waiting} waiting` : ''}`;
+                  }}
+                />
               </select>
             )}
 
@@ -362,7 +363,7 @@ export default function HomeClient() {
               </div>
             </div>
           </label>
-          <InTray local={mailbox} wallet={walletAddress} domain="fax" rolofaxOptions={otherRolofaxEntries.map((e) => ({ handle: e.handle, collection: e.collection }))} getEthereumProvider={evmWallet ? () => evmWallet.getEthereumProvider() : undefined} />
+          <InTray local={mailbox} wallet={walletAddress} domain="fax" rolofaxOptions={otherRolofaxEntries} getEthereumProvider={evmWallet ? () => evmWallet.getEthereumProvider() : undefined} />
         </SkinPanel>
       )}
 
@@ -456,8 +457,8 @@ export default function HomeClient() {
               <div className="relative overflow-hidden"><div className="scanline absolute inset-y-0 w-1/3" /><p className="text-[11px] uppercase tracking-[.2em] text-[#7fa178]">Transmission monitor</p><p className="mt-2 text-sm font-bold">{status === 'sent' ? 'DELIVERY CONFIRMED' : status === 'sending' ? 'DIALING REMOTE STATION…' : status === 'ready' ? 'DOCUMENT READY' : 'AWAITING DOCUMENT'}</p></div>
             </div>
 
-            <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">From fax handle</span>{rolofaxEntries.length > 0 && (<select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select a Rolofax handle…</option>{rolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<div className="flex items-stretch gap-2"><FaxHandleThumb handle={mailbox} label="Sending as" /><div className="flex min-w-0 flex-1"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></div></label>
-            <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Destination address</span>{otherRolofaxEntries.length > 0 && (<select value={recipient.includes('@fax') ? recipient.replace(/@fax$/, '') : ''} onChange={(event) => { const h = event.target.value; setRecipient(h ? `${h}@fax` : ''); }} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select from Rolofax directory…</option>{otherRolofaxEntries.map((entry) => (<option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>))}</select>)}<div className="flex items-stretch gap-2"><FaxHandleThumb handle={recipient} label="Sending to" /><input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></div><FaxHandleOwner handle={recipient} /></label>
+            <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">From fax handle</span>{rolofaxEntries.length > 0 && (<select value={mailbox} onChange={(event) => handleMailboxChange(event.target.value)} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select a Rolofax handle…</option><RolofaxOptionGroups entries={rolofaxEntries} firstWallet={walletAddress} /></select>)}<div className="flex items-stretch gap-2"><FaxHandleThumb handle={mailbox} label="Sending as" /><div className="flex min-w-0 flex-1"><input value={mailbox} onChange={(event) => setMailbox(event.target.value)} placeholder={collectionTheme.mailboxPlaceholder} className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /><span className="border border-l-0 border-[#847d6e] bg-[#d5cebf] px-3 py-3 text-xs">@fax</span></div></div></label>
+            <label className="mb-5 block"><span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Destination address</span>{otherRolofaxEntries.length > 0 && (<select value={recipient.includes('@fax') ? recipient.replace(/@fax$/, '') : ''} onChange={(event) => { const h = event.target.value; setRecipient(h ? `${h}@fax` : ''); }} className="mb-2 w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f]"><option value="">Select from Rolofax directory…</option><RolofaxOptionGroups entries={otherRolofaxEntries} /></select>)}<div className="flex items-stretch gap-2"><FaxHandleThumb handle={recipient} label="Sending to" /><input value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="recipient@nftmail.box or recipient@fax" type="email" className="min-w-0 flex-1 border border-[#847d6e] bg-[#eee8dc] px-3 py-3 text-sm outline-none focus:border-[#e65b2f]" /></div><FaxHandleOwner handle={recipient} /></label>
 
             <div className="mb-5">
               <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[.18em]">Cover note (optional)</span>

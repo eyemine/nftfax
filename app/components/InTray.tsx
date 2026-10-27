@@ -10,6 +10,7 @@
 ///   4. SAVE TO GNOSIS (permanence) — rescues the fax from the fade at any time.
 /// Unsaved / unminted faxes decay after 8 days so the gallery stays uncluttered.
 
+import { RolofaxOptionGroups, type RolofaxOption } from './RolofaxOptionGroups';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
 import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlacement } from '../lib/image';
@@ -81,7 +82,7 @@ interface InTrayProps {
   local: string;
   wallet: string;
   domain?: string;
-  rolofaxOptions?: { handle: string; collection: string }[];
+  rolofaxOptions?: RolofaxOption[];
   /**
    * Returns the connected wallet's EIP-1193 provider (e.g. Privy's
    * `activeWallet.getEthereumProvider()`). Falling back to `window.ethereum`
@@ -1063,9 +1064,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                                   className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f] disabled:opacity-60"
                                 >
                                   <option value="">{opts.length === 0 ? 'No other Rolofax players available' : 'Select a Rolofax address…'}</option>
-                                  {opts.map((entry) => (
-                                    <option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>
-                                  ))}
+                                  <RolofaxOptionGroups entries={opts} />
                                 </select>
                               </div>
                             );
@@ -1249,9 +1248,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                             className="w-full border border-[#847d6e] bg-[#eee8dc] px-3 py-2 text-xs outline-none focus:border-[#e65b2f] disabled:opacity-60"
                           >
                             <option value="">{opts.length === 0 ? 'No other Rolofax players available' : 'Select a Rolofax address…'}</option>
-                            {opts.map((entry) => (
-                              <option key={entry.handle} value={entry.handle}>{entry.handle}@fax ({entry.collection})</option>
-                            ))}
+                            <RolofaxOptionGroups entries={opts} />
                           </select>
                         </div>
                       );
