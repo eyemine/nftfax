@@ -9,3 +9,7 @@ out
 windsurf_deployment.yaml
 .DS_Store
 netlify.toml
+
+# exhibit migration bundle — contains live print/cam keys, never commit
+nftfax-exhibit-migrate.tar.gz
+*.tar.gz
