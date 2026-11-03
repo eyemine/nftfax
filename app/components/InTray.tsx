@@ -17,6 +17,7 @@ import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlac
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
 import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
+import { ensureWalletSession } from '../lib/wallet-session-client';
 import { FaxHandleThumb } from './FaxHandleThumb';
 import { FaxHandleOwner } from './FaxHandleOwner';
 
@@ -347,6 +348,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       if (forwardCoverNote.trim()) {
         payload.coverNote = forwardCoverNote.trim().slice(0, 140);
       }
+      await ensureWalletSession(wallet, getEthereumProvider);
       const res = await fetch('/api/tray/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -416,6 +418,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setReplyError('');
     setNotice('');
     try {
+      await ensureWalletSession(wallet, getEthereumProvider);
       const res = await fetch('/api/tray/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -708,6 +711,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setNotice('');
     setRerouteError('');
     try {
+      await ensureWalletSession(wallet, getEthereumProvider);
       const res = await fetch(`/api/tray/${fax.id}/reroute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

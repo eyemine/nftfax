@@ -11,6 +11,7 @@ type View = 'send' | 'tray' | 'delegate' | 'backpack';
 
 import { prepareImage, type ImageTransform, type Quarter } from './lib/image';
 import { disconnectWallet } from './lib/disconnect';
+import { ensureWalletSession } from './lib/wallet-session-client';
 import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
 import { SkinPanel } from './components/SkinPanel';
 import { DelegatePanel } from './components/DelegatePanel';
@@ -119,6 +120,18 @@ export default function HomeClient() {
     return () => { cancelled = true; clearInterval(timer); };
   }, [walletAddress, view, mailbox]);
 
+  // Sign in once, right after the wallet connects: one signature proves this
+  // wallet is really the player's, and the 30-day session it opens means
+  // sending, forwarding and replying never prompt. If a valid session exists
+  // already, nothing is shown. A dismissed prompt is not repeated here — the
+  // send paths ask again only when the player actually sends.
+  const signInTried = useRef('');
+  useEffect(() => {
+    if (!walletAddress || signInTried.current === walletAddress) return;
+    signInTried.current = walletAddress;
+    void ensureWalletSession(walletAddress, evmWallet ? () => evmWallet.getEthereumProvider() : undefined).catch(() => { /* retried on send */ });
+  }, [walletAddress, evmWallet]);
+
   /// Handles the player is NOT currently looking at. The mailbox on screen has
   /// its own visible inbox, so badging it too would just be noise.
   const unseenFaxAlerts = useMemo(
@@ -174,6 +187,7 @@ export default function HomeClient() {
 
     setStatus('sending');
     try {
+      await ensureWalletSession(walletAddress, evmWallet ? () => evmWallet.getEthereumProvider() : undefined);
       const response = await fetch('/api/tray/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

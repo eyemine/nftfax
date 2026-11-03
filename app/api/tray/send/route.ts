@@ -5,11 +5,17 @@
 /// economy: every forward spends one sender credit and credits the recipient
 /// for hops 1-5; hop 6+ forwards do not credit the recipient.
 ///
-/// Body: { fromLabel, fromDomain, ownerWallet, to, format, dataBase64,
+/// Body: { fromLabel, fromDomain, ownerWallet?, to, format, dataBase64,
 ///   chainTrayId?, sourceChainDepth?, sourceMintedBase?, collection? }
+///
+/// The sender's wallet comes from the wallet session (cookie, or
+/// "Authorization: Bearer" for agents — see app/lib/wallet-session.ts), never
+/// from the body. `ownerWallet`, if sent, must match it.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { transferForwardCredit, getChainTimerMs } from '@/app/lib/fax-credits';
+import { verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
+import { requireSessionWallet } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -73,7 +79,7 @@ export async function POST(req: NextRequest) {
       coverNote?: string;
     };
 
-    let { fromLabel, ownerWallet, to, format, dataBase64, chainTrayId } = body;
+    let { fromLabel, to, format, dataBase64, chainTrayId } = body;
     let fromDomain = (body.fromDomain || '').toLowerCase().trim();
     if (fromLabel) {
       const parts = fromLabel.toLowerCase().trim().split('@');
@@ -88,9 +94,11 @@ export async function POST(req: NextRequest) {
     if (!fromLabel) {
       return NextResponse.json({ error: 'Missing fromLabel' }, { status: 400 });
     }
-    if (!ownerWallet || !/^0x[a-fA-F0-9]{40}$/.test(ownerWallet)) {
-      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    const session = requireSessionWallet(req, body.ownerWallet);
+    if ('error' in session) {
+      return NextResponse.json({ error: session.error }, { status: session.status });
     }
+    const ownerWallet = session.wallet;
     if (!to || !to.includes('@')) {
       return NextResponse.json({ error: 'Invalid recipient address' }, { status: 400 });
     }
@@ -130,8 +138,14 @@ export async function POST(req: NextRequest) {
       rawDataBase64 = dataBase64;
     }
 
-    // @fax senders skip on-chain ownership verification (rolofax registered handles)
-    if (!isFaxSender) {
+    // An @fax handle IS an NFT: the signed-in wallet must hold it (or be a
+    // delegate.xyz delegate for it) — the same check inbox/sent/reroute use.
+    if (isFaxSender) {
+      const auth = await verifyFaxHandleOwner(fromLabel, ownerWallet);
+      if (!auth.authorized) {
+        return NextResponse.json({ error: auth.reason }, { status: auth.status ?? 403 });
+      }
+    } else {
       const resolveRes = await fetch(WORKER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Worker-Secret': WORKER_SECRET },
@@ -203,7 +217,7 @@ export async function POST(req: NextRequest) {
       dataBase64: rawDataBase64,
       chainDepth: nextHop,
       chainTimerDuration,
-      ownerWallet: (body.ownerWallet || '').toLowerCase().trim(),
+      ownerWallet,
     };
     // Pass through cover note (sanitized + capped in the worker).
     if (body.coverNote) {

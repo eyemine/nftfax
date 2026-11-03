@@ -5,7 +5,8 @@
 ///
 /// Body: { fromLabel, ownerWallet, to, dataBase64?, chainTrayId }
 ///   - fromLabel: sender's mailbox (must control the original fax)
-///   - ownerWallet: sender's wallet (verified against on-chain owner)
+///   - ownerWallet: optional; the wallet comes from the wallet session
+///     (app/lib/wallet-session.ts) and is verified against the on-chain owner
 ///   - to: new recipient address
 ///   - dataBase64: optional new image to composite (if omitted, forwards
 ///     the original fax bitmap unchanged)
@@ -17,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 import { transferForwardCredit, getChainTimerMs } from '@/app/lib/fax-credits';
+import { requireSessionWallet } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -38,8 +40,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       chainTrayId?: string;
     };
 
+    const session = requireSessionWallet(req, body.ownerWallet);
+    if ('error' in session) {
+      return NextResponse.json({ error: session.error }, { status: session.status, headers: NO_STORE });
+    }
     let fromLabel = (body.fromLabel || '').toLowerCase().trim();
-    const ownerWallet = (body.ownerWallet || '').toLowerCase().trim();
+    const ownerWallet = session.wallet;
     const to = (body.to || '').toLowerCase().trim();
     const chainTrayId = (body.chainTrayId || originalTrayId).trim();
 
@@ -51,12 +57,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
     const isFaxSender = fromDomain === 'fax';
 
-    if (!fromLabel || !ownerWallet || !to) {
-      return NextResponse.json({ error: 'Missing fromLabel, ownerWallet, or to' }, { status: 400, headers: NO_STORE });
-    }
-
-    if (!/^0x[a-fA-F0-9]{40}$/.test(ownerWallet)) {
-      return NextResponse.json({ error: 'Invalid wallet address' }, { status: 400, headers: NO_STORE });
+    if (!fromLabel || !to) {
+      return NextResponse.json({ error: 'Missing fromLabel or to' }, { status: 400, headers: NO_STORE });
     }
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
