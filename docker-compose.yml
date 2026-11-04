@@ -22,8 +22,19 @@ services:
       - EXHIBIT_KIOSK_HEALTHCHECK_URL=${EXHIBIT_KIOSK_HEALTHCHECK_URL:-}
       - EXHIBIT_PRINTER_HEALTHCHECK_URL=${EXHIBIT_PRINTER_HEALTHCHECK_URL:-}
       - EXHIBIT_LOW_BATTERY=${EXHIBIT_LOW_BATTERY:-}
+      # Cryptographic asset proxy (/api/cryptographic/asset/[cid]) — kubo lives
+      # in a sibling compose project; the shared external network below lets
+      # this container reach its internal gateway port 8080 by service name.
+      - CRYPTO_IPFS_GATEWAY=${CRYPTO_IPFS_GATEWAY:-http://ipfs-archive:8080}
     ports:
       - "3002:3000"
     volumes:
       - ./data:/app/data
     restart: unless-stopped
+    networks:
+      - default
+      - ipfs-archive_default
+
+networks:
+  ipfs-archive_default:
+    external: true

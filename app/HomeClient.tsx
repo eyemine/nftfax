@@ -10,6 +10,7 @@ type Status = 'idle' | 'processing' | 'ready' | 'sending' | 'sent';
 type View = 'send' | 'tray' | 'delegate' | 'backpack';
 
 import { prepareImage, type ImageTransform, type Quarter } from './lib/image';
+import { composeRecipe, renderRecipe, randomSeed } from './lib/cryptographic';
 import { disconnectWallet } from './lib/disconnect';
 import { ensureWalletSession } from './lib/wallet-session-client';
 import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
@@ -40,6 +41,10 @@ export default function HomeClient() {
   const [transform, setTransform] = useState<ImageTransform>({});
   const [sizeKb, setSizeKb] = useState(0);
   const [coverNote, setCoverNote] = useState('');
+  /// Cryptographic-machine state: the seed-derived recipe provenance shown
+  /// under the feeder, and the async roll in flight.
+  const [cryptoInfo, setCryptoInfo] = useState<{ seed: string; packs: string[]; drawn: number; missing: number } | null>(null);
+  const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [trayUrl, setTrayUrl] = useState('');
@@ -145,6 +150,42 @@ export default function HomeClient() {
 
   async function handleDisconnect() {
     await disconnectWallet(activeWallet, { authenticated, logout });
+  }
+
+  /// The Cryptographic machine is a POW perk — the generator button only
+  /// appears when the sending handle's Rolofax entry is a POWNFT mint.
+  const senderIsPow = useMemo(
+    () => rolofaxEntries.find((e) => e.handle === mailbox.trim().toLowerCase())?.collection === 'pow' || collection === 'pow',
+    [rolofaxEntries, mailbox, collection],
+  );
+
+  /// Manual document picks invalidate any generated-roll provenance label.
+  function pickFile(file: File) {
+    setCryptoInfo(null);
+    void selectFile(file);
+  }
+
+  /// Roll a seed -> deterministic pack/pool/pick pipeline -> fetch the blocks
+  /// -> composite on the A4 canvas -> feed the existing document pipeline.
+  /// Re-rolls are one click; each is a fresh seed, exactly like the original.
+  async function rollCryptographic() {
+    setError('');
+    setGenerating(true);
+    try {
+      const seed = randomSeed();
+      const recipe = composeRecipe(seed);
+      if (recipe.picked.length === 0) throw new Error('This roll drew a blank page — roll again.');
+      const { file, drawn, missing } = await renderRecipe(recipe);
+      await selectFile(file);
+      setCryptoInfo({ seed: recipe.seed, packs: recipe.packNames, drawn, missing });
+      if (!coverNote.trim()) {
+        setCoverNote(`crypto-fax · seed ${recipe.seed.slice(0, 16)} · ${recipe.packNames.join(' + ')}`.slice(0, 140));
+      }
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Generation failed.');
+    } finally {
+      setGenerating(false);
+    }
   }
 
   async function selectFile(file: File, nextTransform: ImageTransform = {}) {
@@ -422,7 +463,7 @@ export default function HomeClient() {
             <button
               onClick={() => inputRef.current?.click()}
               onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file) void selectFile(file); }}
+              onDrop={(event) => { event.preventDefault(); const file = event.dataTransfer.files[0]; if (file) pickFile(file); }}
               className="paper-noise relative grid min-h-[310px] w-full place-items-center overflow-hidden border-2 border-dashed border-[#817a6c] bg-[#e7e0d1] p-6 text-center transition hover:bg-[#eee8dc]"
             >
               {preview ? <img src={preview} alt="Fax preview" className="max-h-[290px] max-w-full object-contain grayscale" /> : (
@@ -430,7 +471,7 @@ export default function HomeClient() {
               )}
               {status === 'processing' && <div className="absolute inset-0 grid place-items-center bg-[#e7e0d1]/90"><Loader2 className="animate-spin" /><p className="mt-10 text-[12px] font-bold uppercase">Calibrating image…</p></div>}
             </button>
-            <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.bmp,image/png,image/jpeg,image/bmp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void selectFile(file); }} />
+            <input ref={inputRef} type="file" accept=".png,.jpg,.jpeg,.bmp,image/png,image/jpeg,image/bmp" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) pickFile(file); }} />
 
             {/* Orientation. Only meaningful once a document is loaded, and each
                 press re-runs the pipeline from the original file so repeated
@@ -464,6 +505,35 @@ export default function HomeClient() {
               </div>
             )}
             <div className="mt-3 flex min-h-5 items-center justify-between text-[11px] font-bold uppercase text-[#615c50]"><span>{fileName || 'Feeder empty'}</span><span>{sizeKb ? `${sizeKb} KB / GREYSCALE` : 'Auto reduction enabled'}</span></div>
+
+            {/* Cryptographic machine — POW holders may roll the 2018
+                compositor instead of uploading. Seed-derivable, verifiable,
+                served from the preserved collection's own archive node. */}
+            {senderIsPow && (
+              <div className="mt-4 border border-[#8e8778] bg-[#ded7c8] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[.18em]">Cryptographic machine</p>
+                    <p className="mt-0.5 text-[10px] uppercase leading-tight text-[#6e685a]">2018 compositor · asset packs · POW</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void rollCryptographic()}
+                    disabled={generating || status === 'processing' || status === 'sending'}
+                    title="Roll a seed — the machine composes a fax from the Cryptographics asset packs"
+                    className="key-shadow flex shrink-0 items-center gap-1.5 border border-[#9d3c20] bg-[#e65b2f] px-3 py-2 text-[11px] font-bold uppercase text-white disabled:opacity-50"
+                  >
+                    {generating ? <Loader2 size={14} className="animate-spin" /> : <Dices size={14} />}
+                    {generating ? 'Composing…' : cryptoInfo ? 'Re-roll' : 'Generate'}
+                  </button>
+                </div>
+                {cryptoInfo && (
+                  <p className="mt-2 border-t border-[#b5ad9d] pt-2 text-[10px] font-bold uppercase leading-relaxed tracking-[.08em] text-[#575244]">
+                    seed {cryptoInfo.seed.slice(0, 12)}… · {cryptoInfo.packs.join(' + ')} · {cryptoInfo.drawn} assets{cryptoInfo.missing > 0 ? ` · ${cryptoInfo.missing} lost` : ''}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="bg-[#bbb3a2] p-5 md:p-8">
