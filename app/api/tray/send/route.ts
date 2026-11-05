@@ -13,8 +13,8 @@
 /// from the body. `ownerWallet`, if sent, must match it.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { transferForwardCredit, getChainTimerMs } from '@/app/lib/fax-credits';
-import { verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
+import { transferForwardCredit, getChainTimerMs, earnSendCredit, setLastForwarded } from '@/app/lib/fax-credits';
+import { verifyFaxHandleOwner, parseFaxHandle } from '@/app/lib/fax-ownership';
 import { requireSessionWallet } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
@@ -77,6 +77,7 @@ export async function POST(req: NextRequest) {
       sourceChainDepth?: number;
       sourceMintedBase?: boolean;
       coverNote?: string;
+      cryptoFax?: boolean;
     };
 
     let { fromLabel, to, format, dataBase64, chainTrayId } = body;
@@ -184,12 +185,29 @@ export async function POST(req: NextRequest) {
 
     // Every relay spends one credit from the sender and, for hops 1-5, credits
     // the recipient. If the sender has no credits, the chain cannot continue.
+    //
+    // Exception: a generated cryptographic sent from a POW (atom.*) handle is
+    // free for the sender — the flag is client-asserted but only honoured on a
+    // chain-verified POW handle, so the worst abuse is a POW owner sending a
+    // free upload. The recipient still earns the hop credit so the chain
+    // incentive is preserved.
+    const freeCryptoSend =
+      body.cryptoFax === true &&
+      isFaxSender &&
+      parseFaxHandle(fromLabel)?.collection === 'pow';
     if (nextHop <= 11) {
-      try {
-        await transferForwardCredit(fromLabel, toLocal, ownerWallet, nextHop);
-      } catch (cause: unknown) {
-        const message = cause instanceof Error ? cause.message : 'Credit transfer failed';
-        return NextResponse.json({ error: message }, { status: 402 });
+      if (freeCryptoSend) {
+        if (nextHop <= 5) {
+          try { await earnSendCredit(toLocal, ownerWallet, 1); } catch { /* recipient credit is best-effort */ }
+        }
+        try { await setLastForwarded(fromLabel, Date.now(), ownerWallet); } catch { /* telemetry only */ }
+      } else {
+        try {
+          await transferForwardCredit(fromLabel, toLocal, ownerWallet, nextHop);
+        } catch (cause: unknown) {
+          const message = cause instanceof Error ? cause.message : 'Credit transfer failed';
+          return NextResponse.json({ error: message }, { status: 402 });
+        }
       }
     }
 

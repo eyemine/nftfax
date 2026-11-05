@@ -45,6 +45,12 @@ export default function HomeClient() {
   /// under the feeder, and the async roll in flight.
   const [cryptoInfo, setCryptoInfo] = useState<{ seed: string; packs: string[]; drawn: number; missing: number } | null>(null);
   const [generating, setGenerating] = useState(false);
+  /// The generated PNG is kept so the player can download the file itself;
+  /// object URL is revoked when the roll is replaced or cleared.
+  const [cryptoFile, setCryptoFile] = useState<File | null>(null);
+  /// The cover-note text the machine last wrote. Only replaced on re-roll
+  /// when the field still holds it (or is empty) — never clobbers typing.
+  const lastAutoNote = useRef('');
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [trayUrl, setTrayUrl] = useState('');
@@ -152,16 +158,20 @@ export default function HomeClient() {
     await disconnectWallet(activeWallet, { authenticated, logout });
   }
 
-  /// The Cryptographic machine is a POW perk — the generator button only
-  /// appears when the sending handle's Rolofax entry is a POWNFT mint.
-  const senderIsPow = useMemo(
-    () => rolofaxEntries.find((e) => e.handle === mailbox.trim().toLowerCase())?.collection === 'pow' || collection === 'pow',
-    [rolofaxEntries, mailbox, collection],
+  /// The Cryptographic machine is available to every @fax collection — any
+  /// NFT-backed handle in the player's Rolofax can roll the compositor.
+  const senderHasHandle = useMemo(
+    () => rolofaxEntries.some((e) => e.handle === mailbox.trim().toLowerCase()),
+    [rolofaxEntries, mailbox],
   );
+
+  const cryptoFileUrl = useMemo(() => (cryptoFile ? URL.createObjectURL(cryptoFile) : ''), [cryptoFile]);
+  useEffect(() => () => { if (cryptoFileUrl) URL.revokeObjectURL(cryptoFileUrl); }, [cryptoFileUrl]);
 
   /// Manual document picks invalidate any generated-roll provenance label.
   function pickFile(file: File) {
     setCryptoInfo(null);
+    setCryptoFile(null);
     void selectFile(file);
   }
 
@@ -177,9 +187,12 @@ export default function HomeClient() {
       if (recipe.picked.length === 0) throw new Error('This roll drew a blank page — roll again.');
       const { file, drawn, missing } = await renderRecipe(recipe);
       await selectFile(file);
+      setCryptoFile(file);
       setCryptoInfo({ seed: recipe.seed, packs: recipe.packNames, drawn, missing });
-      if (!coverNote.trim()) {
-        setCoverNote(`crypto-fax · seed ${recipe.seed.slice(0, 16)} · ${recipe.packNames.join(' + ')}`.slice(0, 140));
+      const note = `crypto-fax · seed ${recipe.seed.slice(0, 16)} · ${recipe.packNames.join(' + ')}`.slice(0, 140);
+      if (!coverNote.trim() || coverNote === lastAutoNote.current) {
+        lastAutoNote.current = note;
+        setCoverNote(note);
       }
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : 'Generation failed.');
@@ -241,6 +254,7 @@ export default function HomeClient() {
           format: 'jpg',
           dataBase64: base64,
           colorMode: 'greyscale',
+          ...(cryptoInfo ? { cryptoFax: true } : {}),
           ...(coverNote.trim() ? { coverNote: coverNote.trim().slice(0, 140) } : {}),
         }),
       });
@@ -504,17 +518,25 @@ export default function HomeClient() {
                 })}
               </div>
             )}
-            <div className="mt-3 flex min-h-5 items-center justify-between text-[11px] font-bold uppercase text-[#615c50]"><span>{fileName || 'Feeder empty'}</span><span>{sizeKb ? `${sizeKb} KB / GREYSCALE` : 'Auto reduction enabled'}</span></div>
 
-            {/* Cryptographic machine — POW holders may roll the 2018
-                compositor instead of uploading. Seed-derivable, verifiable,
-                served from the preserved collection's own archive node. */}
-            {senderIsPow && (
+            {/* The generated composition as a downloadable file — kept so the
+                player can archive the full-res PNG before it becomes a fax. */}
+            {cryptoFile && cryptoFileUrl && (
+              <p className="mt-3 text-[10px] font-bold uppercase tracking-[.08em]">
+                <a href={cryptoFileUrl} download={cryptoFile.name} className="break-all text-[#8a3e1e] underline">{cryptoFile.name} ↓</a>
+              </p>
+            )}
+            <div className="mt-3 flex min-h-5 items-center justify-between gap-2 text-[11px] font-bold uppercase text-[#615c50]"><span className="min-w-0 truncate">{fileName || 'Feeder empty'}</span><span className="shrink-0">{sizeKb ? `${sizeKb} KB / GREYSCALE` : 'Auto reduction enabled'}</span></div>
+
+            {/* Cryptographic machine — any @fax handle in the Rolofax may roll
+                the 2018 compositor instead of uploading. Seed-derivable,
+                verifiable, served from the preserved collection's own node. */}
+            {senderHasHandle && (
               <div className="mt-4 border border-[#8e8778] bg-[#ded7c8] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-[10px] font-black uppercase tracking-[.18em]">Cryptographic machine</p>
-                    <p className="mt-0.5 text-[10px] uppercase leading-tight text-[#6e685a]">2018 compositor · asset packs · POW</p>
+                    <p className="mt-0.5 text-[10px] uppercase leading-tight text-[#6e685a]">2018 compositor · 81 packs · all collections</p>
                   </div>
                   <button
                     type="button"
@@ -528,7 +550,7 @@ export default function HomeClient() {
                   </button>
                 </div>
                 {cryptoInfo && (
-                  <p className="mt-2 border-t border-[#b5ad9d] pt-2 text-[10px] font-bold uppercase leading-relaxed tracking-[.08em] text-[#575244]">
+                  <p className="mt-2 break-words border-t border-[#b5ad9d] pt-2 text-[10px] font-bold uppercase leading-relaxed tracking-[.08em] text-[#575244]">
                     seed {cryptoInfo.seed.slice(0, 12)}… · {cryptoInfo.packs.join(' + ')} · {cryptoInfo.drawn} assets{cryptoInfo.missing > 0 ? ` · ${cryptoInfo.missing} lost` : ''}
                   </p>
                 )}

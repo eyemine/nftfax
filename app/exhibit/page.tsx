@@ -952,7 +952,15 @@ export default function ExhibitPage() {
             <div className="grid grid-cols-[1fr_auto] items-stretch gap-4 border-t-2 border-[#575244] pt-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission · not minted · view only</p>
-                <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{featuredFax.id.toUpperCase()}</p>
+                {opts.queueKey ? (
+                  <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{featuredFax.id.toLowerCase()}</p>
+                ) : (
+                  <button
+                    onClick={() => window.open(`https://nftmail.box/tray/${featuredFax.id}`, 'nftfax-tray', 'popup=yes,width=980,height=760,noopener')}
+                    title="Open this fax on nftmail.box"
+                    className="text-lg font-black tracking-[-0.03em] underline decoration-[#8f8878] underline-offset-4 hover:text-[#e65b2f] xl:text-2xl"
+                  >T/#{featuredFax.id.toLowerCase()}</button>
+                )}
                 <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[.1em] text-[#3d5a40] xl:text-[12px]">
                   {featuredFax.from} → {featuredFax.to ?? '…'}
                 </p>
@@ -966,7 +974,15 @@ export default function ExhibitPage() {
             <div className="grid grid-cols-[1fr_auto] items-stretch gap-4 border-t-2 border-[#575244] pt-2">
               <div className="min-w-0">
                 <p className="text-[9px] font-bold uppercase tracking-[.2em] text-[#625e52] xl:text-[11px]">Latest transmission</p>
-                <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{(featuredTrayId || featured.trayId).toUpperCase()}</p>
+                {opts.queueKey ? (
+                  <p className="text-lg font-black tracking-[-0.03em] xl:text-2xl">T/#{(featuredTrayId || featured.trayId).toLowerCase()}</p>
+                ) : (
+                  <button
+                    onClick={() => window.open(`https://nftmail.box/tray/${featuredTrayId || featured.trayId}`, 'nftfax-tray', 'popup=yes,width=980,height=760,noopener')}
+                    title="Open this fax on nftmail.box"
+                    className="text-lg font-black tracking-[-0.03em] underline decoration-[#8f8878] underline-offset-4 hover:text-[#e65b2f] xl:text-2xl"
+                  >T/#{(featuredTrayId || featured.trayId).toLowerCase()}</button>
+                )}
                 <p className="mt-0.5 truncate text-[10px] font-bold uppercase tracking-[.1em] text-[#3d5a40] xl:text-[12px]">
                   {featured.minterEns || short(featured.minter)} · {handleFor(featured)} · {collectionFor(featured)}
                 </p>

@@ -158,7 +158,7 @@ export async function renderRecipe(
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!blob) throw new Error('The composition could not be encoded.');
-  return { file: new File([blob], `cryptographic-${recipe.seed}.png`, { type: 'image/png' }), drawn, missing };
+  return { file: new File([blob], `cryptographic-${recipe.seed.slice(0, 12)}.png`, { type: 'image/png' }), drawn, missing };
 }
 
 /// Random uint256 seed from the CSPRNG — user rolls get real entropy; the
