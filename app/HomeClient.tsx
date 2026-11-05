@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
 import { Check, Loader2, LayersArrowDown, Radar, Send, Upload, Inbox, Info, Link as LinkIcon, Dices, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
@@ -136,12 +136,32 @@ export default function HomeClient() {
   // sending, forwarding and replying never prompt. If a valid session exists
   // already, nothing is shown. A dismissed prompt is not repeated here — the
   // send paths ask again only when the player actually sends.
-  const signInTried = useRef('');
-  useEffect(() => {
-    if (!walletAddress || signInTried.current === walletAddress) return;
-    signInTried.current = walletAddress;
-    void ensureWalletSession(walletAddress, evmWallet ? () => evmWallet.getEthereumProvider() : undefined).catch(() => { /* retried on send */ });
+  /// Marked only on success or a deliberate rejection. A transient failure —
+  /// on mobile the Privy wallet object can still be warming up when the
+  /// address lands, leaving no provider to sign with — must NOT stop retries,
+  /// or the session never gets established and the first send has to sign,
+  /// summoning MetaMask mid-transmission (the old signInTried bug).
+  const signInDone = useRef('');
+  const trySignIn = useCallback(() => {
+    if (!walletAddress || signInDone.current === walletAddress) return;
+    void ensureWalletSession(walletAddress, evmWallet ? () => evmWallet.getEthereumProvider() : undefined)
+      .then(() => { signInDone.current = walletAddress; })
+      .catch((cause: unknown) => {
+        // A cancelled prompt is a choice — don't repeat it until the player
+        // actually sends. Anything else retries on the next dep/focus event.
+        if (cause instanceof Error && cause.message.includes('Sign-in was cancelled')) {
+          signInDone.current = walletAddress;
+        }
+      });
   }, [walletAddress, evmWallet]);
+  useEffect(trySignIn, [trySignIn]);
+  // Returning from the wallet app (iOS suspends the tab mid-sign) is exactly
+  // when a failed attempt should heal — retry on focus while unsigned.
+  useEffect(() => {
+    const onFocus = () => trySignIn();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [trySignIn]);
 
   /// Handles the player is NOT currently looking at. The mailbox on screen has
   /// its own visible inbox, so badging it too would just be noise.

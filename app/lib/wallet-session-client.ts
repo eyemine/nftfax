@@ -11,7 +11,11 @@ import { buildSessionMessage } from './wallet-session-message';
 
 type Eip1193Provider = { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> };
 
-const PROVIDER_TIMEOUT_MS = 8_000;
+/// Generous because a mobile wallet SDK can still be handing the provider back
+/// while the user is deep-linked out to MetaMask — 8 s routinely cut in before
+/// the provider arrived, which failed connect-time sign-in and left the first
+/// send to summon the wallet.
+const PROVIDER_TIMEOUT_MS = 20_000;
 const pending = new Map<string, Promise<void>>();
 
 async function resolveProvider(getProvider?: () => Promise<Eip1193Provider | undefined>): Promise<Eip1193Provider | undefined> {
