@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "crypto:packs": "node scripts/gen-cryptographic-packs.mjs"
   },
   "dependencies": {
     "@irys/upload": "^0.0.15",

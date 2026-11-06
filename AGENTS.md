@@ -29,3 +29,6 @@
 
 - See `env.example` for required environment variables.
 - Run `npx tsc --noEmit` before committing to avoid shipping TypeScript errors.
+- After creating or buying a Cryptographics asset pack (wallets: eyemine.eth,
+  ghostagent.eth, rgbanksy.eth), regenerate the machine's allowlist with
+  `npm run crypto:packs`, then commit + deploy `app/lib/cryptographic-packs.json`.
