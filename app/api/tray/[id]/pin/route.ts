@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { pinImageToIPFS, pinJSONToIPFS } from '../../../../lib/pinata';
+import { kuboPinImage, kuboPinJSON } from '../../../../lib/kubo-pin';
 import { uploadImageToArweave, uploadJSONToArweave, arweaveTxIdToURI } from '../../../../lib/irys';
 import { parseFaxHandle, verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 
@@ -202,7 +203,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const hopCount = chainDepth != null ? Math.max(0, chainDepth - 1) : null;
     const tier = hopCount != null ? tierForDepth(hopCount) : 'Dial Tone';
 
-    const imageUri = await pinImageToIPFS(dataUri, format, `fax-${id}`);
+    // Pinata first; the shared free tier is exhausted by the Cryptographics
+    // archive, so fall through to the self-operated kubo node (same docker
+    // network) rather than letting the mint fall back to the centralised
+    // baseURI — which is what OpenSea flags as "centralised" on token 44/45.
+    const imageUri =
+      (await pinImageToIPFS(dataUri, format, `fax-${id}`)) ||
+      (await kuboPinImage(dataUri, format));
     if (!imageUri) {
       return NextResponse.json({ tokenURI: null, reason: 'image_pin_failed' }, { status: 200, headers: NO_STORE });
     }
@@ -222,7 +229,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       ],
     };
 
-    const metadataUri = await pinJSONToIPFS(metadata, `fax-metadata-${id}`);
+    const metadataUri =
+      (await pinJSONToIPFS(metadata, `fax-metadata-${id}`)) ||
+      (await kuboPinJSON(metadata, `fax-metadata-${id}`));
     if (!metadataUri) {
       return NextResponse.json({ tokenURI: null, reason: 'metadata_pin_failed' }, { status: 200, headers: NO_STORE });
     }
