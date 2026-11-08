@@ -50,7 +50,7 @@ export default function AboutPage() {
                 <li><strong>Send</strong> a greyscale image to any <code>collection.tokenId@fax</code> address — <code>chonk.681@fax</code>, <code>atom.648@fax</code>, <code>dfz.7837@fax</code>, <code>normie.2613@fax</code>.</li>
                 <li><strong>Forward</strong> public faxes you receive to keep the chain alive. Each forward adds your image to the chain&apos;s collage and <strong>costs you 1 credit</strong>; on hops 1–5 the recipient <strong>earns +1</strong> (max 5).</li>
                 <li><strong>Hop 6+</strong> earns nothing — the chain stalls until someone mints.</li>
-                <li><strong>Mint</strong> a fax you have forwarded to Base for <strong>0.002 ETH + 1 credit</strong>. The next recipient gets +1 credit and a fresh 72-hour timer, and you enter the prize draw.</li>
+                <li><strong>Mint</strong> a fax you have forwarded to Base for <strong>0.002 ETH + 1 credit</strong>. The next recipient gets +1 credit and a fresh 72-hour timer, and the minted NFT becomes your prize-draw ticket — whoever holds it at the draw block wins.</li>
                 <li><strong>Beat the clock</strong> — every hop has <strong>72 hours</strong> before the line jams. A jammed hop dies; your credits don&apos;t.</li>
                 <li><strong>No loops</strong> — each @fax appears once per chain. Never forward back to the sender or any earlier hop.</li>
               </ol>

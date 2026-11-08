@@ -10,6 +10,7 @@ import {
   getPrizeSentEvents,
   getAllMintEntries,
   fetchAllTiers,
+  fetchTokenOwners,
   selectTieredWinners,
   type MintEntry,
 } from '@/app/lib/draw';
@@ -50,8 +51,14 @@ export async function GET() {
 
       if (supplyReached && roundData?.seedCaptured) {
         entries = await getAllMintEntries();
-        const tierMap = await fetchAllTiers(entries.map((e) => e.tokenId));
-        const computed = await selectTieredWinners(roundData.seed, entries, tierMap, 10);
+        // Holder snapshot at the committed draw block — the NFT is the
+        // ticket, so owners (not minters) are what's drawn.
+        const tokenIds = entries.map((e) => e.tokenId);
+        const [tierMap, ownerMap] = await Promise.all([
+          fetchAllTiers(tokenIds),
+          fetchTokenOwners(tokenIds, roundData.blockNumber),
+        ]);
+        const computed = await selectTieredWinners(roundData.seed, entries, tierMap, ownerMap, 10);
         const claimedSet = new Set(prizeEvents.map((e) => e.winner));
         tieredWinners = computed.map((w) => ({ ...w, claimed: claimedSet.has(w.winner) }));
       }

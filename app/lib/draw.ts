@@ -17,6 +17,7 @@ const SELECTOR_OWNER = '0x8da5cb5b'; // owner()
 const SELECTOR_COMMIT_DRAW_BLOCK = '0xfdbfd371'; // commitDrawBlock(uint256)
 const SELECTOR_CAPTURE_DRAW_SEED = '0x4023282d'; // captureDrawSeed(uint256)
 const SELECTOR_TOKEN_URI = '0xc87b56dd'; // tokenURI(uint256)
+const SELECTOR_OWNER_OF = '0x6352211e'; // ownerOf(uint256)
 const SELECTOR_TOTAL_MINTED = '0xa2309ff8'; // totalMinted()
 const SELECTOR_MINT_PRICE = '0x6817c76c'; // mintPrice()
 
@@ -38,7 +39,7 @@ interface RpcResponse<T = string> {
   error?: { message?: string };
 }
 
-async function ethCall(data: string, rpcUrl: string = FAX_RPC_URL, contract: string = FAX_CONTRACT): Promise<string> {
+async function ethCall(data: string, rpcUrl: string = FAX_RPC_URL, contract: string = FAX_CONTRACT, blockTag: string = 'latest'): Promise<string> {
   const res = await fetch(rpcUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -46,7 +47,7 @@ async function ethCall(data: string, rpcUrl: string = FAX_RPC_URL, contract: str
       jsonrpc: '2.0',
       id: 1,
       method: 'eth_call',
-      params: [{ to: contract, data }, 'latest'],
+      params: [{ to: contract, data }, blockTag],
     }),
   });
   const json = (await res.json()) as RpcResponse;
@@ -171,8 +172,9 @@ async function getLogs(topic0: string, extraTopics: (string | null)[] = []): Pro
 }
 
 /// Every address a fax collectible has ever been minted to (FaxMinted.to,
-/// the 2nd indexed topic). One entry per mint — a wallet that minted 3
-/// times appears 3 times, so it gets 3 raffle entries in `selectWinners`.
+/// the 2nd indexed topic). One entry per mint. NOTE: the draw pays holders,
+/// not minters — this list is provenance, while `fetchTokenOwners` is the
+/// raffle ticket roll. Kept for the minter-centric views that need it.
 export async function getAllMinters(): Promise<string[]> {
   const logs = await getLogs(TOPIC_FAX_MINTED);
   return logs.map((log) => `0x${log.topics[2].slice(-40)}`.toLowerCase());
@@ -289,6 +291,50 @@ interface NftMetadata {
   attributes?: { trait_type?: string; value?: string | number }[];
   tier?: string | number;
   [key: string]: unknown;
+}
+
+/// Reads ownerOf(tokenId) at a specific block tag. This is what makes the
+/// NFT itself the raffle ticket: the draw pays the HOLDER at the committed
+/// draw block (the same block whose hash seeds the shuffle), not the
+/// recorded minter — so a ticket sold or transferred before the commit
+/// block moves the odds with it, and post-commit moves change nothing.
+/// Returns null if the call fails (burned token / pruned state / RPC
+/// hiccup) — callers treat a missing owner as a void ticket.
+export async function fetchTokenOwner(tokenId: number, blockTag: string | number = 'latest'): Promise<string | null> {
+  const tag = typeof blockTag === 'number' ? `0x${blockTag.toString(16)}` : blockTag;
+  try {
+    const result = await ethCall(SELECTOR_OWNER_OF + encodeUint256(tokenId), FAX_RPC_URL, FAX_CONTRACT, tag);
+    return result && result.length >= 42 ? `0x${result.slice(-40)}`.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/// Bulk ownerOf reads for all minted tokens, pinned to one block tag so
+/// the snapshot is coherent (no ticket can be seen "in two places"). If the
+/// pinned tag fails for a token (e.g. a verifier running long after the
+/// round against a non-archive RPC), that token falls back to 'latest' —
+/// degraded but better than silently voiding tickets.
+export async function fetchTokenOwners(
+  tokenIds: number[],
+  blockTag: string | number = 'latest',
+  concurrency = 10,
+): Promise<Map<number, string>> {
+  const owners = new Map<number, string>();
+  const queue = [...tokenIds];
+
+  async function worker() {
+    while (queue.length > 0) {
+      const tokenId = queue.shift();
+      if (tokenId === undefined) break;
+      let owner = await fetchTokenOwner(tokenId, blockTag);
+      if (!owner && blockTag !== 'latest') owner = await fetchTokenOwner(tokenId, 'latest');
+      if (owner) owners.set(tokenId, owner);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, tokenIds.length) }, () => worker()));
+  return owners;
 }
 
 /// Fetches the metadata JSON for a token via its tokenURI and extracts the
@@ -546,12 +592,14 @@ export async function seededShuffle<T>(entries: T[], seedHex: string): Promise<T
   return arr;
 }
 
-/// Selects `winnerCount` unique wallets from the minter list. Each mint is
-/// one raffle entry (a wallet that minted 3 times has 3x the odds of a
-/// wallet that minted once), then deduplicated in shuffle order so no
-/// wallet can win twice.
-export async function selectWinners(seedHex: string, minters: string[], winnerCount: number): Promise<string[]> {
-  const shuffled = await seededShuffle(minters, seedHex);
+/// Selects `winnerCount` unique wallets from the holder list. Each minted
+/// token is one raffle entry — so a wallet HOLDING 3 tickets at the
+/// snapshot has 3x the odds of a wallet holding one — deduplicated in
+/// shuffle order so no wallet can win twice. `holders` is the ownerOf
+/// snapshot (see fetchTokenOwners), not the minter list: the NFT is the
+/// ticket, and it travels with transfers.
+export async function selectWinners(seedHex: string, holders: string[], winnerCount: number): Promise<string[]> {
+  const shuffled = await seededShuffle(holders, seedHex);
   const winners: string[] = [];
   const seen = new Set<string>();
   for (const addr of shuffled) {
@@ -576,22 +624,30 @@ export interface TieredWinner {
 /// skipped. A wallet can only win once across all tiers.
 ///
 /// This implements the "10 winners — one randomly selected from 11 tiers"
-/// rule: if all 11 tiers have minters, one tier is randomly left out
+/// rule: if all 11 tiers have entries, one tier is randomly left out
 /// (determined by the seed shuffling the tier order).
+///
+/// Winners are the HOLDERS of record in `ownerMap` — ownerOf snapshotted
+/// at the committed draw block (fetchTokenOwners), not the minter. The
+/// NFT is the ticket: buying a minted fax buys its odds, and selling or
+/// transferring before the commit block moves them. Entries whose owner
+/// can't be resolved are void tickets and are skipped.
 export async function selectTieredWinners(
   seedHex: string,
   entries: MintEntry[],
   tierMap: Map<number, string>,
+  ownerMap: Map<number, string>,
   winnerCount: number,
 ): Promise<TieredWinner[]> {
-  // Group entries by tier (skip entries with no tier data)
-  const byTier = new Map<string, MintEntry[]>();
+  // Group entries by tier (skip entries with no tier data or no resolved holder)
+  const byTier = new Map<string, { entry: MintEntry; holder: string }[]>();
   for (const entry of entries) {
     const tier = tierMap.get(entry.tokenId);
-    if (!tier) continue;
+    const holder = ownerMap.get(entry.tokenId);
+    if (!tier || !holder) continue;
     const arr = byTier.get(tier);
-    if (arr) arr.push(entry);
-    else byTier.set(tier, [entry]);
+    if (arr) arr.push({ entry, holder });
+    else byTier.set(tier, [{ entry, holder }]);
   }
 
   // Shuffle the tier order using the seed
@@ -606,10 +662,10 @@ export async function selectTieredWinners(
     const tierEntries = byTier.get(tier)!;
     // Shuffle entries within this tier using seed + tier name for randomness
     const shuffledEntries = await seededShuffle(tierEntries, `${seedHex}:${tier}`);
-    for (const entry of shuffledEntries) {
-      if (seenWallets.has(entry.minter)) continue;
-      seenWallets.add(entry.minter);
-      winners.push({ tier, winner: entry.minter, tokenId: entry.tokenId });
+    for (const { entry, holder } of shuffledEntries) {
+      if (seenWallets.has(holder)) continue;
+      seenWallets.add(holder);
+      winners.push({ tier, winner: holder, tokenId: entry.tokenId });
       break; // one winner per tier
     }
   }

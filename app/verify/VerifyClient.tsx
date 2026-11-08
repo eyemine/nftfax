@@ -9,6 +9,7 @@ import {
   getDrawRound,
   getAllMintEntries,
   fetchAllTiers,
+  fetchTokenOwners,
   getPrizeSentEvents,
   selectTieredWinners,
   type TieredWinner,
@@ -54,11 +55,17 @@ export default function VerifyClient() {
         getPrizeSentEvents(roundNum),
       ]);
 
-      // Fetch tier metadata for all minted tokens
+      // Fetch tier metadata + holder snapshot for all minted tokens.
+      // The draw pays whoever HELD the token at the committed draw block
+      // (roundData.blockNumber — the same block whose hash is the seed),
+      // so the NFT itself is the ticket and transfers move the odds.
       const tokenIds = entries.map((e) => e.tokenId);
-      const tierMap = await fetchAllTiers(tokenIds);
+      const [tierMap, ownerMap] = await Promise.all([
+        fetchAllTiers(tokenIds),
+        fetchTokenOwners(tokenIds, roundData.blockNumber),
+      ]);
 
-      const tieredWinners = await selectTieredWinners(roundData.seed, entries, tierMap, count);
+      const tieredWinners = await selectTieredWinners(roundData.seed, entries, tierMap, ownerMap, count);
       const computedWinners = tieredWinners.map((w) => w.winner);
       const onChainWinners = prizeEvents.map((e) => e.winner);
 
@@ -110,13 +117,15 @@ export default function VerifyClient() {
           <div className="p-5 text-sm leading-relaxed text-[#3e3b34] space-y-2">
             <p>
               This page pulls the captured seed for a draw round directly from the NFTFaxCollectible contract on Base,
-              fetches every minted token's metadata to read its tier trait, groups mint entries by tier, and runs a
+              fetches every minted token's metadata to read its tier trait, snapshots each token's holder
+              (<code>ownerOf</code>) at the committed draw block, groups entries by tier, and runs a
               public, deterministic shuffle (SHA-256 Fisher-Yates keyed by the seed) to pick one winner per tier.
               If it matches the on-chain <code>PrizeSent</code> events, the draw was fair given the published seed.
             </p>
             <p className="text-[12px] font-bold uppercase tracking-wider text-[#8a3e1e]">
-              10 winners are selected — one randomly chosen from each of the 11 tiers. The tier order is shuffled by
-              the seed, so if all 11 tiers have minters, one tier is randomly left out.
+              The NFT is the ticket — it pays whoever holds it at the committed draw block, not the minter. Buying a
+              minted fax buys its odds. 10 winners are selected — one randomly chosen from each of the 11 tiers. The
+              tier order is shuffled by the seed, so if all 11 tiers have entries, one tier is randomly left out.
             </p>
           </div>
         </div>
