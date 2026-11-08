@@ -97,7 +97,19 @@ function persistCache(): void {
   }
 }
 
-async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string; bitmapRepairedAt?: number }> {
+interface TrayMeta { chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string; bitmapRepairedAt?: number }
+
+/// In-process tray-meta cache. Chain fields (rootTrayId, chainDepth) are set
+/// at tray creation and never change, so a tray only needs one worker fetch
+/// per process lifetime — this is what makes sorting the full mint history by
+/// chain/tier affordable (the per-request fetch otherwise only covered the
+/// current page). Empty results are NOT cached so a worker hiccup doesn't
+/// permanently blank a tray's metadata.
+const trayMetaCache = new Map<string, TrayMeta>();
+
+async function fetchTrayMeta(trayId: string): Promise<TrayMeta> {
+  const cached = trayMetaCache.get(trayId);
+  if (cached) return cached;
   try {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (WORKER_SECRET) headers['X-Worker-Secret'] = WORKER_SECRET;
@@ -111,8 +123,8 @@ async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; roo
       body: JSON.stringify({ action: 'getTrayDocument', id: trayId, secret: WEBHOOK_SECRET }),
     });
     if (!res.ok) return {};
-    const doc = await res.json().catch(() => null) as { chainDepth?: number; rootTrayId?: string; from?: string; to?: string; forwardedTrayId?: string; bitmapRepairedAt?: number } | null;
-    return {
+    const doc = await res.json().catch(() => null) as TrayMeta | null;
+    const meta: TrayMeta = {
       chainDepth: typeof doc?.chainDepth === 'number' ? doc.chainDepth : undefined,
       rootTrayId: typeof doc?.rootTrayId === 'string' ? doc.rootTrayId : undefined,
       from: typeof doc?.from === 'string' ? doc.from : undefined,
@@ -120,6 +132,8 @@ async function fetchTrayMeta(trayId: string): Promise<{ chainDepth?: number; roo
       forwardedTrayId: typeof doc?.forwardedTrayId === 'string' ? doc.forwardedTrayId : undefined,
       bitmapRepairedAt: typeof doc?.bitmapRepairedAt === 'number' ? doc.bitmapRepairedAt : undefined,
     };
+    if (meta.chainDepth != null || meta.rootTrayId != null) trayMetaCache.set(trayId, meta);
+    return meta;
   } catch {
     return {};
   }
@@ -293,6 +307,12 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '20', 10) || 20));
+    // Sortable minted-collection panel. `sort` selects the column; anything
+    // other than the tokenId default requires enriching mints BEFORE
+    // pagination (sorting only the fetched page would silently reorder 20
+    // rows instead of the collection — see below).
+    const sortParam = searchParams.get('sort') || 'tokenId';
+    const dirParam = searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
     // Manual cache-bust escape hatch: ?refresh=1 forces a full re-scan from
     // DEPLOY_BLOCK, in case the cache ever needs to be reset.
     if (searchParams.get('refresh') === '1') {
@@ -335,25 +355,107 @@ export async function GET(req: NextRequest) {
       .map(([collection, e]) => ({ collection, mints: e.mints, maxTokenId: e.maxTokenId, communities: e.communities.size }))
       .sort((a, b) => b.mints - a.mints);
 
-    // Newest-first, paginated AFTER sorting so page 1 always shows the most
-    // recent mints. Tray metadata (chain depth/tier) is only fetched for the
-    // current page's mints — at 2200+ mints, fetching metadata for every
-    // single mint on every request would be very slow and mostly wasted.
-    const sortedMints = allMints.slice().sort((a, b) => b.tokenId - a.tokenId);
-    const start = (page - 1) * pageSize;
-    const pageMints = sortedMints.slice(start, start + pageSize);
-    for (const mint of pageMints) {
+    // Post-mint tray corrections apply before ANY enrichment or sorting — an
+    // override changes which tray the metadata comes from.
+    for (const mint of allMints) {
       const override = TOKEN_TRAY_ID_OVERRIDES[mint.tokenId];
       if (override) mint.trayId = override;
     }
 
+    // Chain numbering + chain/tier sorting need rootTrayId/chainDepth for
+    // EVERY mint, not just the page — so enrichment always runs over the
+    // full set. The in-process trayMetaCache keeps this to one worker fetch
+    // per tray per process lifetime; concurrency is bounded so a cold cache
+    // doesn't burst 2000+ simultaneous worker calls at sellout.
+    const needsEns = sortParam === 'minter';
+    const ensByAddress = new Map<string, string>();
+
+    if (allMints.length > 0) {
+      const allTrayIds = Array.from(new Set(allMints.map((m) => m.trayId).filter(Boolean)));
+      const metaByTrayId = new Map<string, TrayMeta>();
+      for (let i = 0; i < allTrayIds.length; i += 16) {
+        const batch = allTrayIds.slice(i, i + 16);
+        const metas = await Promise.all(batch.map((id) => fetchTrayMeta(id)));
+        batch.forEach((id, j) => metaByTrayId.set(id, metas[j]));
+      }
+      for (const mint of allMints) {
+        const meta = metaByTrayId.get(mint.trayId);
+        mint.rootTrayId = meta?.rootTrayId;
+        mint.displayTrayId = TOKEN_TRAY_ID_OVERRIDES[mint.tokenId]
+          ?? resolveDisplayTrayId(mint.trayId, minterHandleFor(mint), meta ?? {});
+        mint.chainDepth = meta?.chainDepth;
+      }
+      // Depth describes the displayed hop (the artwork), not the received
+      // tray — same rule the per-page enrichment applies below.
+      const redirected = allMints.filter((m) => m.displayTrayId && m.displayTrayId !== m.trayId);
+      if (redirected.length) {
+        const hopMetas = await Promise.all(redirected.map((m) => fetchTrayMeta(m.displayTrayId as string)));
+        redirected.forEach((m, i) => {
+          if (hopMetas[i]?.chainDepth != null) m.chainDepth = hopMetas[i].chainDepth;
+          if (!m.rootTrayId && hopMetas[i]?.rootTrayId) m.rootTrayId = hopMetas[i].rootTrayId;
+        });
+      }
+    }
+    if (needsEns) {
+      const allMinters = Array.from(new Set(allMints.map((m) => m.minter)));
+      (await resolveEnsNames(allMinters)).forEach((v, k) => ensByAddress.set(k, v));
+    }
+
+    // Chain index: a stable, human-readable number per chain. Chains are
+    // ordered by the tokenId of their earliest mint — "Chain #1" is the
+    // chain whose first mint came first. The chain key is the chain's root
+    // tray (rootTrayId), falling back to the tray itself for root mints
+    // whose docs predate the field.
+    const chainOrder = new Map<string, number>();
+    if (allMints.length > 0) {
+      const chainFirstMint = new Map<string, number>();
+      for (const m of allMints) {
+        const key = m.rootTrayId || m.trayId;
+        if (!key) continue;
+        const prev = chainFirstMint.get(key);
+        if (prev == null || m.tokenId < prev) chainFirstMint.set(key, m.tokenId);
+      }
+      Array.from(chainFirstMint.entries())
+        .sort((a, b) => a[1] - b[1])
+        .forEach(([key], i) => chainOrder.set(key, i + 1));
+      for (const m of allMints) {
+        const key = m.rootTrayId || m.trayId;
+        m.chainIndex = key ? chainOrder.get(key) : undefined;
+      }
+    }
+
+    const tierRank = (m: MintEntry): number | undefined => (m.chainDepth == null ? undefined : Math.max(0, m.chainDepth - 1)); // hop count, matches tierForDepth
+    const handleKey = (m: MintEntry): number => m.community * 1e12 + m.sourceTokenId;
+    const mul = dirParam === 'asc' ? 1 : -1;
+    const numCmp = (av: number | undefined, bv: number | undefined): number => {
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;  // unresolved values sink to the end either direction
+      if (bv == null) return -1;
+      return (av - bv) * mul;
+    };
+    const strCmp = (av: string, bv: string): number => av.localeCompare(bv) * mul;
+    const comparators: Record<string, (a: MintEntry, b: MintEntry) => number> = {
+      tokenId: (a, b) => numCmp(a.tokenId, b.tokenId),
+      tray: (a, b) => strCmp(a.trayId, b.trayId),
+      chain: (a, b) => numCmp(a.chainIndex, b.chainIndex),
+      tier: (a, b) => numCmp(tierRank(a), tierRank(b)),
+      minter: (a, b) => strCmp(ensByAddress.get(a.minter) || a.minter, ensByAddress.get(b.minter) || b.minter),
+      handle: (a, b) => numCmp(handleKey(a), handleKey(b)),
+    };
+    const cmp = comparators[sortParam] || comparators.tokenId;
+    const sortedMints = allMints.slice().sort(cmp);
+
+    const start = (page - 1) * pageSize;
+    const pageMints = sortedMints.slice(start, start + pageSize);
+
     const uniqueMintersTotal = new Set(allMints.map((m) => m.minter)).size;
     const uniqueTrayIds = Array.from(new Set(pageMints.map((m) => m.trayId).filter(Boolean)));
     const uniqueMinters = Array.from(new Set(pageMints.map((m) => m.minter)));
-    const [metas, ensByAddress] = await Promise.all([
+    const [metas, ensPage] = await Promise.all([
       Promise.all(uniqueTrayIds.map((id) => fetchTrayMeta(id))),
       resolveEnsNames(uniqueMinters),
     ]);
+    ensPage.forEach((v, k) => ensByAddress.set(k, v));
     const metaByTrayId = new Map(uniqueTrayIds.map((id, i) => [id, metas[i]]));
     for (const mint of pageMints) {
       const meta = metaByTrayId.get(mint.trayId);

@@ -40,6 +40,9 @@ export interface MintEntry {
   txHash?: string;
   /// Bumps when the display tray's bitmap is repaired in place; busts image caches.
   imageVersion?: number;
+  /// Stable chain number for the minted-collection table — chains ordered by
+  /// their earliest mint's tokenId (Chain #1 = earliest-started chain).
+  chainIndex?: number;
 }
 
 /// DeadFellaz/POW/Normie mints encode sourceTokenId on-chain as a composite

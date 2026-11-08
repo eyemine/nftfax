@@ -37,6 +37,7 @@ interface MintEntry {
   trayId: string;
   chainDepth?: number;
   rootTrayId?: string;
+  chainIndex?: number;
   minterEns?: string;
   displayTrayId?: string;
 }
@@ -165,12 +166,16 @@ export default function RolofaxClient() {
   const [refreshing, setRefreshing] = useState(false);
   const [mintsPage, setMintsPage] = useState(1);
   const [faxTrayInput, setFaxTrayInput] = useState('');
+  /// Sort for the minted collection panel — applied server-side so it
+  /// orders the whole collection, not just the visible page.
+  type MintSortKey = 'tokenId' | 'tray' | 'chain' | 'tier' | 'minter' | 'handle';
+  const [mintSort, setMintSort] = useState<{ key: MintSortKey; dir: 'asc' | 'desc' }>({ key: 'tokenId', dir: 'desc' });
 
-  const loadLeaderboard = useCallback(async (page: number, opts?: { refresh?: boolean }) => {
+  const loadLeaderboard = useCallback(async (page: number, sort = mintSort, opts?: { refresh?: boolean }) => {
     setMintsLoading(true);
     setMintsError('');
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(MINTS_PAGE_SIZE) });
+      const params = new URLSearchParams({ page: String(page), pageSize: String(MINTS_PAGE_SIZE), sort: sort.key, dir: sort.dir });
       if (opts?.refresh) params.set('refresh', '1');
       const res = await fetch(`/api/tray/leaderboard?${params.toString()}`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Leaderboard request failed');
@@ -183,7 +188,21 @@ export default function RolofaxClient() {
     } finally {
       setMintsLoading(false);
     }
-  }, []);
+  }, [mintSort]);
+
+  const toggleMintSort = (key: MintSortKey) => {
+    const next = mintSort.key === key
+      ? { key, dir: (mintSort.dir === 'asc' ? 'desc' : 'asc') as 'asc' | 'desc' }
+      : { key, dir: (key === 'tokenId' || key === 'tier' ? 'desc' : 'asc') as 'asc' | 'desc' };
+    setMintSort(next);
+    void loadLeaderboard(1, next);
+  };
+
+  const mintSortIcon = (key: MintSortKey) =>
+    mintSort.key === key
+      ? (mintSort.dir === 'asc' ? <ArrowUp size={10} className="inline" /> : <ArrowDown size={10} className="inline" />)
+      : <ArrowUpDown size={10} className="inline opacity-40" />;
+  const mintTh = 'border-b border-[#8f8878] p-3 font-bold cursor-pointer select-none hover:text-[#e65b2f]';
 
   useEffect(() => {
     let cancelled = false;
@@ -206,7 +225,7 @@ export default function RolofaxClient() {
 
   async function refresh() {
     setRefreshing(true);
-    await loadLeaderboard(1, { refresh: true });
+    await loadLeaderboard(1, mintSort, { refresh: true });
     setRefreshing(false);
   }
 
@@ -256,12 +275,13 @@ export default function RolofaxClient() {
               <table className="w-full border-collapse text-left text-[12px]">
                 <thead className="sticky top-0 bg-[#b5ad9d] text-[11px] uppercase tracking-wider">
                   <tr>
-                    <th className="border-b border-[#8f8878] p-3 font-bold">Token ID</th>
+                    <th className={mintTh} onClick={() => toggleMintSort('tokenId')}>Token ID {mintSortIcon('tokenId')}</th>
                     <th className="border-b border-[#8f8878] p-3 font-bold">Preview</th>
-                    <th className="border-b border-[#8f8878] p-3 font-bold">Fax Tray ID</th>
-                    <th className="border-b border-[#8f8878] p-3 font-bold">Tier</th>
-                    <th className="border-b border-[#8f8878] p-3 font-bold">Minter EOA</th>
-                    <th className="border-b border-[#8f8878] p-3 font-bold">@</th>
+                    <th className={mintTh} onClick={() => toggleMintSort('tray')}>Fax Tray ID {mintSortIcon('tray')}</th>
+                    <th className={mintTh} onClick={() => toggleMintSort('chain')}>Chain {mintSortIcon('chain')}</th>
+                    <th className={mintTh} onClick={() => toggleMintSort('tier')}>Tier {mintSortIcon('tier')}</th>
+                    <th className={mintTh} onClick={() => toggleMintSort('minter')}>Minter EOA {mintSortIcon('minter')}</th>
+                    <th className={mintTh} onClick={() => toggleMintSort('handle')}>@ {mintSortIcon('handle')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -283,6 +303,21 @@ export default function RolofaxClient() {
                       <td className="p-3 font-mono">
                         {mint.trayId ? (
                           <a href={`https://nftmail.box/tray/${mint.displayTrayId || mint.trayId}`} target="_blank" rel="noopener noreferrer" className="text-[#e65b2f] hover:underline">{mint.displayTrayId || mint.trayId}</a>
+                        ) : '—'}
+                      </td>
+                      {/* The chain this hop belongs to — Chain #n is ordered by each
+                          chain's earliest mint, keyed on the chain's root tray. */}
+                      <td className="p-3 font-mono whitespace-nowrap">
+                        {mint.chainIndex ? (
+                          <a
+                            href={`https://nftmail.box/tray/${mint.rootTrayId || mint.trayId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold text-[#e65b2f] hover:underline"
+                            title={`Chain root: ${mint.rootTrayId || mint.trayId}`}
+                          >
+                            Chain #{mint.chainIndex}
+                          </a>
                         ) : '—'}
                       </td>
                       <td className="p-3">{tierForDepth(Math.max(0, (mint.chainDepth ?? 1) - 1))}</td>
