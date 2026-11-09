@@ -21,6 +21,8 @@ import { pinImageToIPFS, pinJSONToIPFS } from '../../../../lib/pinata';
 import { kuboPinImage, kuboPinJSON } from '../../../../lib/kubo-pin';
 import { uploadImageToArweave, uploadJSONToArweave, arweaveTxIdToURI } from '../../../../lib/irys';
 import { parseFaxHandle, verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
+import { tierForHop } from '@/app/lib/tiers';
+import { reserveTierSlot } from '@/app/lib/tier-supply';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 
@@ -50,27 +52,6 @@ async function getNextTokenId(): Promise<number | null> {
   return null;
 }
 
-/// Tier names based on chain depth (hop count), matching CHAIN_GAME_DESIGN
-/// and the existing /api/metadata/[tokenId] route.
-const TIERS: { depth: number; name: string }[] = [
-  { depth: 1, name: 'Dial Tone' },
-  { depth: 2, name: 'Hop 2' },
-  { depth: 3, name: 'Hop 3' },
-  { depth: 4, name: 'Hop 4' },
-  { depth: 5, name: 'Hop 5' },
-  { depth: 6, name: 'Hop 6' },
-  { depth: 7, name: 'Hop 7' },
-  { depth: 8, name: 'Hop 8' },
-  { depth: 9, name: 'Hop 9' },
-  { depth: 10, name: 'Hop 10' },
-  { depth: 11, name: 'Dead Letter' },
-];
-
-function tierForDepth(depth: number): string {
-  if (depth < 1) return 'Dial Tone';
-  if (depth >= 11) return 'Dead Letter';
-  return TIERS[depth - 1]?.name ?? 'Dead Letter';
-}
 
 interface TrayDoc {
   dataBase64?: string;
@@ -159,7 +140,13 @@ async function mirrorToArweave(args: {
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const body = await req.json().catch(() => ({})) as { local?: string; ownerWallet?: string };
+  // mode: 'mint' (default) checks + reserves the tier slot and pins;
+  // 'prefetch' (pin at forward time) checks the tier but holds no slot, since
+  // the player may never mint; 'reserve' checks + reserves without pinning
+  // again — the mint path uses it when it already holds a prefetched URI, so a
+  // tier that filled up since the forward still refuses the mint.
+  const body = await req.json().catch(() => ({})) as { local?: string; ownerWallet?: string; mode?: 'mint' | 'prefetch' | 'reserve' };
+  const mode = body.mode === 'prefetch' || body.mode === 'reserve' ? body.mode : 'mint';
   const local = (body.local || '').trim();
   const wallet = (body.ownerWallet || '').trim();
   const collectionName = collectionNameFromLocal(local);
@@ -201,7 +188,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Worker counts the initial send as depth 1, but the first send is not a hop.
     // First forward = hop 1 (Dial Tone). Subtract 1 to get actual hop count.
     const hopCount = chainDepth != null ? Math.max(0, chainDepth - 1) : null;
-    const tier = hopCount != null ? tierForDepth(hopCount) : 'Dial Tone';
+    const tier = tierForHop(hopCount ?? 0);
+
+    // Tier supply is fixed (TIER_SUPPLY) and the prize draw reads this tier
+    // trait, so a full tier must refuse BEFORE anything is pinned. This is a
+    // hard stop, not the non-fatal "mint without URI" fallback: minting
+    // without a per-token URI would just put the same tier in the baseURI
+    // metadata. The slot is reserved briefly so concurrent mints can't both
+    // take the last one.
+    // Prefetch (forward-time pin, Gnosis save) still pins on a full tier — it
+    // isn't a mint — and just reports it; the mint itself re-checks.
+    const slot = await reserveTierSlot(tier, id, { hold: mode !== 'prefetch' });
+    if (!slot.ok && mode !== 'prefetch') {
+      return NextResponse.json(
+        { tokenURI: null, reason: 'tier_minted_out', tier, supply: slot.supply, minted: slot.minted,
+          error: `${tier} is minted out (${slot.minted}/${slot.supply}). You can still create and forward this fax, but this hop can't be minted.` },
+        { status: 409, headers: NO_STORE },
+      );
+    }
+    if (mode === 'reserve') {
+      return NextResponse.json({ reserved: true, tier }, { status: 200, headers: NO_STORE });
+    }
 
     // Pinata first; the shared free tier is exhausted by the Cryptographics
     // archive, so fall through to the self-operated kubo node (same docker
@@ -249,7 +256,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     void mirrorToArweave({ id, local, format, dataBase64: doc.dataBase64, metadata, nextTokenId });
 
     return NextResponse.json(
-      { tokenURI: metadataUri, imageUri, arweaveQueued: true },
+      { tokenURI: metadataUri, imageUri, arweaveQueued: true, tier, tierMintedOut: !slot.ok },
       { status: 200, headers: NO_STORE },
     );
   } catch {

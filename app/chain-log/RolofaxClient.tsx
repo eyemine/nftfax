@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, Info, Link as LinkIcon, Trophy, ExternalLink, Search, RefreshCw, ArrowUp, ArrowDown, ArrowUpDown, LampDesk } from 'lucide-react';
 import Link from 'next/link';
 import { ExhibitButton } from '../components/ExhibitButton';
+import { tierForHop } from '../lib/tiers';
 
 interface ChainEntry {
   id: string;
@@ -118,16 +119,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleString();
 }
 
-const TIERS: string[] = [
-  'Dial Tone', 'Hop 2', 'Hop 3', 'Hop 4', 'Hop 5',
-  'Hop 6', 'Hop 7', 'Hop 8', 'Hop 9', 'Hop 10', 'Dead Letter',
-];
-
-function tierForDepth(depth: number): string {
-  if (depth < 1) return 'Dial Tone';
-  if (depth >= 11) return 'Dead Letter';
-  return TIERS[depth - 1] ?? 'Dead Letter';
-}
+const tierForDepth = tierForHop;
 
 const COMMUNITY_PREFIXES: Record<number, string> = {
   1: 'chonk', 2: 'dfz', 3: 'atom', 4: 'normie',

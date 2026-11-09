@@ -47,7 +47,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let fromLabel = (body.fromLabel || '').toLowerCase().trim();
     const ownerWallet = session.wallet;
     const to = (body.to || '').toLowerCase().trim();
-    const chainTrayId = (body.chainTrayId || originalTrayId).trim();
 
     let fromDomain = 'nftmail.box';
     const parts = fromLabel.split('@');
@@ -129,9 +128,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }, { status: 409, headers: NO_STORE });
     }
 
-    const sourceChainDepth = Number(doc.chainDepth) || 0;
+    // A re-route is a sideways move: the same hop goes to a different
+    // recipient, so it keeps the original's depth (and therefore its tier).
+    // The worker inherits the lineage via `rerouteOf`.
+    const sourceChainDepth = Number(doc.chainDepth) || 1;
     const sourceMintedBase = Boolean(doc.sourceMintedBase);
-    const nextHop = sourceChainDepth + 1;
+    const nextHop = sourceChainDepth;
     const chainTimerDuration = getChainTimerMs(nextHop, sourceMintedBase);
 
     const trayPayload: Record<string, unknown> = {
@@ -143,7 +145,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       isMultipage: false,
       colorMode: 'greyscale',
       channel: 'public',
-      chainTrayId,
+      rerouteOf: originalTrayId,
       chainDepth: nextHop,
       chainTimerDuration,
     };

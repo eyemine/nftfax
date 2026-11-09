@@ -17,7 +17,6 @@ import {
   type MintEntry,
   PRIZE_TIERS,
   TIER_SUPPLY,
-  tierForChainDepth,
 } from '../lib/draw';
 
 const MAX_SUPPLY = 2222;
@@ -73,9 +72,10 @@ export default function DrawClient() {
   const [distributeMsg, setDistributeMsg] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawMsg, setWithdrawMsg] = useState('');
-  /// Live mints per tier, and address -> ENS. Sourced from the leaderboard,
-  /// which already resolves both, so the table can show real standings before
-  /// the draw unlocks at MAX_SUPPLY.
+  /// Live mints per tier, and address -> ENS. Counts come from /api/tiers,
+  /// which reads the `Tier` trait in each token's on-chain metadata — the
+  /// same source the draw itself uses. ENS names still come from the
+  /// leaderboard, which already resolves them.
   const [tierMints, setTierMints] = useState<Record<string, number>>({});
   const [ensByAddress, setEnsByAddress] = useState<Record<string, string>>({});
   const [mintsCounted, setMintsCounted] = useState(0);
@@ -127,22 +127,23 @@ export default function DrawClient() {
 
   const refreshTierMints = useCallback(async () => {
     try {
-      const res = await fetch(`/api/tray/leaderboard?pageSize=${MAX_SUPPLY}`, { cache: 'no-store' });
-      if (!res.ok) return;
-      const json = await res.json() as {
-        mints?: { minter?: string; minterEns?: string; chainDepth?: number | null }[];
-      };
-      const mints = json.mints ?? [];
-      const counts: Record<string, number> = {};
-      const ens: Record<string, string> = {};
-      for (const mint of mints) {
-        const tier = tierForChainDepth(mint.chainDepth);
-        counts[tier] = (counts[tier] ?? 0) + 1;
-        if (mint.minter && mint.minterEns) ens[mint.minter.toLowerCase()] = mint.minterEns;
+      const res = await fetch('/api/tiers', { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json() as { tiers?: { tier: string; minted: number }[]; totalMinted?: number };
+        const counts: Record<string, number> = {};
+        for (const t of json.tiers ?? []) counts[t.tier] = t.minted;
+        setTierMints(counts);
+        setMintsCounted(json.totalMinted ?? 0);
       }
-      setTierMints(counts);
-      setEnsByAddress(ens);
-      setMintsCounted(mints.length);
+      const lb = await fetch(`/api/tray/leaderboard?pageSize=${MAX_SUPPLY}`, { cache: 'no-store' });
+      if (lb.ok) {
+        const json = await lb.json() as { mints?: { minter?: string; minterEns?: string }[] };
+        const ens: Record<string, string> = {};
+        for (const mint of json.mints ?? []) {
+          if (mint.minter && mint.minterEns) ens[mint.minter.toLowerCase()] = mint.minterEns;
+        }
+        setEnsByAddress(ens);
+      }
     } catch {
       // Non-fatal: the table falls back to showing zero counts.
     }

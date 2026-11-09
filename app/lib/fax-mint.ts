@@ -255,6 +255,15 @@ export interface PinnedFax {
   tokenURI: string | null;
   /** `ar://<txId>` of the self-contained Arweave metadata backup, if stored. */
   arweaveURI: string | null;
+  /** Set when the hop's tier is full — the mint must not proceed. */
+  mintedOut?: { tier: string; message: string };
+}
+
+export type PinMode = 'mint' | 'prefetch' | 'reserve';
+
+/// Thrown by the mint path when the hop's prize tier has no supply left.
+export class TierMintedOutError extends Error {
+  constructor(public tier: string, message: string) { super(message); this.name = 'TierMintedOutError'; }
 }
 
 /// Pins the fax's image + metadata JSON to IPFS via the `/api/tray/[id]/pin`
@@ -262,18 +271,22 @@ export interface PinnedFax {
 /// the `ipfs://<cid>` metadata URI plus the `ar://<txId>` backup pointer.
 /// Either may be null if pinning is unconfigured/unavailable — callers should
 /// treat a null tokenURI as "mint without a per-token URI" rather than an
-/// error, so minting is never blocked by an IPFS outage.
-export async function pinFaxMetadataFull(trayId: string, local: string, ownerWallet: string): Promise<PinnedFax> {
+/// error, so minting is never blocked by an IPFS outage. The one exception is
+/// `mintedOut`: the hop's tier is full and the mint must stop.
+export async function pinFaxMetadataFull(trayId: string, local: string, ownerWallet: string, mode: PinMode = 'mint'): Promise<PinnedFax> {
   try {
     const res = await fetch(`/api/tray/${encodeURIComponent(trayId)}/pin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       // ownerWallet is required: pinning spends Pinata quota and Irys funds, so
       // the route verifies the caller owns `local` before doing any of it.
-      body: JSON.stringify({ local, ownerWallet }),
+      body: JSON.stringify({ local, ownerWallet, mode }),
     });
+    const json = await res.json().catch(() => ({})) as { tokenURI?: string | null; arweaveURI?: string | null; reason?: string; tier?: string; error?: string };
+    if (json.reason === 'tier_minted_out') {
+      return { tokenURI: null, arweaveURI: null, mintedOut: { tier: json.tier || '', message: json.error || 'This tier is minted out.' } };
+    }
     if (!res.ok) return { tokenURI: null, arweaveURI: null };
-    const json = await res.json() as { tokenURI?: string | null; arweaveURI?: string | null };
     return { tokenURI: json.tokenURI || null, arweaveURI: json.arweaveURI || null };
   } catch {
     return { tokenURI: null, arweaveURI: null };
@@ -281,8 +294,8 @@ export async function pinFaxMetadataFull(trayId: string, local: string, ownerWal
 }
 
 /// Back-compat wrapper for callers that only need the IPFS tokenURI.
-export async function pinFaxMetadata(trayId: string, local: string, ownerWallet: string): Promise<string | null> {
-  return (await pinFaxMetadataFull(trayId, local, ownerWallet)).tokenURI;
+export async function pinFaxMetadata(trayId: string, local: string, ownerWallet: string, mode: PinMode = 'mint'): Promise<string | null> {
+  return (await pinFaxMetadataFull(trayId, local, ownerWallet, mode)).tokenURI;
 }
 
 /// ABI-encodes FaxTray.saveFax(address to, string trayId, string tokenURI).

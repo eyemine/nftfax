@@ -182,43 +182,10 @@ export async function getAllMinters(): Promise<string[]> {
 
 // ── Prize tiers ──────────────────────────────────────────────────────────────
 
-/// The 11 prize tiers, shallowest first. One winner is drawn per tier (with one
+/// The 11 prize tiers, their fixed supplies and the depth->tier mapping live in
+/// ./tiers (single source of truth). One winner is drawn per tier (with one
 /// tier randomly left out, giving 10 winners) — see selectTieredWinners.
-export const PRIZE_TIERS = [
-  'Dial Tone', 'Hop 2', 'Hop 3', 'Hop 4', 'Hop 5',
-  'Hop 6', 'Hop 7', 'Hop 8', 'Hop 9', 'Hop 10', 'Dead Letter',
-] as const;
-
-/// Fixed supply per tier. Canonical source: the tier table on /about, which
-/// sums to exactly MAX_SUPPLY (2,222). Rarity increases with chain depth — a
-/// deep hop is hard to reach, so the deepest tiers are the scarcest.
-export const TIER_SUPPLY: Record<string, number> = {
-  'Dial Tone': 1111,
-  'Hop 2': 555,
-  'Hop 3': 246,
-  'Hop 4': 111,
-  'Hop 5': 88,
-  'Hop 6': 44,
-  'Hop 7': 21,
-  'Hop 8': 13,
-  'Hop 9': 12,
-  'Hop 10': 11,
-  'Dead Letter': 10,
-};
-
-/// Maps a fax's raw chainDepth to its prize tier.
-///
-/// The worker counts the initial send as depth 1, and that first send is not a
-/// hop, so the hop count is depth - 1. Kept identical to the derivation in
-/// /api/metadata/[tokenId] so the tier shown here matches the tier minted into
-/// each token's metadata — the draw itself reads that metadata trait.
-export function tierForChainDepth(chainDepth?: number | null): string {
-  if (chainDepth == null) return PRIZE_TIERS[0];
-  const hop = Math.max(0, chainDepth - 1);
-  if (hop < 1) return PRIZE_TIERS[0];
-  if (hop >= PRIZE_TIERS.length) return PRIZE_TIERS[PRIZE_TIERS.length - 1];
-  return PRIZE_TIERS[hop - 1];
-}
+export { PRIZE_TIERS, TIER_SUPPLY, tierForChainDepth } from './tiers';
 
 export interface MintEntry {
   tokenId: number;

@@ -13,6 +13,7 @@ import { minterHandleFor, resolveDisplayTrayId } from '@/app/lib/mint-display';
 import { NextRequest, NextResponse } from 'next/server';
 import { BASE_FAX_COLLECTIBLE } from '../../../lib/contracts';
 import { decodeFaxMintedLog, decodeSourceTokenId, readLogCache } from '../../../lib/fax-stats';
+import { tierForHop } from '@/app/lib/tiers';
 
 const RPC_URL = 'https://mainnet.base.org';
 const FAX_MINTED_TOPIC = '0x20a7befda21edb48bdea9b5c9be274f9329f49476f8e64469506e5629bcb0e5c';
@@ -31,27 +32,9 @@ const MAX_CONCURRENT_CHUNKS = 4;
 
 const COLLECTION_IMAGE = 'https://costumes.mypinata.cloud/ipfs/bafkreihl3q3aqf7njgqdv4swkglcuc633krvpxottun455ttll2zsqn42a';
 
-/// Tier names based on chain depth (hop count), matching the CHAIN_GAME_DESIGN
-/// spec: Dial Tone (1) → Dead Letter (11+). Used for prize draw eligibility.
-const TIERS: { depth: number; name: string }[] = [
-  { depth: 1, name: 'Dial Tone' },
-  { depth: 2, name: 'Hop 2' },
-  { depth: 3, name: 'Hop 3' },
-  { depth: 4, name: 'Hop 4' },
-  { depth: 5, name: 'Hop 5' },
-  { depth: 6, name: 'Hop 6' },
-  { depth: 7, name: 'Hop 7' },
-  { depth: 8, name: 'Hop 8' },
-  { depth: 9, name: 'Hop 9' },
-  { depth: 10, name: 'Hop 10' },
-  { depth: 11, name: 'Dead Letter' },
-];
-
-function tierForDepth(depth: number): string {
-  if (depth < 1) return 'Dial Tone';
-  if (depth >= 11) return 'Dead Letter';
-  return TIERS[depth - 1]?.name ?? 'Dead Letter';
-}
+// Tier names by hop count (Dial Tone = hop 1 → Dead Letter = hop 11+). Used for
+// prize draw eligibility — shared with the pin route via app/lib/tiers.
+const tierForDepth = tierForHop;
 
 const COMMUNITY_NAMES: Record<number, string> = {
   0: 'NONE',

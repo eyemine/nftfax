@@ -15,8 +15,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Send, Coins, Archive, Clock, Lock, LayersArrowDown, X, Upload, Link2, Stamp, Ghost, Sun, ExternalLink, ZoomIn, ZoomOut, RotateCw, RotateCcw, FlipHorizontal, FlipVertical } from 'lucide-react';
 import { compositeChain, prepareImage, CHAIN_OPS, type ChainOp, type OverlayPlacement } from '../lib/image';
 import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAUSED, MINT_RESUME_AT } from '../lib/contracts';
-import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility } from '../lib/fax-mint';
+import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility, TierMintedOutError } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
+import { tierForChainDepth } from '../lib/tiers';
 import { ensureWalletSession } from '../lib/wallet-session-client';
 import { FaxHandleThumb } from './FaxHandleThumb';
 import { FaxHandleOwner } from './FaxHandleOwner';
@@ -171,7 +172,51 @@ function FaxThumb({ id, encrypted, elapsed, jammed, className = 'h-40', override
   );
 }
 
+interface TierStatusEntry { tier: string; supply: number; minted: number; remaining: number; mintedOut: boolean }
+
+/// Live tier supply from /api/tiers (refreshes every minute). Null until
+/// loaded or if the endpoint is unavailable — callers then show nothing and
+/// the server-side pin check remains the enforcement point.
+function useTierStatus(): Record<string, TierStatusEntry> | null {
+  const [tiers, setTiers] = useState<Record<string, TierStatusEntry> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/tiers');
+        if (!res.ok) return;
+        const json = await res.json() as { tiers?: TierStatusEntry[] };
+        if (!cancelled && json.tiers) setTiers(Object.fromEntries(json.tiers.map((t) => [t.tier, t])));
+      } catch { /* non-fatal: the pin route still enforces the cap */ }
+    };
+    void load();
+    const timer = setInterval(load, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, []);
+  return tiers;
+}
+
+/// Tells the player which tier their hop lands in and whether it can still be
+/// minted. A minted-out tier never blocks creating or forwarding — only minting.
+function TierNotice({ tier, status }: { tier: string; status?: TierStatusEntry }) {
+  if (!status) return null;
+  if (status.mintedOut) {
+    return (
+      <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] text-[#a94228]">
+        <p className="font-black uppercase">{tier} is minted out ({status.minted}/{status.supply})</p>
+        <p className="mt-1">You can still add your art and forward it to keep the chain alive, but this hop can&apos;t be minted.</p>
+      </div>
+    );
+  }
+  return (
+    <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-[#5a4d3e]">
+      Your hop: {tier} · {status.remaining} of {status.supply} mints left
+    </p>
+  );
+}
+
 export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxOptions = [], getEthereumProvider }: InTrayProps) {
+  const tierStatus = useTierStatus();
   const [faxes, setFaxes] = useState<InboxFax[]>([]);
   const [sentFaxes, setSentFaxes] = useState<InboxFax[]>([]);
   const [activeTab, setActiveTab] = useState<TabKey>('inbox');
@@ -197,6 +242,13 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
   const [overlayPlacement, setOverlayPlacement] = useState<OverlayPlacement>(DEFAULT_PLACEMENT);
   const [notice, setNotice] = useState('');
   const [selected, setSelected] = useState<InboxFax | null>(null);
+  // The hop a mint would represent: on Sent it's the selected fax itself; on
+  // the In-Tray it's the player's forward of the selected fax, one link deeper.
+  const hopTier = selected
+    ? tierForChainDepth(activeTab === 'sent' ? (selected.chainDepth || 1) : (selected.chainDepth || 1) + 1)
+    : null;
+  const hopTierStatus = hopTier ? tierStatus?.[hopTier] : undefined;
+  const hopMintedOut = !!hopTierStatus?.mintedOut;
   const [relaySuggestions, setRelaySuggestions] = useState<RelaySuggestion[]>([]);
   const [rerouteTo, setRerouteTo] = useState('');
   const [showReroute, setShowReroute] = useState(false);
@@ -368,7 +420,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       // the ownership/provenance trayId argument — see act()'s mint path.
       // Non-fatal: if pinning fails, mint will fall back to baseURI.
       if (data.id) {
-        pinFaxMetadata(data.id, cleanLocal, wallet).then((uri) => {
+        pinFaxMetadata(data.id, cleanLocal, wallet, 'prefetch').then((uri) => {
           if (uri) {
             setSelected((prev) => prev ? { ...prev, pinnedURI: uri } : prev);
           }
@@ -534,13 +586,20 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         // On the Inbox/Saved tab, fax.forwardedTrayId is the forwarded hop.
         const mintTrayId = activeTab === 'sent' ? fax.id : (fax.forwardedTrayId || fax.id);
         let tokenURI = fax.pinnedURI || undefined;
-        if (!tokenURI) {
+        if (tokenURI) {
+          // Already pinned at forward time — still claim the tier slot, since
+          // the tier may have filled up since then.
+          setNotice('Checking tier supply…');
+          const reserved = await pinFaxMetadataFull(mintTrayId, cleanLocal, wallet, 'reserve').catch(() => null);
+          if (reserved?.mintedOut) throw new TierMintedOutError(reserved.mintedOut.tier, reserved.mintedOut.message);
+        } else {
           // Capture the Arweave backup pointer too, so it can be recorded
           // against the mint below — otherwise the ar:// txId is created and
           // then discarded, leaving the backup unreachable.
           setNotice('Pinning fax metadata to IPFS…');
           stage(`pinning ${mintTrayId}`);
           const pinned = await pinFaxMetadataFull(mintTrayId, cleanLocal, wallet).catch(() => null);
+          if (pinned?.mintedOut) throw new TierMintedOutError(pinned.mintedOut.tier, pinned.mintedOut.message);
           tokenURI = pinned?.tokenURI || undefined;
           arweaveUri = pinned?.arweaveURI || undefined;
           stage(`pinned tokenURI=${tokenURI ?? 'none'}`);
@@ -570,7 +629,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         const saveTrayId = activeTab === 'sent' ? fax.id : (fax.forwardedTrayId || fax.id);
         let tokenURI = fax.pinnedURI || undefined;
         if (!tokenURI) {
-          tokenURI = await pinFaxMetadata(saveTrayId, cleanLocal, wallet).catch(() => null) || undefined;
+          tokenURI = await pinFaxMetadata(saveTrayId, cleanLocal, wallet, 'prefetch').catch(() => null) || undefined;
         }
         if (!tokenURI) throw new Error('Could not pin fax metadata for saving.');
 
@@ -1110,6 +1169,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   <div className="mb-5 border-2 border-[#3d6fd6] bg-[#d3ddf2] p-4">
                     <p className="mb-2 text-[12px] font-black uppercase tracking-[.14em] text-[#26417d]">✓ Forwarded — Mint unlocked</p>
                     <p className="mb-3 text-[12px] text-[#26417d]">You've passed the chain on. Mint this fax to Base as a permanent collectible.</p>
+                    {hopTier && <TierNotice tier={hopTier} status={hopTierStatus} />}
                     <a href={`https://nftmail.box/tray/${forwardedTrayId || selected.id}`} target="_blank" rel="noreferrer" className="mb-3 flex items-center gap-1 text-[11px] font-bold uppercase text-[#26417d] underline">
                       <ExternalLink size={11} /> View public fax
                     </a>
@@ -1119,7 +1179,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                         <p className="mt-1 text-[11px] uppercase text-[#6e685a]">Resumes on V2 contract — {MINT_RESUME_AT}</p>
                       </div>
                     ) : (
-                      <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
+                      <button onClick={() => void act(selected, 'mint')} title={hopMintedOut ? `${hopTier} is minted out` : undefined} disabled={hopMintedOut || busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex w-full items-center justify-center gap-2 border border-[#26417d] bg-[#3d6fd6] px-3 py-3 text-[12px] font-black uppercase text-white disabled:opacity-50">
                         {busyId === selected.id ? <Loader2 className="animate-spin" size={14} /> : <Coins size={14} />} Mint to Base
                       </button>
                     )}
@@ -1143,7 +1203,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                   >
                     <Send size={12} className="-scale-x-100" /> Reply
                   </button>
-                  <button onClick={() => void act(selected, 'mint')} disabled={MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40" title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : undefined}>
+                  <button onClick={() => void act(selected, 'mint')} title={MINT_PAUSED ? `Minting resumes ${MINT_RESUME_AT}` : hopMintedOut ? `${hopTier} is minted out` : undefined} disabled={hopMintedOut || MINT_PAUSED || busyId === selected.id || selected.encrypted || !selected.forwarded || !!selected.mintedBase || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> {MINT_PAUSED ? 'Paused' : 'Mint'}
                   </button>
                   <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis || !selected.forwarded} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[11px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
@@ -1208,7 +1268,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 )}
                 {activeTab === 'sent' && !selected.mintedBase && !selected.savedGnosis && !MINT_PAUSED && !selected.encrypted && (selected.sourceTrayId || selected.chainTrayId || selected.recipientForwarded || selected.forwarded) && (
                 <div className="mb-5 grid grid-cols-2 gap-2">
-                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'mint')} title={hopMintedOut ? `${hopTier} is minted out` : undefined} disabled={hopMintedOut || busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
                   </button>
                   <button onClick={() => void act(selected, 'save')} disabled={busyId === selected.id || !!selected.savedGnosis} className="key-shadow flex items-center justify-center gap-1 border border-[#c08a2f] bg-[#f0e4cd] px-2 py-3 text-[11px] font-bold uppercase text-[#7a5a15] disabled:cursor-not-allowed disabled:opacity-40">
@@ -1218,7 +1278,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 )}
                 {activeTab === 'saved' && !selected.mintedBase && !MINT_PAUSED && !selected.encrypted && selected.forwarded && (
                 <div className="mb-5 grid grid-cols-1 gap-2">
-                  <button onClick={() => void act(selected, 'mint')} disabled={busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
+                  <button onClick={() => void act(selected, 'mint')} title={hopMintedOut ? `${hopTier} is minted out` : undefined} disabled={hopMintedOut || busyId === selected.id || (now - selected.createdAt) > (selected.chainTimerDuration || getChainTimerMs(selected.chainDepth || 1, !!selected.sourceMintedBase))} className="key-shadow flex items-center justify-center gap-1 border border-[#3d6fd6] bg-[#d3ddf2] px-2 py-3 text-[11px] font-bold uppercase text-[#26417d] disabled:cursor-not-allowed disabled:opacity-40">
                     <Coins size={12} /> Mint to Base
                   </button>
                 </div>
@@ -1233,6 +1293,8 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
                 {forwardFor === selected.id && (
                   <div className="border-t-2 border-dashed border-[#8f8878] pt-5">
                     <p className="mb-3 text-[13px] font-bold uppercase tracking-[.18em] sm:whitespace-nowrap sm:text-[16px]">Remix and continue the chain</p>
+
+                    {hopTier && <TierNotice tier={hopTier} status={hopTierStatus} />}
 
                     {forwardError && (
                       <div className="mb-3 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold uppercase text-[#a94228]">{forwardError}</div>

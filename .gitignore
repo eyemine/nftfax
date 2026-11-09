@@ -13,3 +13,7 @@ netlify.toml
 # exhibit migration bundle — contains live print/cam keys, never commit
 nftfax-exhibit-migrate.tar.gz
 *.tar.gz
+
+# cryptographics tools data (mirrored IPFS + renders)
+tools/cryptographics/data/
+tools/cryptographics/node_modules/
