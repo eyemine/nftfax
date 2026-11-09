@@ -31,6 +31,7 @@ const CORRECTIONS = {
   1:  { tier: 'Dial Tone', depth: 1 }, // operator declaration: token #1 is hop 1
   8:  { tier: 'Hop 2',     depth: 2 }, // tray b5886bc11c08 repaired d4 -> d3
   22: { tier: 'Hop 5',     depth: 5 }, // tray d01a3a84f6b5 repaired d7 -> d6
+  35: { tier: 'Hop 2',     depth: 2 }, // tray 54be96d37bbd restored d3 — forwarded a decayed reroute-inflated doc
   36: { tier: 'Hop 5',     depth: 5 }, // tray 11e70eb05c1e repaired d7 -> d6
   50: { tier: 'Hop 2',     depth: 2 }, // tray 08c83e9c5947 repaired d4 -> d3
 };
