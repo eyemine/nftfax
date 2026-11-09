@@ -7,6 +7,11 @@ services:
     image: ghcr.io/eyemine/nftfax:latest
     container_name: nftfax-nftfax-1
     environment:
+      # Next standalone binds process.env.HOSTNAME when set — Docker sets it
+      # to the container ID, which on a multi-network container resolves to
+      # the WRONG interface's IP (port 3002 then refuses connections while
+      # the logs claim "Ready"). Pin the listener to all interfaces.
+      - HOSTNAME=0.0.0.0
       - WORKER_SECRET=${WORKER_SECRET}
       - WEBHOOK_SECRET=${WEBHOOK_SECRET}
       - NFTMAIL_WEBHOOK_SECRET=${NFTMAIL_WEBHOOK_SECRET}
