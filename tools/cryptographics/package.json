@@ -1,0 +1,11 @@
+{
+  "name": "cryptographics-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
+    "blockstore-core": "^7.0.1",
+    "ipfs-unixfs-importer": "^17.1.1",
+    "viem": "^2.52.0"
+  }
+}
