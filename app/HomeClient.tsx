@@ -45,6 +45,10 @@ export default function HomeClient() {
   /// under the feeder, and the async roll in flight.
   const [cryptoInfo, setCryptoInfo] = useState<{ seed: string; packs: string[]; drawn: number; missing: number } | null>(null);
   const [generating, setGenerating] = useState(false);
+  /// Live status line shown inside the machine panel while a roll composes —
+  /// asset fetches through the CID proxy take real seconds, so the feeder
+  /// narrates what's happening instead of looking stalled.
+  const [cryptoStage, setCryptoStage] = useState('');
   /// The generated PNG is kept so the player can download the file itself;
   /// object URL is revoked when the roll is replaced or cleared.
   const [cryptoFile, setCryptoFile] = useState<File | null>(null);
@@ -198,14 +202,32 @@ export default function HomeClient() {
   /// Roll a seed -> deterministic pack/pool/pick pipeline -> fetch the blocks
   /// -> composite on the A4 canvas -> feed the existing document pipeline.
   /// Re-rolls are one click; each is a fresh seed, exactly like the original.
+  /// The stage line narrates real phases; pack names in "Looking for …" are
+  /// the actual packs of the assets currently streaming through the proxy.
   async function rollCryptographic() {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     setError('');
     setGenerating(true);
+    setCryptoStage('Reaching back to 2018…');
     try {
       const seed = randomSeed();
       const recipe = composeRecipe(seed);
       if (recipe.picked.length === 0) throw new Error('This roll drew a blank page — roll again.');
-      const { file, drawn, missing } = await renderRecipe(recipe);
+      setCryptoStage('Doing deterministic keccak math…');
+      await sleep(450);
+      setCryptoStage(`Adding seed ${recipe.seed.slice(0, 10)}…`);
+      await sleep(450);
+      let lastPack = '';
+      const { file, drawn, missing } = await renderRecipe(recipe, (done, total) => {
+        const pack = recipe.picked[done - 1]?.pack.name ?? '';
+        if (pack && pack !== lastPack) {
+          lastPack = pack;
+          setCryptoStage(`Looking for ${pack.length > 26 ? pack.slice(0, 26) + '…' : pack}`);
+        } else {
+          setCryptoStage(`Leafing through IPFS · ${done}/${total}`);
+        }
+      });
+      setCryptoStage('Unfolding the document…');
       await selectFile(file);
       setCryptoFile(file);
       setCryptoInfo({ seed: recipe.seed, packs: recipe.packNames, drawn, missing });
@@ -218,6 +240,7 @@ export default function HomeClient() {
       setError(cause instanceof Error ? cause.message : 'Generation failed.');
     } finally {
       setGenerating(false);
+      setCryptoStage('');
     }
   }
 
@@ -569,7 +592,12 @@ export default function HomeClient() {
                     {generating ? 'Composing…' : cryptoInfo ? 'Re-roll' : 'Generate'}
                   </button>
                 </div>
-                {cryptoInfo && (
+                {generating && (
+                  <p className="mt-2 truncate border-t border-[#b5ad9d] pt-2 text-[10px] font-bold uppercase tracking-[.08em] text-[#8a3e1e]">
+                    ▸ {cryptoStage || 'Composing…'}
+                  </p>
+                )}
+                {cryptoInfo && !generating && (
                   <p className="mt-2 break-words border-t border-[#b5ad9d] pt-2 text-[10px] font-bold uppercase leading-relaxed tracking-[.08em] text-[#575244]">
                     seed {cryptoInfo.seed.slice(0, 12)}… · {cryptoInfo.packs.join(' + ')} · {cryptoInfo.drawn} assets{cryptoInfo.missing > 0 ? ` · ${cryptoInfo.missing} lost` : ''}
                   </p>
