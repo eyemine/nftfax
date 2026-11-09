@@ -237,9 +237,14 @@ export async function POST(req: NextRequest) {
       chainTimerDuration,
       ownerWallet,
     };
-    // Pass through cover note (sanitized + capped in the worker).
+    // Pass through cover note (sanitized + capped in the worker). Verified
+    // POW cryptoFax senders get an extended budget — the welcome agent's
+    // onboarding message plus provenance specs don't fit in 140. The flag
+    // is only honoured after session + NFT ownership checks above, so the
+    // extension can't be claimed by an unverified wallet.
     if (body.coverNote) {
-      trayPayload.coverNote = body.coverNote.trim().slice(0, 140);
+      trayPayload.coverNote = body.coverNote.trim().slice(0, freeCryptoSend ? 500 : 140);
+      if (freeCryptoSend) trayPayload.coverNoteLong = true;
     }
     if (chainTrayId) {
       trayPayload.chainTrayId = chainTrayId;
