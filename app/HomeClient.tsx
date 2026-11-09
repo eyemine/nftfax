@@ -146,26 +146,50 @@ export default function HomeClient() {
   /// or the session never gets established and the first send has to sign,
   /// summoning MetaMask mid-transmission (the old signInTried bug).
   const signInDone = useRef('');
+  /// Whether the server holds a session for the connected wallet — drives
+  /// the "Sign in to send" affordance. Checked silently (GET), never prompts.
+  const [sessionReady, setSessionReady] = useState(false);
+  /// Set when a send was deferred for a signature — resumes transmit() once
+  /// the signature lands so "Sign in" flows straight through to "send".
+  const resumeSendAfterSignIn = useRef(false);
+  const checkSession = useCallback(async () => {
+    if (!walletAddress) { setSessionReady(false); return; }
+    try {
+      const j = await fetch('/api/auth/session', { cache: 'no-store' }).then((r) => r.json()) as { wallet?: string | null };
+      setSessionReady(j?.wallet === walletAddress.toLowerCase());
+    } catch { /* leave state — transient read failures shouldn't flap the UI */ }
+  }, [walletAddress]);
+  useEffect(() => { void checkSession(); }, [checkSession]);
+
   const trySignIn = useCallback(() => {
     if (!walletAddress || signInDone.current === walletAddress) return;
     void ensureWalletSession(walletAddress, evmWallet ? () => evmWallet.getEthereumProvider() : undefined)
-      .then(() => { signInDone.current = walletAddress; })
+      .then(() => {
+        signInDone.current = walletAddress;
+        setSessionReady(true);
+        if (resumeSendAfterSignIn.current) {
+          resumeSendAfterSignIn.current = false;
+          void transmit();
+        }
+      })
       .catch((cause: unknown) => {
-        // A cancelled prompt is a choice — don't repeat it until the player
-        // actually sends. Anything else retries on the next dep/focus event.
+        // A cancelled prompt is a choice — don't repeat it; the button
+        // labelled "Sign in to send" is the explicit re-prompt.
         if (cause instanceof Error && cause.message.includes('Sign-in was cancelled')) {
           signInDone.current = walletAddress;
         }
       });
   }, [walletAddress, evmWallet]);
   useEffect(trySignIn, [trySignIn]);
-  // Returning from the wallet app (iOS suspends the tab mid-sign) is exactly
-  // when a failed attempt should heal — retry on focus while unsigned.
+  // NEVER prompt a signature without a click — returning from the wallet app
+  // just re-checks the session silently. The previous focus→trySignIn retry
+  // fired personal_sign on tab focus, which read as a random MetaMask
+  // summons mid-session.
   useEffect(() => {
-    const onFocus = () => trySignIn();
+    const onFocus = () => void checkSession();
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [trySignIn]);
+  }, [checkSession]);
 
   /// Handles the player is NOT currently looking at. The mailbox on screen has
   /// its own visible inbox, so badging it too would just be noise.
@@ -284,7 +308,20 @@ export default function HomeClient() {
 
     setStatus('sending');
     try {
-      await ensureWalletSession(walletAddress, evmWallet ? () => evmWallet.getEthereumProvider() : undefined);
+      // Never summon the wallet mid-send: check the session silently. If it
+      // is absent (sign-in dismissed/failed at connect), defer the send and
+      // fire the signature now — this call only happens from the Send click,
+      // so the prompt is gesture-tied, and trySignIn resumes transmit() on
+      // success so "Sign in" flows straight into "sending".
+      const sessionRes = await fetch('/api/auth/session', { cache: 'no-store' })
+        .then((r) => r.json()).catch(() => null) as { wallet?: string | null } | null;
+      if (sessionRes?.wallet !== walletAddress.toLowerCase()) {
+        resumeSendAfterSignIn.current = true;
+        signInDone.current = ''; // allow a fresh attempt even if one ran earlier
+        trySignIn();
+        setStatus('ready');
+        return;
+      }
       const response = await fetch('/api/tray/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -629,7 +666,7 @@ export default function HomeClient() {
             {error && <div className="mb-4 border-l-4 border-[#a94228] bg-[#e2c9bc] p-3 text-[12px] font-bold">FAULT: {error}</div>}
             {trayUrl && <a href={trayUrl} target="_blank" rel="noreferrer" className="mb-4 flex items-center gap-2 border-l-4 border-[#56705a] bg-[#cad8c7] p-3 text-[12px] font-bold underline"><Check size={15} /> Transmission received — open receipt</a>}
 
-            <button onClick={() => isConnected ? void transmit() : connectWallet()} disabled={status === 'sending' || (isConnected && !base64)} className={`key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white transition-opacity ${!isConnected ? 'opacity-40' : 'disabled:cursor-not-allowed disabled:opacity-45'}`}>{status === 'sending' ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />} Transmit NFTfax</button>
+            <button onClick={() => isConnected ? void transmit() : connectWallet()} disabled={status === 'sending' || (isConnected && !base64)} className={`key-shadow flex w-full items-center justify-center gap-2 border border-[#983b21] bg-[#e65b2f] px-5 py-4 text-xs font-black uppercase tracking-[.12em] text-white transition-opacity ${!isConnected ? 'opacity-40' : 'disabled:cursor-not-allowed disabled:opacity-45'}`}>{status === 'sending' ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />} {isConnected && !sessionReady ? 'Sign in to send' : 'Transmit NFTfax'}</button>
             <p className="mt-4 text-center text-[11px] uppercase tracking-[.16em] text-[#625d51]">Basic: earn send credits by forwarding · Pro: unlimited internal · Premium: external + colour</p>
           </div>
         </div>
