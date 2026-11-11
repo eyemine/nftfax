@@ -32,8 +32,14 @@ export async function disconnectWallet(
   try { await wallet?.disconnect?.(); } catch { /* noop — unsupported clients */ }
 
   // End the nftfax wallet session too, so a shared machine (an exhibit kiosk)
-  // cannot keep sending as the last player.
-  try { await fetch('/api/auth/session', { method: 'DELETE' }); } catch { /* offline — cookie expires on its own */ }
+  // cannot keep sending as the last player — cookie and the localStorage
+  // fallback token alike.
+  try {
+    await fetch('/api/auth/session', { method: 'DELETE' });
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('nftfax-session:')) localStorage.removeItem(key);
+    }
+  } catch { /* offline — cookie expires on its own */ }
 
   if (opts.authenticated && opts.logout) {
     try { await opts.logout(); } catch { /* no session to clear */ }

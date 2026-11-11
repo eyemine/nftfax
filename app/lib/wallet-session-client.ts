@@ -18,6 +18,29 @@ type Eip1193Provider = { request: (args: { method: string; params?: unknown[] })
 const PROVIDER_TIMEOUT_MS = 20_000;
 const pending = new Map<string, Promise<void>>();
 
+const TOKEN_KEY = (wallet: string) => `nftfax-session:${wallet}`;
+
+/// The issued session token, kept in localStorage as a fallback for contexts
+/// where the httpOnly cookie doesn't survive (mobile in-app wallet browsers
+/// suspend the tab mid-sign, and some webviews partition cookie storage).
+/// The server accepts "Authorization: Bearer <token>" everywhere it accepts
+/// the cookie, so attaching it makes the session durable on mobile.
+function storedToken(wallet: string): string | null {
+  try { return localStorage.getItem(TOKEN_KEY(wallet)); } catch { return null; }
+}
+
+/// Attach to session-gated fetches alongside credentials; empty object when
+/// nothing is stored. `Authorization` is a Request header, so spread it into
+/// the headers of POST /api/tray/* calls.
+export function sessionHeaders(wallet: string): Record<string, string> {
+  const token = storedToken(wallet.toLowerCase());
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export function clearStoredSession(wallet: string): void {
+  try { localStorage.removeItem(TOKEN_KEY(wallet.toLowerCase())); } catch { /* storage unavailable */ }
+}
+
 async function resolveProvider(getProvider?: () => Promise<Eip1193Provider | undefined>): Promise<Eip1193Provider | undefined> {
   if (getProvider) {
     const provider = await Promise.race([
@@ -30,7 +53,8 @@ async function resolveProvider(getProvider?: () => Promise<Eip1193Provider | und
 }
 
 async function signIn(wallet: string, getProvider?: () => Promise<Eip1193Provider | undefined>): Promise<void> {
-  const current = await fetch('/api/auth/session', { cache: 'no-store' }).then((r) => r.json()).catch(() => null) as { wallet?: string | null } | null;
+  const current = await fetch('/api/auth/session', { cache: 'no-store', headers: sessionHeaders(wallet) })
+    .then((r) => r.json()).catch(() => null) as { wallet?: string | null } | null;
   if (current?.wallet === wallet) return;
 
   const provider = await resolveProvider(getProvider);
@@ -50,9 +74,13 @@ async function signIn(wallet: string, getProvider?: () => Promise<Eip1193Provide
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, signature }),
   });
+  const data = await res.json().catch(() => ({})) as { error?: string; token?: string };
   if (!res.ok) {
-    const data = await res.json().catch(() => ({})) as { error?: string };
+    clearStoredSession(wallet);
     throw new Error(data.error || 'Wallet sign-in failed.');
+  }
+  if (data.token) {
+    try { localStorage.setItem(TOKEN_KEY(wallet), data.token); } catch { /* storage unavailable — cookie still works */ }
   }
 }
 

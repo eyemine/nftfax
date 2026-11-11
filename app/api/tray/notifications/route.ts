@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getChainTimerMs } from '@/app/lib/fax-credits';
 import { verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
+import { requireSessionWallet } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -78,6 +79,10 @@ export async function GET(req: NextRequest) {
   const wallet = (req.nextUrl.searchParams.get('wallet') || '').trim().toLowerCase();
   if (!wallet || !/^0x[a-f0-9]{40}$/.test(wallet)) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers: NO_STORE });
+  }
+  const session = requireSessionWallet(req, wallet);
+  if ('error' in session) {
+    return NextResponse.json({ error: session.error }, { status: session.status, headers: NO_STORE });
   }
 
   // Same-origin self-fetch: force http for the internal hop, matching the

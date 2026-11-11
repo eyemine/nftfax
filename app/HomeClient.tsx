@@ -12,7 +12,7 @@ type View = 'send' | 'tray' | 'delegate' | 'backpack';
 import { prepareImage, type ImageTransform, type Quarter } from './lib/image';
 import { composeRecipe, renderRecipe, randomSeed } from './lib/cryptographic';
 import { disconnectWallet } from './lib/disconnect';
-import { ensureWalletSession } from './lib/wallet-session-client';
+import { ensureWalletSession, sessionHeaders } from './lib/wallet-session-client';
 import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
 import { SkinPanel } from './components/SkinPanel';
 import { DelegatePanel } from './components/DelegatePanel';
@@ -124,7 +124,7 @@ export default function HomeClient() {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch(`/api/tray/notifications?wallet=${encodeURIComponent(walletAddress)}`, { cache: 'no-store' });
+        const res = await fetch(`/api/tray/notifications?wallet=${encodeURIComponent(walletAddress)}`, { cache: 'no-store', headers: sessionHeaders(walletAddress) });
         if (!res.ok) return;
         const json = await res.json() as { handles?: { handle: string; collection: string; actionable: number }[] };
         if (!cancelled) setFaxAlerts(json.handles ?? []);
@@ -155,7 +155,7 @@ export default function HomeClient() {
   const checkSession = useCallback(async () => {
     if (!walletAddress) { setSessionReady(false); return; }
     try {
-      const j = await fetch('/api/auth/session', { cache: 'no-store' }).then((r) => r.json()) as { wallet?: string | null };
+      const j = await fetch('/api/auth/session', { cache: 'no-store', headers: sessionHeaders(walletAddress) }).then((r) => r.json()) as { wallet?: string | null };
       setSessionReady(j?.wallet === walletAddress.toLowerCase());
     } catch { /* leave state — transient read failures shouldn't flap the UI */ }
   }, [walletAddress]);
@@ -177,6 +177,11 @@ export default function HomeClient() {
         // labelled "Sign in to send" is the explicit re-prompt.
         if (cause instanceof Error && cause.message.includes('Sign-in was cancelled')) {
           signInDone.current = walletAddress;
+        } else if (cause instanceof Error && cause.message) {
+          // Show WHY sign-in failed (wrong account, contract-wallet signature
+          // not yet confirmed on-chain, session endpoint down) — otherwise a
+          // rejecting signature reads as an endless MetaMask loop.
+          setError(`Sign-in failed: ${cause.message}`);
         }
       });
   }, [walletAddress, evmWallet]);
@@ -313,7 +318,7 @@ export default function HomeClient() {
       // fire the signature now — this call only happens from the Send click,
       // so the prompt is gesture-tied, and trySignIn resumes transmit() on
       // success so "Sign in" flows straight into "sending".
-      const sessionRes = await fetch('/api/auth/session', { cache: 'no-store' })
+      const sessionRes = await fetch('/api/auth/session', { cache: 'no-store', headers: sessionHeaders(walletAddress) })
         .then((r) => r.json()).catch(() => null) as { wallet?: string | null } | null;
       if (sessionRes?.wallet !== walletAddress.toLowerCase()) {
         resumeSendAfterSignIn.current = true;
@@ -324,7 +329,7 @@ export default function HomeClient() {
       }
       const response = await fetch('/api/tray/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...sessionHeaders(walletAddress) },
         body: JSON.stringify({
           fromLabel: mailbox.trim().toLowerCase().replace(/@nftmail\.box$/, '').replace(/@fax$/, ''),
           fromDomain: 'fax',

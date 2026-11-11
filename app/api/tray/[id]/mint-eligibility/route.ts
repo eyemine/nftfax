@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseFaxIdentity, COMMUNITY_ENUM, encodeCompositeSourceTokenId } from '@/app/lib/fax-mint';
 import { isClaimedOnChain, findMintByTray } from '@/app/lib/mint-verify';
+import { requireSessionWallet } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -30,6 +31,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!local) return NextResponse.json({ error: 'Missing local' }, { status: 400, headers: NO_STORE });
   if (!wallet || !/^0x[a-fA-F0-9]{40}$/.test(wallet)) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers: NO_STORE });
+  }
+
+  const session = requireSessionWallet(req, wallet);
+  if ('error' in session) {
+    return NextResponse.json({ error: session.error }, { status: session.status, headers: NO_STORE });
   }
 
   try {

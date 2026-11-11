@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { transferMintCredit } from '@/app/lib/fax-credits';
 import { verifyMintTx } from '@/app/lib/mint-verify';
+import { requireSessionWallet, sessionForwardHeaders } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -52,6 +53,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers: NO_STORE });
   }
 
+  const session = requireSessionWallet(req, wallet);
+  if ('error' in session) {
+    return NextResponse.json({ error: session.error }, { status: session.status, headers: NO_STORE });
+  }
+
   // Next.js standalone can misreport nextUrl.origin as https:// against its own
   // plain-HTTP internal listener (behind an nginx TLS-terminating proxy), which
   // breaks this same-origin self-fetch with an SSL handshake error. Force http
@@ -61,7 +67,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   try {
     const listRes = await fetch(
       `${internalOrigin}/api/tray/inbox?local=${encodeURIComponent(local)}&wallet=${encodeURIComponent(wallet)}`,
-      { cache: 'no-store' },
+      { cache: 'no-store', headers: sessionForwardHeaders(req) },
     );
     if (!listRes.ok) {
       const err = await listRes.json().catch(() => ({})) as { error?: string };

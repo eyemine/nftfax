@@ -13,7 +13,7 @@
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { createPublicClient, http, recoverMessageAddress, type Hex } from 'viem';
-import { base, mainnet } from 'viem/chains';
+import { base, gnosis, mainnet } from 'viem/chains';
 import type { NextRequest } from 'next/server';
 import { parseSessionMessage } from './wallet-session-message';
 
@@ -72,6 +72,9 @@ export function getSession(req: NextRequest): { wallet: string; expiresAt: numbe
 const clients = [
   createPublicClient({ chain: mainnet, transport: http(process.env.ETH_RPC_URL || undefined) }),
   createPublicClient({ chain: base, transport: http() }),
+  // @fax collections and player Safes live on Gnosis — a Safe's ERC-1271
+  // signature only verifies on the chain the contract sits on.
+  createPublicClient({ chain: gnosis, transport: http(process.env.GNOSIS_RPC_URL || undefined) }),
 ];
 
 /// Checks a signed sign-in message. Plain wallets are checked by recovering
@@ -90,6 +93,11 @@ export async function verifySessionSignature(message: string, signature: string)
   try {
     const recovered = await recoverMessageAddress({ message, signature: signature as Hex });
     if (recovered.toLowerCase() === parsed.wallet) return { wallet: parsed.wallet };
+    // Recovered a DIFFERENT plain wallet: the classic mobile failure is the
+    // wallet app signing with whichever account is active, not the connected
+    // one. Name it so the player knows what to fix instead of re-prompting.
+    console.warn(`[session] signature recovered to ${recovered}, expected ${parsed.wallet}`);
+    return { error: `Signed with ${recovered.slice(0, 6)}…${recovered.slice(-4)}, not the connected wallet — switch to it in your wallet app and try again.` };
   } catch { /* not a plain ECDSA signature — try contract wallets */ }
 
   for (const client of clients) {
@@ -99,7 +107,19 @@ export async function verifySessionSignature(message: string, signature: string)
       }
     } catch { /* try the next chain */ }
   }
+  console.warn(`[session] signature verification failed for ${parsed.wallet} (EOA recovery + ERC-1271 on eth/base/gnosis)`);
   return { error: 'Signature does not match the wallet.' };
+}
+
+/// Authorization header to attach when one of our routes calls another
+/// internally — server-to-server hops don't carry the session cookie, so the
+/// caller's credential (Bearer, or the cookie token re-encoded as Bearer) is
+/// forwarded explicitly.
+export function sessionForwardHeaders(req: NextRequest): Record<string, string> {
+  const bearer = req.headers.get('authorization');
+  if (bearer) return { authorization: bearer };
+  const cookie = req.cookies.get(SESSION_COOKIE)?.value;
+  return cookie ? { authorization: `Bearer ${cookie}` } : {};
 }
 
 /// For routes: the verified wallet, or the response to return instead. A

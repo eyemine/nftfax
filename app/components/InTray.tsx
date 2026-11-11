@@ -18,7 +18,7 @@ import { MINT_CONFIG, SAVE_CONFIG, isPlaceholderAddress, switchToChain, MINT_PAU
 import { buildMintTx, sendMintTx, pinFaxMetadata, pinFaxMetadataFull, encodeSaveFax, parseFaxIdentity, checkMintFundsEligibility, TierMintedOutError } from '../lib/fax-mint';
 import { DEFAULT_JAM_MS, getChainTimerMs, MAX_CREDITS } from '../lib/fax-credits';
 import { tierForChainDepth } from '../lib/tiers';
-import { ensureWalletSession } from '../lib/wallet-session-client';
+import { ensureWalletSession, sessionHeaders } from '../lib/wallet-session-client';
 import { FaxHandleThumb } from './FaxHandleThumb';
 import { FaxHandleOwner } from './FaxHandleOwner';
 
@@ -287,9 +287,9 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     setError('');
     try {
       const [inboxRes, sentRes, creditsRes] = await Promise.all([
-        fetch(`/api/tray/inbox?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store' }),
-        fetch(`/api/tray/sent?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store' }),
-        fetch(`/api/tray/credits?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store' }),
+        fetch(`/api/tray/inbox?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
+        fetch(`/api/tray/sent?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
+        fetch(`/api/tray/credits?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
       ]);
       const inboxData = await inboxRes.json() as { faxes?: InboxFax[]; error?: string };
       if (!inboxRes.ok) throw new Error(inboxData.error || 'Could not load fax-tray');
@@ -403,7 +403,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       await ensureWalletSession(wallet, getEthereumProvider);
       const res = await fetch('/api/tray/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...sessionHeaders(wallet) },
         body: JSON.stringify(payload),
       });
       const data = await res.json() as { error?: string; id?: string };
@@ -473,7 +473,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       await ensureWalletSession(wallet, getEthereumProvider);
       const res = await fetch('/api/tray/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...sessionHeaders(wallet) },
         body: JSON.stringify({
           fromLabel: cleanLocal,
           fromDomain: effectiveDomain,
@@ -636,7 +636,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         // Try gasless relayer first.
         const gaslessRes = await fetch(`/api/tray/${targetId}/save`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...sessionHeaders(wallet) },
           body: JSON.stringify({
             local: cleanLocal,
             domain: effectiveDomain,
@@ -682,7 +682,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
         }
         res = await fetch(`/api/tray/${targetId}/${kind}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...sessionHeaders(wallet) },
           body: JSON.stringify({
             local: cleanLocal,
             domain: effectiveDomain,
@@ -739,7 +739,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     try {
       const res = await fetch(`/api/tray/${fax.id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...sessionHeaders(wallet) },
         body: JSON.stringify({ local: cleanLocal, ownerWallet: wallet }),
       });
       const data = await res.json() as { error?: string };
@@ -773,7 +773,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
       await ensureWalletSession(wallet, getEthereumProvider);
       const res = await fetch(`/api/tray/${fax.id}/reroute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...sessionHeaders(wallet) },
         body: JSON.stringify({
           fromLabel: fax.from || cleanLocal,
           ownerWallet: wallet,

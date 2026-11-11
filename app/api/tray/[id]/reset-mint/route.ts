@@ -5,6 +5,7 @@
 /// reverted/failed on-chain, yet the UI already recorded it as minted.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSessionWallet, sessionForwardHeaders } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
 const WORKER_SECRET = process.env.WORKER_SECRET || '';
@@ -35,13 +36,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Authentication required' }, { status: 401, headers: NO_STORE });
   }
 
+  const session = requireSessionWallet(req, wallet);
+  if ('error' in session) {
+    return NextResponse.json({ error: session.error }, { status: session.status, headers: NO_STORE });
+  }
+
   // Same self-fetch as /api/tray/[id]/mint: use http for the internal hop.
   const internalOrigin = `http://${req.nextUrl.hostname}:${req.nextUrl.port || process.env.PORT || 3000}`;
 
   try {
     const listRes = await fetch(
       `${internalOrigin}/api/tray/inbox?local=${encodeURIComponent(local)}&wallet=${encodeURIComponent(wallet)}`,
-      { cache: 'no-store' },
+      { cache: 'no-store', headers: sessionForwardHeaders(req) },
     );
     if (!listRes.ok) {
       const err = await listRes.json().catch(() => ({})) as { error?: string };

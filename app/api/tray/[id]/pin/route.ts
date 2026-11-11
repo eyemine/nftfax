@@ -23,6 +23,7 @@ import { uploadImageToArweave, uploadJSONToArweave, arweaveTxIdToURI } from '../
 import { parseFaxHandle, verifyFaxHandleOwner } from '@/app/lib/fax-ownership';
 import { tierForHop } from '@/app/lib/tiers';
 import { reserveTierSlot } from '@/app/lib/tier-supply';
+import { requireSessionWallet } from '@/app/lib/wallet-session';
 
 const NO_STORE = { 'Cache-Control': 'no-store' } as const;
 
@@ -162,6 +163,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // the mailbox the pin is attributed to.
   if (!local) {
     return NextResponse.json({ error: 'Missing local' }, { status: 400, headers: NO_STORE });
+  }
+  const session = requireSessionWallet(req, wallet);
+  if ('error' in session) {
+    return NextResponse.json({ error: session.error }, { status: session.status, headers: NO_STORE });
   }
   if (!parseFaxHandle(local)) {
     return NextResponse.json({ error: 'Not a recognised @fax handle.' }, { status: 404, headers: NO_STORE });

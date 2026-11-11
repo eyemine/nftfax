@@ -16,6 +16,7 @@
 
 import { BASE_FAX_COLLECTIBLE, BASE_CHAIN } from './contracts';
 import { resolveMintRecipient } from './mint-recipient';
+import { sessionHeaders } from './wallet-session-client';
 import type { CollectionKey } from './theme';
 
 const MINT_FAX_ON_CHAIN_SELECTOR = '0xcf6c8408'; // mintFaxOnChain(uint256,string)
@@ -210,7 +211,7 @@ export async function buildMintTx({ local, connectedWallet, trayId, rootTrayId, 
     return { to: BASE_FAX_COLLECTIBLE, data: '', value, error: 'Could not determine an NFT collection/token ID from this mailbox to mint against.' };
   }
 
-  const eligibilityRes = await fetch(`/api/tray/${trayId}/mint-eligibility?local=${encodeURIComponent(local)}&wallet=${encodeURIComponent(connectedWallet)}`, { cache: 'no-store' });
+  const eligibilityRes = await fetch(`/api/tray/${trayId}/mint-eligibility?local=${encodeURIComponent(local)}&wallet=${encodeURIComponent(connectedWallet)}`, { cache: 'no-store', headers: sessionHeaders(connectedWallet) });
   if (eligibilityRes.ok) {
     const eligibility = await eligibilityRes.json().catch(() => ({ eligible: true })) as { eligible?: boolean; reason?: string };
     if (!eligibility.eligible) {
@@ -277,7 +278,7 @@ export async function pinFaxMetadataFull(trayId: string, local: string, ownerWal
   try {
     const res = await fetch(`/api/tray/${encodeURIComponent(trayId)}/pin`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...sessionHeaders(ownerWallet) },
       // ownerWallet is required: pinning spends Pinata quota and Irys funds, so
       // the route verifies the caller owns `local` before doing any of it.
       body: JSON.stringify({ local, ownerWallet, mode }),
