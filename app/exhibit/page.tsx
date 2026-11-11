@@ -45,7 +45,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { Cctv, ExternalLink, LampDesk, Maximize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
+import { Cctv, ExternalLink, LampDesk, Maximize2, Minimize2, Minus, Plus, Printer, Send, Wifi, WifiOff, X } from 'lucide-react';
 import { playFaxHandshake, primeFaxAudio, SLIP_GAP_SEC } from '../lib/fax-audio';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { tierForChainDepth } from '../lib/draw';
@@ -555,6 +555,7 @@ export default function ExhibitPage() {
     return () => clearInterval(t);
   }, [camOn, printing, faxingId]);
   const [canFullscreen, setCanFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [featuredTrayId, setFeaturedTrayId] = useState<string>('');
   const [hydrated, setHydrated] = useState(false);
 
@@ -571,6 +572,9 @@ export default function ExhibitPage() {
     setOpts(o);
     setCamOn(o.cam.kind !== 'off');
     setCanFullscreen(typeof document.documentElement.requestFullscreen === 'function');
+    const syncFs = () => setIsFullscreen(!!document.fullscreenElement);
+    syncFs();
+    document.addEventListener('fullscreenchange', syncFs);
     setHydrated(true);
     // Tell the inline diagnostic (layout.tsx) the React bundle is alive.
     document.getElementById('exhibit-diag-hyd')?.replaceChildren('hydrated');
@@ -745,7 +749,7 @@ export default function ExhibitPage() {
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
       if (e.metaKey || e.ctrlKey || e.altKey || outgoing) return;
-      if (e.key === 'f' || e.key === 'F') void document.documentElement.requestFullscreen?.();
+      if (e.key === 'f' || e.key === 'F') void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.());
       if (e.key === 'c' || e.key === 'C') setCamOn((v) => !v);
       if ((e.key === 't' || e.key === 'T') && board?.mints[0] && !featuredFax) firePrint(featured ?? board.mints[0]);
       if (e.key === 'Escape') setPrinting(null);
@@ -1190,8 +1194,12 @@ export default function ExhibitPage() {
           );
         })()}
         {canFullscreen && (
-          <button onClick={() => void document.documentElement.requestFullscreen?.()} title="Fullscreen" className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]">
-            <Maximize2 size={14} />
+          <button
+            onClick={() => void (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.())}
+            title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+            className="border border-[#77705f] bg-[#d8d0bf]/90 p-2 text-[#625e52]"
+          >
+            {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         )}
       </div>

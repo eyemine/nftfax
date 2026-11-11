@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { transferForwardCredit, getChainTimerMs, earnSendCredit, setLastForwarded } from '@/app/lib/fax-credits';
-import { verifyFaxHandleOwner, parseFaxHandle } from '@/app/lib/fax-ownership';
+import { verifyFaxHandleOwner, parseFaxHandle, resolveFaxHandleOwner } from '@/app/lib/fax-ownership';
 import { requireSessionWallet } from '@/app/lib/wallet-session';
 
 const WORKER_URL = process.env.NEXT_PUBLIC_WORKER_URL || 'https://worker.nftmail.box';
@@ -182,6 +182,28 @@ export async function POST(req: NextRequest) {
     const nextHop = isForward ? sourceChainDepth + 1 : 1;
     const chainTimerDuration = getChainTimerMs(nextHop, sourceMintedBase);
     const toLocal = (to || '').split('@')[0].toLowerCase();
+
+    // @fax recipients don't have to be registered: the fax waits in
+    // tray-in:<handle> until the token's holder connects and proves ownership
+    // on-chain (see api/tray/inbox). But the handle must name a real NFT in an
+    // approved collection — parseFaxHandle enforces the prefix allowlist, and
+    // resolveFaxHandleOwner confirms the token is minted — otherwise a typo'd
+    // address would silently swallow the fax into a tray nobody can ever open.
+    if (to.toLowerCase().endsWith('@fax')) {
+      if (!parseFaxHandle(toLocal)) {
+        return NextResponse.json(
+          { error: 'Not a recognised @fax handle (expected e.g. chonk.681, dfz.7837, atom.1999, normie.42).' },
+          { status: 400 },
+        );
+      }
+      const recipient = await resolveFaxHandleOwner(toLocal);
+      if (!recipient) {
+        return NextResponse.json(
+          { error: `Could not verify ${toLocal}@fax on-chain — check the collection prefix and token id, or try again.` },
+          { status: 404 },
+        );
+      }
+    }
 
     // Every relay spends one credit from the sender and, for hops 1-5, credits
     // the recipient. If the sender has no credits, the chain cannot continue.
