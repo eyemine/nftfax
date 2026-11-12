@@ -12,7 +12,7 @@ type View = 'send' | 'tray' | 'delegate' | 'backpack';
 import { prepareImage, type ImageTransform, type Quarter } from './lib/image';
 import { composeRecipe, renderRecipe, randomSeed } from './lib/cryptographic';
 import { disconnectWallet } from './lib/disconnect';
-import { ensureWalletSession, sessionHeaders } from './lib/wallet-session-client';
+import { consumeInterruptedSignIn, ensureWalletSession, isExternalMobileWallet, metamaskBrowserLink, sessionHeaders } from './lib/wallet-session-client';
 import { FAX_THEME, getCollectionTheme, type CollectionKey } from './lib/theme';
 import { SkinPanel } from './components/SkinPanel';
 import { DelegatePanel } from './components/DelegatePanel';
@@ -149,6 +149,11 @@ export default function HomeClient() {
   /// Whether the server holds a session for the connected wallet — drives
   /// the "Sign in to send" affordance. Checked silently (GET), never prompts.
   const [sessionReady, setSessionReady] = useState(false);
+  /// The page was reloaded while a signature was out in the wallet app (mobile
+  /// Chrome discards the tab), so that signature was lost. Shown instead of
+  /// re-prompting automatically.
+  const [signInInterrupted, setSignInInterrupted] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   /// Set when a send was deferred for a signature — resumes transmit() once
   /// the signature lands so "Sign in" flows straight through to "send".
   const resumeSendAfterSignIn = useRef(false);
@@ -163,10 +168,13 @@ export default function HomeClient() {
 
   const trySignIn = useCallback(() => {
     if (!walletAddress || signInDone.current === walletAddress) return;
+    setSigningIn(true);
     void ensureWalletSession(walletAddress, evmWallet ? () => evmWallet.getEthereumProvider() : undefined)
       .then(() => {
         signInDone.current = walletAddress;
         setSessionReady(true);
+        setSignInInterrupted(false);
+        setError('');
         if (resumeSendAfterSignIn.current) {
           resumeSendAfterSignIn.current = false;
           void transmit();
@@ -183,9 +191,27 @@ export default function HomeClient() {
           // rejecting signature reads as an endless MetaMask loop.
           setError(`Sign-in failed: ${cause.message}`);
         }
-      });
+      })
+      .finally(() => setSigningIn(false));
   }, [walletAddress, evmWallet]);
-  useEffect(trySignIn, [trySignIn]);
+  /// Explicit, click-driven sign-in (header button / interrupted notice).
+  const signInNow = useCallback(() => {
+    signInDone.current = '';
+    setError('');
+    trySignIn();
+  }, [trySignIn]);
+  // Connect-time auto sign-in — unless this page load follows a signature
+  // that was lost to a mobile tab reload. Auto-prompting again then is what
+  // looped MetaMask forever; wait for a tap instead.
+  useEffect(() => {
+    if (!walletAddress) return;
+    if (consumeInterruptedSignIn(walletAddress)) {
+      signInDone.current = walletAddress;
+      setSignInInterrupted(true);
+      return;
+    }
+    trySignIn();
+  }, [walletAddress, trySignIn]);
   // NEVER prompt a signature without a click — returning from the wallet app
   // just re-checks the session silently. The previous focus→trySignIn retry
   // fired personal_sign on tab focus, which read as a random MetaMask
@@ -365,6 +391,9 @@ export default function HomeClient() {
           </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
+          {isConnected && walletAddress && !sessionReady && (
+            <button onClick={signInNow} disabled={signingIn} className="key-shadow border border-[#9d3c20] bg-[#e65b2f] px-2 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap text-white disabled:opacity-50">{signingIn ? 'Signing…' : 'Sign in'}</button>
+          )}
           {isConnected && walletAddress ? (
             <button onClick={handleDisconnect} className="key-shadow border border-[#77705f] bg-[#d8d0bf] px-2 sm:px-3 py-1.5 text-[11px] sm:text-[12px] font-bold uppercase whitespace-nowrap hover:bg-[#c0392b] hover:text-white hover:border-[#9d3c20] transition-colors">{walletAddress.slice(0, 6)}…{walletAddress.slice(-4)} · Disconnect</button>
           ) : (
@@ -372,6 +401,16 @@ export default function HomeClient() {
           )}
         </div>
       </header>
+
+      {isConnected && !sessionReady && signInInterrupted && (
+        <div className="mx-auto mb-4 max-w-6xl border-l-4 border-[#e65b2f] bg-[#f5dcc8] p-3 text-[12px] text-[#5a2a14]">
+          <p className="font-black uppercase">Your signature didn&apos;t make it back</p>
+          <p className="mt-1">Your browser reloaded this page while you were in your wallet app, so the sign-in was lost. Tap <strong>Sign in</strong> to try once more{isExternalMobileWallet() ? <> — or, more reliably on a phone, open nftfax.app inside MetaMask&apos;s own browser, where signing never leaves the page:</> : '.'}</p>
+          {isExternalMobileWallet() && (
+            <a href={metamaskBrowserLink()} className="key-shadow mt-2 inline-block border border-[#9d3c20] bg-[#e65b2f] px-3 py-1.5 text-[11px] font-bold uppercase text-white">Open in MetaMask browser</a>
+          )}
+        </div>
+      )}
 
       <div className="mx-auto mb-4 flex max-w-6xl flex-wrap items-center justify-center gap-2 md:grid md:grid-cols-3">
         <div className="flex flex-wrap items-center gap-1.5 md:gap-2 md:justify-self-start">
