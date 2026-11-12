@@ -19,6 +19,7 @@
 /// is retried once before giving up, so a transient upstream blip does not
 /// become a permanently blank tile.
 
+import { ipfsToGatewayUrl } from '@/app/lib/pinata';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface CachedImage { body: Buffer; type: string }
@@ -48,7 +49,7 @@ async function resolve(origin: string, tokenId: number): Promise<{ img?: CachedI
   const meta = await res.json() as { image?: string };
   const m = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(meta.image || '');
   if (m) return { img: { body: Buffer.from(m[2], 'base64'), type: m[1] }, status: 200 };
-  if (meta.image) return { redirect: meta.image, status: 302 };
+  if (meta.image) return { redirect: ipfsToGatewayUrl(meta.image), status: 302 };
   return { status: 404 };
 }
 

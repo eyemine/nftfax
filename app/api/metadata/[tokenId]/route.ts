@@ -10,6 +10,8 @@
 
 import { overrideTrayId } from '@/app/lib/mint-overrides';
 import { minterHandleFor, resolveDisplayTrayId } from '@/app/lib/mint-display';
+import { getTokenURI } from '@/app/lib/draw';
+import { ipfsToGatewayUrl } from '@/app/lib/pinata';
 import { NextRequest, NextResponse } from 'next/server';
 import { BASE_FAX_COLLECTIBLE } from '../../../lib/contracts';
 import { decodeFaxMintedLog, decodeSourceTokenId, readLogCache } from '../../../lib/fax-stats';
@@ -319,6 +321,27 @@ export async function GET(
   if (tokenId > totalMinted) {
     return NextResponse.json({ error: 'Token does not exist' }, { status: 404 });
   }
+
+  // The mint pins the token's metadata to IPFS and records its URI on-chain —
+  // that frozen document is canonical and permanent, while the tray doc it was
+  // minted from is allowed to decay. Serve the pinned metadata verbatim when
+  // tokenURI points at it (ipfs:// or an external http URI). Only when the
+  // token URI resolves back to this endpoint (baseURI+id, i.e. no pin) do we
+  // rebuild metadata from the tray record below.
+  try {
+    const uri = await getTokenURI(tokenId);
+    if (uri && !/data:|\/api\/metadata\//.test(uri)) {
+      const res = await fetch(ipfsToGatewayUrl(uri), { cache: 'force-cache' });
+      if (res.ok) {
+        const pinned = await res.json() as Record<string, unknown>;
+        if (pinned && typeof pinned === 'object' && pinned.image) {
+          return NextResponse.json(pinned, {
+            headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
+          });
+        }
+      }
+    }
+  } catch { /* tokenURI read or pin fetch failed — fall through to the tray rebuild */ }
 
   const rawMintInfo = await findFaxMinted(tokenId);
   // Apply the same post-mint tray corrections the leaderboard uses, so both

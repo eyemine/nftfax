@@ -443,7 +443,7 @@ function MintTile({ m, featured, onPick }: { m: Mint; featured: boolean; onPick:
       {/* Keyed by the DISPLAY tray, not the token: if the resolved hop
           ever changes, the URL changes with it, so neither the browser,
           Cloudflare nor next/image can pin a stale image for a day. */}
-      <Image src={`/api/tray/${m.displayTrayId || m.trayId}/image${m.imageVersion ? `?v=${m.imageVersion}` : ''}`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
+      <Image src={`/api/metadata/${m.tokenId}/image${m.imageVersion ? `?v=${m.imageVersion}` : ''}`} alt="" fill sizes="(min-width: 1280px) 220px, 160px" className="object-cover opacity-95" loading="lazy" />
       <span className="absolute bottom-0 left-0 right-0 truncate bg-[#25251f]/85 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[.08em] text-[#efe8d8] xl:text-[10px]">
         #{m.tokenId} · hop {hopsOf(m)}
       </span>
