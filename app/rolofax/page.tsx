@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { usePrivy, useActiveWallet, useConnectWallet } from '@privy-io/react-auth';
+import { usePrivy, useActiveWallet, useConnectWallet, getAccessToken } from '@privy-io/react-auth';
 import { LayersArrowDown, Radar, Loader2, Check, Users, AlertCircle, X, Send, LampDesk, Backpack as BackpackIcon, UserCheck } from 'lucide-react';
 import { OdometerCounter } from '../components/OdometerCounter';
 import { FaxHandleThumb } from '../components/FaxHandleThumb';
@@ -132,7 +132,7 @@ const COLLECTION_LOGOS: Record<string, { src: string; scale: number; w: number; 
 };
 
 export default function PreRegisterPage() {
-  const { ready, authenticated, logout } = usePrivy();
+  const { ready, authenticated, login, logout } = usePrivy();
   const { connectWallet } = useConnectWallet();
   const activeWallet = useActiveWallet().wallet;
   const [collection, setCollection] = useState<CollectionKey>('chonk');
@@ -243,9 +243,25 @@ export default function PreRegisterPage() {
     }
 
     try {
+      // Registration is proxied to nftmail.box, which verifies a Privy
+      // access token — same Privy app, so the connected wallet's session is
+      // proof enough (no extra signature). Without a session, log in first.
+      if (!authenticated) {
+        setError('Sign in to register — proving your wallet to the directory.');
+        await login();
+        setStatus('idle');
+        return;
+      }
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        setError('Sign in to register — proving your wallet to the directory.');
+        await login();
+        setStatus('idle');
+        return;
+      }
       const res = await fetch('/api/telegraph/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}`, 'X-Auth-Kind': 'privy' },
         body: JSON.stringify({
           handle: h,
           wallet: walletAddress,
@@ -278,9 +294,15 @@ export default function PreRegisterPage() {
       return;
     }
     try {
+      const removeToken = await getAccessToken();
+      if (!authenticated || !removeToken) {
+        setError('Sign in to remove entries.');
+        await login();
+        return;
+      }
       const res = await fetch('/api/telegraph/remove', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${removeToken}`, 'X-Auth-Kind': 'privy' },
         body: JSON.stringify({
           handle: entry.handle,
           wallet: entry.wallet,
