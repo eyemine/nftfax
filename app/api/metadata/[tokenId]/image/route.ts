@@ -49,7 +49,21 @@ async function resolve(origin: string, tokenId: number): Promise<{ img?: CachedI
   const meta = await res.json() as { image?: string };
   const m = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(meta.image || '');
   if (m) return { img: { body: Buffer.from(m[2], 'base64'), type: m[1] }, status: 200 };
-  if (meta.image) return { redirect: ipfsToGatewayUrl(meta.image), status: 302 };
+  if (meta.image) {
+    // Fetch the artwork server-side rather than redirecting: the next/image
+    // optimizer will not follow a 302 to an external host, so every minted
+    // tile whose image is an ipfs:// or gateway URL rendered broken.
+    try {
+      const imgRes = await fetch(ipfsToGatewayUrl(meta.image), { cache: 'force-cache' });
+      const type = imgRes.headers.get('content-type') || '';
+      if (imgRes.ok && type.startsWith('image/')) {
+        return { img: { body: Buffer.from(await imgRes.arrayBuffer()), type }, status: 200 };
+      }
+      return { status: 502 };
+    } catch {
+      return { status: 503 };
+    }
+  }
   return { status: 404 };
 }
 
