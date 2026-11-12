@@ -58,19 +58,25 @@ export default function HomeClient() {
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState('');
   const [trayUrl, setTrayUrl] = useState('');
-  const [view, setView] = useState<View>('send');
+  const [view, setView] = useState<View>('tray');
   const [collection, setCollection] = useState<CollectionKey | ''>('');
   const collectionTheme = useMemo(() => getCollectionTheme(collection || FAX_THEME.key), [collection]);
   const walletAddress = activeWallet?.address?.toLowerCase() || '';
   const isConnected = authenticated || !!walletAddress;
   const [rolofaxEntries, setRolofaxEntries] = useState<{ handle: string; wallet: string; collection: string }[]>([]);
   const [allRolofaxEntries, setAllRolofaxEntries] = useState<{ handle: string; wallet: string; collection: string }[]>([]);
-  const [showSplash, setShowSplash] = useState(!searchParams.get('to') && !searchParams.get('view'));
+  const [showSplash, setShowSplash] = useState(false);
   // Backpack and Delegate are reached from the Rolofax / Fax Chain Log pages via ?view=.
   useEffect(() => {
     const v = searchParams.get('view');
     if (v === 'backpack' || v === 'delegate') { setView(v); setShowSplash(false); }
+    else if (v === 'send' || v === 'tray') { setView(v); setShowSplash(false); }
   }, [searchParams]);
+  // Landing on the Tray should open mail, not an empty dropdown — pick the
+  // player's first Rolofax handle (they can switch away from it after).
+  useEffect(() => {
+    if (!mailbox && rolofaxEntries.length > 0) setMailbox(rolofaxEntries[0].handle);
+  }, [mailbox, rolofaxEntries]);
   /// Actionable (unforwarded, not-yet-jammed) fax counts per owned @fax handle.
   /// Identities are per-NFT, so a fax often lands on a handle the player is not
   /// looking at and silently jams — these drive the Fax-Tray badge.
@@ -383,12 +389,12 @@ export default function HomeClient() {
     <main className="min-h-screen px-4 py-6 md:px-8 md:py-10">
       <header className="mx-auto mb-5 flex max-w-6xl items-center justify-between border-b border-[#575244] pb-4">
         <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <button onClick={() => setShowSplash(true)} title="NFTFAX — the landing page" className="flex items-center gap-2 text-left sm:gap-3">
             <LayersArrowDown size={28} className="text-[#1a1a14]" />
             <div>
               <h1 className="text-lg sm:text-2xl font-black tracking-[-0.06em] sm:tracking-[-0.08em] leading-[0.95]"><span className="font-['Courier_New',_monospace] text-[#1a1a14] font-black sm:font-bold [-webkit-text-stroke:0.6px_#1a1a14] sm:[-webkit-text-stroke:0.2px_#1a1a14]">{showSplash && collection ? collectionTheme.siteName : 'NFTFAX'}</span><span style={{ color: collectionTheme.accent }}>™</span></h1>
             </div>
-          </div>
+          </button>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           {isConnected && walletAddress && !sessionReady && (
@@ -497,7 +503,7 @@ export default function HomeClient() {
                 <Radar size={19} /> Join the Rolofax directory
               </Link>
               <button
-                onClick={() => setShowSplash(false)}
+                onClick={() => { setShowSplash(false); setView('tray'); }}
                 className="mt-4 text-[11px] font-bold uppercase tracking-[.16em] text-[#625e52] underline hover:text-[#454138]"
               >
                 Enter the office →
