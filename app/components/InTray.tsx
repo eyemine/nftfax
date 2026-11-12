@@ -285,12 +285,20 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     if (!cleanLocal || !wallet) return;
     setLoading(true);
     setError('');
+    const authedFetch = () => Promise.all([
+      fetch(`/api/tray/inbox?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
+      fetch(`/api/tray/sent?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
+      fetch(`/api/tray/credits?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
+    ]);
     try {
-      const [inboxRes, sentRes, creditsRes] = await Promise.all([
-        fetch(`/api/tray/inbox?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
-        fetch(`/api/tray/sent?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
-        fetch(`/api/tray/credits?local=${encodeURIComponent(cleanLocal)}&wallet=${encodeURIComponent(wallet)}&domain=${encodeURIComponent(effectiveDomain)}`, { cache: 'no-store', headers: sessionHeaders(wallet) }),
-      ]);
+      let [inboxRes, sentRes, creditsRes] = await authedFetch();
+      if (inboxRes.status === 401) {
+        // Mount-time load can race the connect-time sign-in (joins the
+        // in-flight attempt, no extra prompt) — or the session simply isn't
+        // there yet on mobile. Establish it, then retry once.
+        await ensureWalletSession(wallet, getEthereumProvider);
+        [inboxRes, sentRes, creditsRes] = await authedFetch();
+      }
       const inboxData = await inboxRes.json() as { faxes?: InboxFax[]; error?: string };
       if (!inboxRes.ok) throw new Error(inboxData.error || 'Could not load fax-tray');
       setFaxes(inboxData.faxes || []);
@@ -307,7 +315,7 @@ export default function InTray({ local, wallet, domain = 'nftmail.box', rolofaxO
     } finally {
       setLoading(false);
     }
-  }, [cleanLocal, wallet, effectiveDomain]);
+  }, [cleanLocal, wallet, effectiveDomain, getEthereumProvider]);
 
   useEffect(() => { void load(); }, [load]);
 
